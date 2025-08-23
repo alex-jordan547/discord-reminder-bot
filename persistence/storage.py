@@ -7,7 +7,7 @@ It provides functions to persist the application state across restarts.
 
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from models.reminder import MatchReminder
 
@@ -53,11 +53,21 @@ def load_matches() -> Dict[int, MatchReminder]:
     """
     Load watched matches from the JSON save file.
     
+    This function now includes automatic migration for older data formats.
+    
     Returns:
         Dict[int, MatchReminder]: Dictionary mapping message IDs to MatchReminder instances
         Returns empty dict if file doesn't exist or loading fails
     """
     try:
+        # Check if migration is needed and run it
+        from utils.migration import check_migration_needed, run_migration
+        
+        if check_migration_needed():
+            logger.info("Data migration needed - running migration...")
+            if not run_migration():
+                logger.error("Migration failed - proceeding with original data")
+        
         with open(SAVE_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
@@ -81,7 +91,7 @@ def load_matches() -> Dict[int, MatchReminder]:
         return {}
 
 
-def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: str = None) -> bool:
+def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Optional[str] = None) -> bool:
     """
     Create a backup of the current matches data.
     

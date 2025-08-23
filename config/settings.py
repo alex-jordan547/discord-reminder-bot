@@ -7,7 +7,7 @@ a clean interface for configuration management.
 
 import os
 import logging
-from typing import List
+from typing import List, Optional
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class Settings:
     """
     
     # Discord Bot Configuration
-    TOKEN: str = os.getenv('DISCORD_TOKEN')
+    TOKEN: Optional[str] = os.getenv('DISCORD_TOKEN')
     COMMAND_PREFIX: str = '!'
     
     # Reminder Configuration
@@ -40,11 +40,57 @@ class Settings:
     MAX_MENTIONS_PER_REMINDER: int = 50
     MAX_TITLE_LENGTH: int = 100
     
+    # Slash Command Configuration
+    DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new matches
+    MIN_INTERVAL_MINUTES: int = 5       # Minimum allowed interval
+    MAX_INTERVAL_MINUTES: int = 1440    # Maximum allowed interval (24 hours)
+    
+    # Suggested interval options for slash command choices
+    INTERVAL_CHOICES: List[int] = [5, 15, 30, 60, 120, 360, 720, 1440]
+    
     # Timing Configuration
     REMINDER_DELAY_SECONDS: int = 2  # Delay between multiple reminder messages
     
     # File Configuration
     MATCHES_SAVE_FILE: str = 'watched_matches.json'
+    
+    @classmethod
+    def validate_interval_minutes(cls, interval_minutes: int) -> int:
+        """
+        Validate and clamp an interval value to acceptable range.
+        
+        Args:
+            interval_minutes: The interval to validate
+            
+        Returns:
+            int: The clamped interval value
+        """
+        return max(cls.MIN_INTERVAL_MINUTES, min(cls.MAX_INTERVAL_MINUTES, interval_minutes))
+    
+    @classmethod
+    def format_interval_display(cls, minutes: int) -> str:
+        """
+        Format an interval in minutes for user-friendly display.
+        
+        Args:
+            minutes: Interval in minutes
+            
+        Returns:
+            str: Formatted interval string
+        """
+        if minutes < 60:
+            return f"{minutes} minute(s)"
+        elif minutes == 60:
+            return "1 heure"
+        elif minutes < 1440:
+            hours = minutes // 60
+            remaining_minutes = minutes % 60
+            if remaining_minutes == 0:
+                return f"{hours} heure(s)"
+            else:
+                return f"{hours}h{remaining_minutes}m"
+        else:
+            return f"{minutes // 60} heure(s)"
     
     @classmethod
     def get_reminder_interval_minutes(cls) -> int:
@@ -149,6 +195,17 @@ class Messages:
     MATCH_REMOVED = "✅ Match **{}** retiré de la surveillance."
     REMINDER_SENT = "✅ Rappel envoyé! {} personne(s) notifiée(s) au total."
     CHANNEL_CREATED = "✅ Canal #{} créé sur le serveur {}"
+    INTERVAL_UPDATED = "✅ Intervalle mis à jour : {} pour le match **{}**"
+    MATCH_PAUSED = "⏸️ Match **{}** mis en pause."
+    MATCH_RESUMED = "▶️ Match **{}** repris."
+    
+    # Slash command responses
+    SLASH_WATCH_SUCCESS = "Match ajouté avec succès!"
+    SLASH_UNWATCH_SUCCESS = "Match retiré de la surveillance."
+    SLASH_REMIND_SUCCESS = "Rappel envoyé!"
+    SLASH_INTERVAL_SUCCESS = "Intervalle mis à jour."
+    SLASH_PAUSE_SUCCESS = "Rappels mis en pause."
+    SLASH_RESUME_SUCCESS = "Rappels repris."
     
     # Info messages
     NO_SAVE_FILE = "ℹ️ Aucune sauvegarde trouvée, démarrage avec une liste vide"
