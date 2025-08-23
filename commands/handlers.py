@@ -8,7 +8,7 @@ functionality for managing match reminders.
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import discord
 from discord.ext import commands, tasks
@@ -49,6 +49,22 @@ def reschedule_reminders() -> None:
         print("😴 Aucun match à surveiller, mise en veille du système")
 
 
+async def sync_slash_commands_logic(bot: commands.Bot) -> List[discord.app_commands.AppCommand]:
+    """
+    Logique de synchronisation des commandes slash (utilisée par !sync et /sync).
+    
+    Args:
+        bot: Le bot Discord
+        
+    Returns:
+        List[discord.app_commands.AppCommand]: Liste des commandes synchronisées
+        
+    Raises:
+        Exception: Si la synchronisation échoue
+    """
+    return await bot.tree.sync()
+
+
 async def sync_slash_commands(ctx: commands.Context) -> None:
     """
     Synchronise manuellement les commandes slash avec Discord (commande de développement).
@@ -61,7 +77,7 @@ async def sync_slash_commands(ctx: commands.Context) -> None:
         return
     
     try:
-        synced = await ctx.bot.tree.sync()
+        synced = await sync_slash_commands_logic(ctx.bot)
         await ctx.send(f"✅ {len(synced)} commande(s) slash synchronisée(s) avec Discord !")
         logger.info(f"Manual slash command sync: {len(synced)} commands")
     except Exception as e:
@@ -775,11 +791,18 @@ def register_commands(bot: commands.Bot) -> None:
             inline=True
         )
         
+        # Recovery statistics
+        recovery_text = f"**❌ Échecs**: {stats['failed_calls']}\n**🔁 Retries**: {stats['retried_calls']}"
+        if stats.get('recovered_calls', 0) > 0:
+            recovery_text += f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n**📈 Taux de récupération**: {stats.get('recovery_rate_percent', 0):.1f}%"
+        else:
+            # Fallback calculation for backward compatibility
+            recovery_rate = ((stats['retried_calls'] - stats['failed_calls']) / max(stats['retried_calls'], 1) * 100)
+            recovery_text += f"\n**📈 Récupération**: {recovery_rate:.1f}%"
+
         embed.add_field(
             name="🔄 Récupération d'erreurs",
-            value=f"**❌ Échecs**: {stats['failed_calls']}\n"
-                  f"**🔁 Retries**: {stats['retried_calls']}\n"
-                  f"**📈 Récupération**: {((stats['retried_calls'] - stats['failed_calls']) / max(stats['retried_calls'], 1) * 100):.1f}%",
+            value=recovery_text,
             inline=True
         )
         

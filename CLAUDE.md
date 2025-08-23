@@ -89,7 +89,10 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 ├── utils/
 │   ├── logging_config.py    # Configuration des logs
 │   ├── message_parser.py    # Analyse des liens Discord
-│   └── permissions.py       # Gestion des permissions
+│   ├── permissions.py       # Gestion des permissions
+│   └── error_recovery.py    # Système de récupération d'erreurs
+├── tests/
+│   └── test_error_recovery.py # Tests unitaires récupération d'erreurs
 ├── data/                    # Données persistantes
 └── logs/                    # Logs de l'application
 ```

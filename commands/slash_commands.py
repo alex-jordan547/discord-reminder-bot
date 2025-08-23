@@ -18,7 +18,7 @@ from models.reminder import MatchReminder
 from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission
 from utils.message_parser import parse_message_link, extract_message_title
-from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message
+from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
 from config.settings import Settings, Messages
 
 # Get logger for this module
@@ -633,6 +633,121 @@ class SlashCommands(commands.Cog):
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="health", description="Afficher les statistiques de santé et de récupération d'erreurs du bot")
+    async def health(self, interaction: discord.Interaction):
+        """Show bot health and error recovery statistics."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True
+            )
+            return
+
+        stats = retry_stats.get_summary()
+        
+        # Determine embed color based on success rate
+        if stats['success_rate_percent'] >= 95:
+            color = discord.Color.green()
+            status_indicator = "🟢 Excellent"
+        elif stats['success_rate_percent'] >= 80:
+            color = discord.Color.orange()
+            status_indicator = "🟡 Dégradé"
+        else:
+            color = discord.Color.red()
+            status_indicator = "🔴 Critique"
+
+        embed = discord.Embed(
+            title="🏥 État de santé du bot",
+            color=color,
+            timestamp=datetime.now()
+        )
+
+        # Status indicator
+        embed.add_field(
+            name="📊 État général",
+            value=status_indicator,
+            inline=True
+        )
+        
+        # General statistics
+        embed.add_field(
+            name="📞 Statistiques d'appels",
+            value=f"**⏱️ Uptime**: {stats['uptime_hours']:.1f}h\n"
+                  f"**📞 Total appels**: {stats['total_calls']}\n"
+                  f"**✅ Taux de succès**: {stats['success_rate_percent']}%",
+            inline=True
+        )
+        
+        # Recovery statistics
+        recovery_text = f"**❌ Échecs**: {stats['failed_calls']}\n**🔁 Retries**: {stats['retried_calls']}"
+        if stats.get('recovered_calls', 0) > 0:
+            recovery_text += f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n**📈 Taux de récupération**: {stats.get('recovery_rate_percent', 0):.1f}%"
+        else:
+            # Fallback calculation for backward compatibility
+            recovery_rate = ((stats['retried_calls'] - stats['failed_calls']) / max(stats['retried_calls'], 1) * 100)
+            recovery_text += f"\n**📈 Récupération**: {recovery_rate:.1f}%"
+            
+        embed.add_field(
+            name="🔄 Récupération d'erreurs",
+            value=recovery_text,
+            inline=True
+        )
+        
+        # Most common errors if any
+        if stats['most_common_errors']:
+            error_list = "\n".join([f"• **{error}**: {count}" for error, count in stats['most_common_errors']])
+            embed.add_field(
+                name="🐛 Erreurs les plus fréquentes",
+                value=error_list[:1024],  # Limit field length
+                inline=False
+            )
+        
+        # Add footer
+        embed.set_footer(text="Statistiques depuis le dernier redémarrage")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="sync", description="Synchroniser les commandes slash avec Discord (commande de développement)")
+    async def sync(self, interaction: discord.Interaction):
+        """Synchronize slash commands with Discord (development command)."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            # Import the sync function from handlers
+            from commands.handlers import sync_slash_commands_logic
+            
+            # Sync commands
+            synced = await sync_slash_commands_logic(self.bot)
+            
+            embed = discord.Embed(
+                title="✅ Synchronisation réussie",
+                description=f"**{len(synced)}** commande(s) slash synchronisée(s) avec Discord.",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Slash commands synced successfully via /sync command: {len(synced)} commands")
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Erreur de synchronisation",
+                description=f"Erreur lors de la synchronisation: {str(e)}",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.error(f"Failed to sync slash commands via /sync: {e}")
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -9,6 +9,7 @@ et stratégies de récupération adaptatives.
 import asyncio
 import logging
 import random
+import threading
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
@@ -219,49 +220,65 @@ class RetryStats:
     """Collecte des statistiques sur les retries pour monitoring."""
     
     def __init__(self):
+        self._lock = threading.Lock()
         self.total_calls = 0
         self.successful_calls = 0
         self.failed_calls = 0
         self.retried_calls = 0
+        self.recovered_calls = 0  # Pour un calcul précis du taux de récupération
         self.error_counts: Dict[str, int] = {}
         self.last_reset = datetime.now()
     
     def record_call(self, success: bool, error_type: Optional[str] = None, retries: int = 0):
         """Enregistre les statistiques d'un appel."""
-        self.total_calls += 1
-        
-        if success:
-            self.successful_calls += 1
-        else:
-            self.failed_calls += 1
-            if error_type:
-                self.error_counts[error_type] = self.error_counts.get(error_type, 0) + 1
-        
-        if retries > 0:
-            self.retried_calls += 1
+        with self._lock:
+            self.total_calls += 1
+            
+            if success:
+                self.successful_calls += 1
+                if retries > 0:
+                    self.recovered_calls += 1
+            else:
+                self.failed_calls += 1
+                if error_type:
+                    self.error_counts[error_type] = self.error_counts.get(error_type, 0) + 1
+            
+            if retries > 0:
+                self.retried_calls += 1
     
     def get_summary(self) -> Dict[str, Any]:
         """Retourne un résumé des statistiques."""
-        uptime = datetime.now() - self.last_reset
-        success_rate = (self.successful_calls / max(self.total_calls, 1)) * 100
-        
-        return {
-            'uptime_hours': uptime.total_seconds() / 3600,
-            'total_calls': self.total_calls,
-            'successful_calls': self.successful_calls,
-            'success_rate_percent': round(success_rate, 2),
-            'failed_calls': self.failed_calls,
-            'retried_calls': self.retried_calls,
-            'most_common_errors': sorted(
-                self.error_counts.items(), 
-                key=lambda x: x[1], 
-                reverse=True
-            )[:5]
-        }
+        with self._lock:
+            uptime = datetime.now() - self.last_reset
+            success_rate = (self.successful_calls / max(self.total_calls, 1)) * 100
+            recovery_rate = (self.recovered_calls / max(self.retried_calls, 1)) * 100
+            
+            return {
+                'uptime_hours': uptime.total_seconds() / 3600,
+                'total_calls': self.total_calls,
+                'successful_calls': self.successful_calls,
+                'success_rate_percent': round(success_rate, 2),
+                'failed_calls': self.failed_calls,
+                'retried_calls': self.retried_calls,
+                'recovered_calls': self.recovered_calls,
+                'recovery_rate_percent': round(recovery_rate, 2),
+                'most_common_errors': sorted(
+                    self.error_counts.items(), 
+                    key=lambda x: x[1], 
+                    reverse=True
+                )[:5]
+            }
     
     def reset(self):
         """Remet à zéro les statistiques."""
-        self.__init__()
+        with self._lock:
+            self.total_calls = 0
+            self.successful_calls = 0
+            self.failed_calls = 0
+            self.retried_calls = 0
+            self.recovered_calls = 0
+            self.error_counts = {}
+            self.last_reset = datetime.now()
 
 
 # Instance globale pour collecter les statistiques
