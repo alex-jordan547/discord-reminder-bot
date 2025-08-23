@@ -154,16 +154,19 @@ def register_commands(bot: commands.Bot) -> None:
     """
     
     @bot.command(name='watch')
-    async def watch_match(ctx: commands.Context, message_link: str) -> None:
+    async def watch_match(ctx: commands.Context, message_link: str, interval_minutes: int = 60) -> None:
         """
         Add a match message to watch for availability responses.
         
-        Usage: !watch [message_link]
+        Usage: !watch [message_link] [optional_interval_minutes]
         """
         # Check permissions
         if not has_admin_permission(ctx.author):
             await ctx.send(get_permission_error_message())
             return
+        
+        # Validate interval
+        interval_minutes = Settings.validate_interval_minutes(interval_minutes)
         
         # Parse the message link
         link_info = parse_message_link(message_link)
@@ -190,12 +193,13 @@ def register_commands(bot: commands.Bot) -> None:
             if title == "Match sans titre":
                 title = f"Match #{link_info.message_id}"
             
-            # Create the reminder
+            # Create the reminder with interval
             reminder = MatchReminder(
                 link_info.message_id, 
                 link_info.channel_id, 
                 link_info.guild_id, 
                 title,
+                interval_minutes,
                 Settings.DEFAULT_REACTIONS
             )
             
@@ -221,12 +225,13 @@ def register_commands(bot: commands.Bot) -> None:
                 timestamp=datetime.now()
             )
             embed.add_field(name="📌 Match", value=title, inline=False)
+            embed.add_field(name="⏰ Intervalle", value=Settings.format_interval_display(interval_minutes), inline=True)
             embed.add_field(name="✅ Ont répondu", value=str(reminder.get_response_count()), inline=True)
             embed.add_field(name="❌ Manquants", value=str(reminder.get_missing_count()), inline=True)
             embed.add_field(name="👥 Total", value=str(reminder.get_total_users_count()), inline=True)
             
             await ctx.send(embed=embed)
-            logger.info(f"Added match {link_info.message_id} to watch list on guild {ctx.guild.id}")
+            logger.info(f"Added match {link_info.message_id} to watch list on guild {ctx.guild.id} with {interval_minutes}min interval")
             
         except discord.NotFound:
             await ctx.send(Messages.MESSAGE_NOT_FOUND)
@@ -288,7 +293,7 @@ def register_commands(bot: commands.Bot) -> None:
         await ctx.send(embed=embed)
 
     @bot.command(name='remind')
-    async def manual_remind(ctx: commands.Context, message_id: int = None) -> None:
+    async def manual_remind(ctx: commands.Context, message_id: Optional[int] = None) -> None:
         """
         Send a manual reminder for a specific match or all matches on the server.
         
@@ -450,18 +455,17 @@ def register_commands(bot: commands.Bot) -> None:
                 save_matches(watched_matches)
                 logger.debug(f"User {user.id} removed all valid reactions from match {message_id}")
 
-    @tasks.loop(minutes=Settings.get_reminder_interval_minutes())
+    @tasks.loop(minutes=5)  # Check every 5 minutes for due reminders
     async def check_reminders() -> None:
-        """Check and send automatic reminders."""
+        """Check and send automatic reminders based on individual match intervals."""
         if not watched_matches:
             return
         
         total_reminded = 0
         
         for reminder in watched_matches.values():
-            # Check if enough time has passed since last reminder
-            time_since_last = datetime.now() - reminder.last_reminder
-            if time_since_last >= timedelta(minutes=Settings.get_reminder_interval_minutes() - 1):
+            # Use the new is_reminder_due method that checks individual intervals
+            if reminder.is_reminder_due():
                 # Find the guild and appropriate channel
                 guild = bot.get_guild(reminder.guild_id)
                 if not guild:
@@ -489,5 +493,13 @@ def register_commands(bot: commands.Bot) -> None:
     # Load matches on startup
     global watched_matches
     watched_matches = load_matches()
+    
+    # Register slash commands
+    from commands.slash_commands import register_slash_commands
+    register_slash_commands(bot)
+    
+    # Share the watched_matches dictionary with slash commands
+    import commands.slash_commands as slash_commands_module
+    slash_commands_module.watched_matches = watched_matches
     
     logger.info(f"Registered all commands and loaded {len(watched_matches)} matches from storage")
