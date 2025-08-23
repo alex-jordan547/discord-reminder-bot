@@ -1,0 +1,33 @@
+# Development dependencies for Discord Reminder Bot
+# These tools are used for code quality, linting, and development workflow
+
+# Code formatting and style
+black==23.12.1                # Code formatter
+isort==5.13.2                 # Import sorting
+
+# Linting and code quality
+flake8==6.1.0                 # Python linting
+flake8-docstrings==1.7.0      # Docstring conventions
+flake8-import-order==0.18.2   # Import order checking
+flake8-bugbear==23.12.2       # Additional bug and design problem detection
+flake8-comprehensions==3.14.0 # List/dict/set comprehension improvements
+mypy==1.7.1                   # Static type checking
+
+# Security scanning
+bandit==1.7.5                 # Security linter
+safety==2.3.5                 # Dependency vulnerability scanner
+
+# Testing (if tests are added in the future)
+pytest==7.4.3                # Testing framework
+pytest-asyncio==0.23.2       # Async testing support
+pytest-cov==4.1.0            # Coverage reporting
+coverage==7.3.2              # Coverage analysis
+
+# Pre-commit hooks
+pre-commit==3.6.0             # Git pre-commit hook framework
+
+# Documentation
+sphinx==7.2.6                # Documentation generator (if needed)
+
+# Development utilities
+python-dotenv==1.0.0          # Environment variable loading (already in main requirements)
