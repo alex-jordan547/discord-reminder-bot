@@ -1,168 +1,107 @@
-# Makefile for Discord Reminder Bot
-# Automates common development tasks
+# Discord Reminder Bot - Makefile
+# Commandes utiles pour le développement et le déploiement
 
-.PHONY: help install install-dev setup format lint type-check security test clean run docker-build docker-run pre-commit
+.PHONY: help build run stop logs clean validate test-docker
+
+# Variables
+IMAGE_NAME=discord-reminder-bot
+CONTAINER_NAME=discord-reminder-bot
+
+help: ## Affiche cette aide
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+validate: ## Valide la structure avant build Docker
+	@echo "🔍 Validation de la structure..."
+	@python3 validate_docker_structure.py
+
+build: validate ## Construit l'image Docker
+	@echo "🔨 Construction de l'image Docker..."
+	docker build -t $(IMAGE_NAME) .
+	@echo "✅ Image construite avec succès!"
+
+run: ## Lance le bot avec docker-compose
+	@echo "🚀 Lancement du bot..."
+	@if [ ! -f .env ]; then \
+		echo "❌ Fichier .env manquant!"; \
+		echo "💡 Copiez .env.example vers .env et configurez vos variables"; \
+		exit 1; \
+	fi
+	docker-compose up -d
+	@echo "✅ Bot démarré en arrière-plan"
+
+stop: ## Arrête le bot
+	@echo "⏹️  Arrêt du bot..."
+	docker-compose down
+	@echo "✅ Bot arrêté"
+
+restart: stop run ## Redémarre le bot
+
+logs: ## Affiche les logs du bot
+	@echo "📝 Logs du bot (Ctrl+C pour quitter):"
+	docker-compose logs -f
+
+logs-tail: ## Affiche les derniers logs
+	@echo "📝 Derniers logs:"
+	docker-compose logs --tail=50
+
+status: ## Affiche le statut du conteneur
+	@echo "📊 Statut du conteneur:"
+	@docker ps -a --filter="name=$(CONTAINER_NAME)" --format="table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+clean: ## Nettoie les conteneurs et images
+	@echo "🧹 Nettoyage..."
+	docker-compose down --volumes --remove-orphans
+	docker rmi $(IMAGE_NAME) 2>/dev/null || true
+	@echo "✅ Nettoyage terminé"
+
+test-docker: build ## Teste l'image Docker localement
+	@echo "🧪 Test de l'image Docker..."
+	@if [ ! -f .env ]; then \
+		echo "❌ Fichier .env manquant pour les tests!"; \
+		echo "💡 Copiez .env.example vers .env et configurez vos variables"; \
+		exit 1; \
+	fi
+	docker run --rm --env-file .env $(IMAGE_NAME) python -c "print('✅ Import test passed'); import bot"
+
+shell: ## Lance un shell dans le conteneur
+	@echo "🐚 Ouverture d'un shell dans le conteneur..."
+	docker run --rm -it --env-file .env -v $(PWD)/data:/app/data $(IMAGE_NAME) /bin/bash
+
+setup: ## Configuration initiale (copie .env.example)
+	@if [ ! -f .env ]; then \
+		echo "📝 Création du fichier .env..."; \
+		cp .env.example .env; \
+		echo "✅ Fichier .env créé!"; \
+		echo "💡 Editez le fichier .env avec vos configurations"; \
+	else \
+		echo "ℹ️  Le fichier .env existe déjà"; \
+	fi
+
+# Commandes Docker directes
+docker-build: ## Build Docker sans validation
+	docker build -t $(IMAGE_NAME) .
+
+docker-run: ## Lance le conteneur directement (sans compose)
+	docker run -d --name $(CONTAINER_NAME) --env-file .env -v $(PWD)/data:/app/data $(IMAGE_NAME)
+
+docker-stop: ## Arrête le conteneur direct
+	docker stop $(CONTAINER_NAME) 2>/dev/null || true
+	docker rm $(CONTAINER_NAME) 2>/dev/null || true
+
+# Commandes de développement
+dev-install: ## Installe les dépendances pour le développement local
+	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
+
+dev-test: ## Lance les tests localement
+	python3 -m pytest tests/ -v
+
+# Maintenance
+backup-data: ## Sauvegarde les données
+	@echo "💾 Sauvegarde des données..."
+	@mkdir -p backups
+	@tar -czf backups/data-backup-$(shell date +%Y%m%d-%H%M%S).tar.gz data/
+	@echo "✅ Sauvegarde créée dans backups/"
 
 # Default target
-help:
-	@echo "Discord Reminder Bot - Development Commands"
-	@echo ""
-	@echo "Setup Commands:"
-	@echo "  install          Install production dependencies"
-	@echo "  install-dev      Install development dependencies"
-	@echo "  setup            Complete development setup (install-dev + pre-commit)"
-	@echo ""
-	@echo "Code Quality Commands:"
-	@echo "  format           Format code with black and isort"
-	@echo "  lint             Run flake8 linting"
-	@echo "  type-check       Run mypy type checking"
-	@echo "  security         Run bandit security checks"
-	@echo "  pre-commit       Run all pre-commit hooks"
-	@echo "  check-all        Run all quality checks (format + lint + type-check + security)"
-	@echo ""
-	@echo "Testing Commands:"
-	@echo "  test             Run tests with pytest"
-	@echo "  test-cov         Run tests with coverage report"
-	@echo ""
-	@echo "Run Commands:"
-	@echo "  run              Run the bot locally"
-	@echo "  docker-build     Build Docker image"
-	@echo "  docker-run       Run bot in Docker container"
-	@echo ""
-	@echo "Utility Commands:"
-	@echo "  clean            Clean up temporary files"
-	@echo "  logs             Show recent bot logs"
-
-# Installation commands
-install:
-	pip install -r requirements.txt
-
-install-dev:
-	pip install -r requirements.txt -r requirements-dev.txt
-
-setup: install-dev
-	pre-commit install
-	@echo "Development environment setup complete!"
-
-# Code quality commands
-format:
-	@echo "Formatting code with black..."
-	black . --line-length=100
-	@echo "Sorting imports with isort..."
-	isort . --profile=black --line-length=100
-	@echo "Code formatting complete!"
-
-lint:
-	@echo "Running flake8 linting..."
-	flake8 .
-
-type-check:
-	@echo "Running mypy type checking..."
-	mypy .
-
-security:
-	@echo "Running bandit security checks..."
-	bandit -r . -c pyproject.toml
-
-pre-commit:
-	@echo "Running pre-commit hooks..."
-	pre-commit run --all-files
-
-check-all: format lint type-check security
-	@echo "All code quality checks completed!"
-
-# Testing commands
-test:
-	@echo "Running tests..."
-	pytest
-
-test-cov:
-	@echo "Running tests with coverage..."
-	pytest --cov=. --cov-report=term-missing --cov-report=html
-
-# Run commands
-run:
-	@echo "Starting Discord Reminder Bot..."
-	python bot.py
-
-docker-build:
-	@echo "Building Docker image..."
-	docker-compose build
-
-docker-run:
-	@echo "Running bot in Docker container..."
-	docker-compose up
-
-docker-run-detached:
-	@echo "Running bot in Docker container (detached)..."
-	docker-compose up -d
-
-docker-stop:
-	@echo "Stopping Docker containers..."
-	docker-compose down
-
-# Utility commands
-clean:
-	@echo "Cleaning up temporary files..."
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
-	find . -name ".coverage" -delete 2>/dev/null || true
-	@echo "Cleanup complete!"
-
-logs:
-	@echo "Recent bot logs (last 50 lines):"
-	@if [ -d "logs" ] && [ -n "$$(ls -A logs/ 2>/dev/null)" ]; then \
-		tail -n 50 logs/bot_*.log 2>/dev/null || echo "No log files found"; \
-	else \
-		echo "No logs directory found. Run the bot first to generate logs."; \
-	fi
-
-# Development workflow helpers
-dev-setup: setup
-	@echo "Creating example environment file..."
-	@if [ ! -f ".env" ]; then \
-		echo "# Discord Bot Configuration" > .env.example; \
-		echo "DISCORD_TOKEN=your_bot_token_here" >> .env.example; \
-		echo "REMINDER_INTERVAL_HOURS=24" >> .env.example; \
-		echo "USE_SEPARATE_REMINDER_CHANNEL=false" >> .env.example; \
-		echo "REMINDER_CHANNEL_NAME=rappels-matchs" >> .env.example; \
-		echo "ADMIN_ROLES=Admin,Moderateur,Coach" >> .env.example; \
-		echo "LOG_LEVEL=INFO" >> .env.example; \
-		echo "LOG_TO_FILE=true" >> .env.example; \
-		echo ""; \
-		echo "Example environment file created: .env.example"; \
-		echo "Copy it to .env and fill in your Discord token."; \
-	fi
-
-# Quick development cycle
-dev: format lint
-	@echo "Development checks passed! Ready to commit."
-
-# Production deployment helpers
-deploy-check: check-all test
-	@echo "Pre-deployment checks completed successfully!"
-
-# Show project status
-status:
-	@echo "Discord Reminder Bot - Project Status"
-	@echo "======================================"
-	@echo ""
-	@echo "Python version: $$(python --version 2>&1)"
-	@echo "Pip version: $$(pip --version 2>&1 | cut -d' ' -f2)"
-	@echo ""
-	@echo "Installed packages:"
-	@pip list --format=columns | head -10
-	@echo "... (showing first 10 packages)"
-	@echo ""
-	@echo "Git status:"
-	@git status --porcelain | head -5 || echo "Not a git repository or no changes"
-	@echo ""
-	@if [ -f "watched_matches.json" ]; then \
-		echo "Watched matches file exists: $$(wc -l < watched_matches.json) lines"; \
-	else \
-		echo "No watched matches file found"; \
-	fi
+.DEFAULT_GOAL := help
