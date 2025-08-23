@@ -12,10 +12,10 @@ from typing import Set, List, Dict, Any, Optional
 class MatchReminder:
     """
     Represents a match being watched for user availability responses.
-    
+
     This class stores all the information needed to track user reactions
     to a Discord message and send automated reminders.
-    
+
     Attributes:
         message_id (int): The Discord message ID being watched
         channel_id (int): The Discord channel ID where the message is located
@@ -29,19 +29,19 @@ class MatchReminder:
         is_paused (bool): Whether reminders are paused for this match
         created_at (datetime): When this match was first added to watch
     """
-    
+
     def __init__(
-        self, 
-        message_id: int, 
-        channel_id: int, 
-        guild_id: int, 
-        title: str, 
+        self,
+        message_id: int,
+        channel_id: int,
+        guild_id: int,
+        title: str,
         interval_minutes: int = 60,
         required_reactions: Optional[List[str]] = None
     ) -> None:
         """
         Initialize a new MatchReminder instance.
-        
+
         Args:
             message_id: The Discord message ID to watch
             channel_id: The Discord channel ID containing the message
@@ -54,7 +54,9 @@ class MatchReminder:
         self.channel_id: int = channel_id
         self.guild_id: int = guild_id
         self.title: str = title
-        self.interval_minutes: int = max(5, min(1440, interval_minutes))  # Clamp between 5 minutes and 24 hours
+        # Use centralized validation that accounts for test mode
+        from config.settings import Settings
+        self.interval_minutes: int = Settings.validate_interval_minutes(interval_minutes)
         self.required_reactions: List[str] = required_reactions or ['✅', '❌', '❓']
         self.last_reminder: datetime = datetime.now()
         self.users_who_reacted: Set[int] = set()
@@ -65,7 +67,7 @@ class MatchReminder:
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the MatchReminder instance to a dictionary for JSON serialization.
-        
+
         Returns:
             Dict containing all instance data in serializable format
         """
@@ -87,10 +89,10 @@ class MatchReminder:
     def from_dict(cls, data: Dict[str, Any]) -> 'MatchReminder':
         """
         Create a MatchReminder instance from a dictionary (JSON deserialization).
-        
+
         Args:
             data: Dictionary containing the serialized MatchReminder data
-            
+
         Returns:
             MatchReminder instance reconstructed from the dictionary
         """
@@ -100,7 +102,7 @@ class MatchReminder:
             # Try to convert from old REMINDER_INTERVAL_HOURS if present
             from config.settings import Settings
             interval_minutes = Settings.get_reminder_interval_minutes()
-        
+
         reminder = cls(
             data['message_id'],
             data['channel_id'],
@@ -115,102 +117,119 @@ class MatchReminder:
         reminder.is_paused = data.get('is_paused', False)
         reminder.created_at = datetime.fromisoformat(data.get('created_at', reminder.last_reminder.isoformat()))
         return reminder
-    
+
     def get_missing_users(self) -> Set[int]:
         """
         Get the set of user IDs who haven't reacted to the match.
-        
+
         Returns:
             Set of user IDs who are in all_users but not in users_who_reacted
         """
         return self.all_users - self.users_who_reacted
-    
+
     def get_response_count(self) -> int:
         """
         Get the number of users who have responded.
-        
+
         Returns:
             Number of users who have reacted
         """
         return len(self.users_who_reacted)
-    
+
     def get_missing_count(self) -> int:
         """
         Get the number of users who haven't responded.
-        
+
         Returns:
             Number of users who haven't reacted
         """
         return len(self.get_missing_users())
-    
+
     def get_total_users_count(self) -> int:
         """
         Get the total number of users being tracked.
-        
+
         Returns:
             Total number of users in the server
         """
         return len(self.all_users)
-    
+
     def get_next_reminder_time(self) -> datetime:
         """
         Calculate when the next reminder should be sent.
-        
+
         Returns:
             datetime: The time when the next reminder should be sent
         """
         return self.last_reminder + timedelta(minutes=self.interval_minutes)
-    
+
     def get_time_until_next_reminder(self) -> timedelta:
         """
         Get the time remaining until the next reminder.
-        
+
         Returns:
             timedelta: Time remaining until next reminder (negative if overdue)
         """
         return self.get_next_reminder_time() - datetime.now()
-    
+
     def is_reminder_due(self) -> bool:
         """
         Check if a reminder is due for this match.
-        
+
         Returns:
             bool: True if a reminder should be sent now
         """
         if self.is_paused:
             return False
-        return datetime.now() >= self.get_next_reminder_time()
-    
+
+        next_reminder_time = self.get_next_reminder_time()
+        current_time = datetime.now()
+        is_due = current_time >= next_reminder_time
+
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        if is_due:
+            time_diff = current_time - next_reminder_time
+            logger.debug(f"Match {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}")
+        else:
+            time_until = next_reminder_time - current_time
+            logger.debug(f"Match {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}")
+
+        return is_due
+
     def pause_reminders(self) -> None:
         """
         Pause reminders for this match.
         """
         self.is_paused = True
-    
+
     def resume_reminders(self) -> None:
         """
         Resume reminders for this match.
         """
         self.is_paused = False
-    
+
     def set_interval(self, interval_minutes: int) -> None:
         """
         Set a new reminder interval for this match.
-        
+        Uses centralized validation that accounts for test mode.
+
         Args:
-            interval_minutes: New interval in minutes (clamped between 5 and 1440)
+            interval_minutes: New interval in minutes (validation depends on mode)
         """
-        self.interval_minutes = max(5, min(1440, interval_minutes))
-    
+        from config.settings import Settings
+        self.interval_minutes = Settings.validate_interval_minutes(interval_minutes)
+
     def get_status_summary(self) -> Dict[str, Any]:
         """
         Get a comprehensive status summary for this match.
-        
+
         Returns:
             Dict containing status information for display
         """
         time_until_next = self.get_time_until_next_reminder()
-        
+
         return {
             'title': self.title,
             'message_id': self.message_id,

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class MessageLinkInfo(NamedTuple):
     """
     Named tuple containing information extracted from a Discord message link.
-    
+
     Attributes:
         guild_id: The Discord guild (server) ID
         channel_id: The Discord channel ID
@@ -39,41 +39,41 @@ MESSAGE_LINK_PATTERN = re.compile(
 def parse_message_link(message_link: str) -> Optional[MessageLinkInfo]:
     """
     Parse a Discord message link to extract guild, channel, and message IDs.
-    
+
     Supports various Discord message link formats:
     - https://discord.com/channels/123456789/987654321/555666777
     - https://discordapp.com/channels/123456789/987654321/555666777
     - discord://channels/123456789/987654321/555666777
-    
+
     Args:
         message_link: Discord message link URL or string containing the link
-        
+
     Returns:
         MessageLinkInfo if parsing successful, None if invalid format
     """
     # Clean the input string
     message_link = message_link.strip()
-    
+
     logger.debug(f"Attempting to parse message link: {message_link}")
-    
+
     match = MESSAGE_LINK_PATTERN.search(message_link)
-    
+
     if not match:
         logger.warning(f"Failed to parse message link: {message_link}")
         return None
-    
+
     try:
         guild_id, channel_id, message_id = map(int, match.groups())
-        
+
         link_info = MessageLinkInfo(
             guild_id=guild_id,
             channel_id=channel_id,
             message_id=message_id
         )
-        
+
         logger.debug(f"Successfully parsed message link: {link_info}")
         return link_info
-        
+
     except ValueError as e:
         logger.error(f"Failed to convert IDs to integers: {e}")
         return None
@@ -82,10 +82,10 @@ def parse_message_link(message_link: str) -> Optional[MessageLinkInfo]:
 def validate_message_link_format(message_link: str) -> bool:
     """
     Validate if a string appears to be a valid Discord message link format.
-    
+
     Args:
         message_link: String to validate
-        
+
     Returns:
         bool: True if format appears valid, False otherwise
     """
@@ -95,12 +95,12 @@ def validate_message_link_format(message_link: str) -> bool:
 def create_message_link(guild_id: int, channel_id: int, message_id: int) -> str:
     """
     Create a Discord message link from guild, channel, and message IDs.
-    
+
     Args:
         guild_id: Discord guild (server) ID
-        channel_id: Discord channel ID  
+        channel_id: Discord channel ID
         message_id: Discord message ID
-        
+
     Returns:
         str: Formatted Discord message link
     """
@@ -110,7 +110,7 @@ def create_message_link(guild_id: int, channel_id: int, message_id: int) -> str:
 def get_parsing_error_message() -> str:
     """
     Get a standardized error message for invalid message link format.
-    
+
     Returns:
         str: User-friendly error message with usage instructions
     """
@@ -123,28 +123,52 @@ def get_parsing_error_message() -> str:
 def extract_message_title(message_content: str, max_length: int = 100) -> str:
     """
     Extract a title from Discord message content.
-    
-    Takes the first line of the message content as the title,
-    truncating if necessary.
-    
+
+    Takes the first meaningful line of the message content as the title,
+    ignoring bot commands and very short content.
+
     Args:
         message_content: The full message content
         max_length: Maximum length for the title (default: 100)
-        
+
     Returns:
         str: Extracted and potentially truncated title
     """
     if not message_content:
         return "Match sans titre"
-    
-    # Take the first line as title
-    first_line = message_content.split('\n')[0].strip()
-    
-    if not first_line:
+
+    # Split into lines and find the first meaningful line
+    lines = [line.strip() for line in message_content.split('\n') if line.strip()]
+
+    if not lines:
         return "Match sans titre"
-    
+
+    # Filter out bot commands and very short messages
+    for line in lines:
+        # Skip bot commands (starting with ! or /) and very short content
+        if not line.startswith(('!', '/', '@')) and len(line) > 5:
+            # Truncate if too long
+            if len(line) > max_length:
+                return line[:max_length - 3] + "..."
+            return line
+
+    # If no meaningful content found, create a better default title
+    first_line = lines[0]
+    if first_line.startswith(('!', '/')):
+        # For commands, create a more user-friendly title
+        command_name = first_line.split()[0] if ' ' in first_line else first_line
+        return f"Match avec commande {command_name}"
+
+    # For mentions or other short content, be more descriptive
+    if first_line.startswith('@'):
+        return "Match avec mentions"
+
+    # Default fallback
+    if len(first_line) <= 5:
+        return "Match de test"
+
     # Truncate if too long
     if len(first_line) > max_length:
         return first_line[:max_length - 3] + "..."
-    
+
     return first_line

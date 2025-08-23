@@ -21,23 +21,23 @@ logger = logging.getLogger(__name__)
 def save_matches(watched_matches: Dict[int, MatchReminder]) -> bool:
     """
     Save the watched matches dictionary to a JSON file.
-    
+
     Args:
         watched_matches: Dictionary mapping message IDs to MatchReminder instances
-        
+
     Returns:
         bool: True if save was successful, False otherwise
     """
     try:
         # Convert MatchReminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
-        
+
         with open(SAVE_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        
+
         logger.debug(f"Successfully saved {len(watched_matches)} matches to {SAVE_FILE}")
         return True
-        
+
     except IOError as e:
         logger.error(f"Failed to save matches to {SAVE_FILE}: {e}")
         return False
@@ -52,9 +52,9 @@ def save_matches(watched_matches: Dict[int, MatchReminder]) -> bool:
 def load_matches() -> Dict[int, MatchReminder]:
     """
     Load watched matches from the JSON save file.
-    
+
     This function now includes automatic migration for older data formats.
-    
+
     Returns:
         Dict[int, MatchReminder]: Dictionary mapping message IDs to MatchReminder instances
         Returns empty dict if file doesn't exist or loading fails
@@ -62,21 +62,21 @@ def load_matches() -> Dict[int, MatchReminder]:
     try:
         # Check if migration is needed and run it
         from utils.migration import check_migration_needed, run_migration
-        
+
         if check_migration_needed():
             logger.info("Data migration needed - running migration...")
             if not run_migration():
                 logger.error("Migration failed - proceeding with original data")
-        
+
         with open(SAVE_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         # Convert dictionaries back to MatchReminder instances
         watched_matches = {int(k): MatchReminder.from_dict(v) for k, v in data.items()}
-        
+
         logger.info(f"Successfully loaded {len(watched_matches)} matches from {SAVE_FILE}")
         return watched_matches
-        
+
     except FileNotFoundError:
         logger.info(f"No save file found at {SAVE_FILE}, starting with empty matches")
         return {}
@@ -94,11 +94,11 @@ def load_matches() -> Dict[int, MatchReminder]:
 def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Optional[str] = None) -> bool:
     """
     Create a backup of the current matches data.
-    
+
     Args:
         watched_matches: Dictionary mapping message IDs to MatchReminder instances
         backup_suffix: Optional suffix for the backup file name
-        
+
     Returns:
         bool: True if backup was successful, False otherwise
     """
@@ -109,16 +109,16 @@ def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Opt
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_file = f"watched_matches_backup_{timestamp}.json"
-        
+
         # Convert MatchReminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
-        
+
         with open(backup_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Successfully created backup: {backup_file}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to create backup: {e}")
         return False

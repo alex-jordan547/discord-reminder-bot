@@ -13,6 +13,10 @@ import sys
 
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from commands.handlers import register_commands
 from config.settings import Settings, Messages
@@ -22,7 +26,7 @@ from utils.logging_config import setup_logging, get_log_level_from_env, should_l
 def create_bot() -> commands.Bot:
     """
     Create and configure the Discord bot instance.
-    
+
     Returns:
         commands.Bot: Configured Discord bot instance
     """
@@ -32,45 +36,53 @@ def create_bot() -> commands.Bot:
     intents.reactions = True
     intents.guilds = True
     intents.members = True
-    
+
     # Create bot instance
     bot = commands.Bot(command_prefix=Settings.COMMAND_PREFIX, intents=intents)
-    
+
     return bot
 
 
-async def on_ready(bot: commands.Bot) -> None:
+async def setup_bot_ready(bot: commands.Bot) -> None:
     """
     Handle bot ready event - called when bot is fully connected and ready.
-    
+
     Args:
         bot: The Discord bot instance
     """
     logger = logging.getLogger(__name__)
-    
+
     logger.info(Messages.BOT_CONNECTED.format(bot.user))
     logger.info(f"Bot is present on {len(bot.guilds)} server(s)")
-    
+
     print(Messages.BOT_CONNECTED.format(bot.user))
     print(f"📊 Présent sur {len(bot.guilds)} serveur(s)")
-    
+
     # Log server information
     for guild in bot.guilds:
         logger.info(f"  - {guild.name} (ID: {guild.id})")
         print(f"  - {guild.name} (ID: {guild.id})")
-    
-    # Start the reminder checking task
-    if hasattr(bot, 'check_reminders'):
-        bot.check_reminders.start()
-        
+
+    # Setup slash commands when bot is ready
+    try:
+        from commands.slash_commands import SlashCommands
+        await bot.add_cog(SlashCommands(bot))
+        logger.info("Slash commands cog registered successfully")
+    except Exception as e:
+        logger.error(f"Failed to register slash commands cog: {e}")
+
+    # Start the dynamic reminder system
+    if hasattr(bot, 'start_dynamic_reminder_system'):
+        await bot.start_dynamic_reminder_system()
+
         # Display reminder interval information
         if Settings.is_test_mode():
-            logger.info(f"Automatic reminders enabled every {Settings.get_reminder_interval_minutes()} minutes (TEST MODE)")
-            print(f"⏰ Rappels automatiques activés toutes les {Settings.get_reminder_interval_minutes()} minutes")
+            logger.info(f"Dynamic reminder system enabled (TEST MODE) - Intervals: 1-10080 min")
+            print(f"⏰ Système de rappels dynamique activé (MODE TEST)")
         else:
-            logger.info(f"Automatic reminders enabled every {Settings.REMINDER_INTERVAL_HOURS} hours")
-            print(f"⏰ Rappels automatiques activés toutes les {Settings.REMINDER_INTERVAL_HOURS} heures")
-    
+            logger.info(f"Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
+            print(f"⏰ Système de rappels dynamique activé")
+
     # Display channel mode information
     if Settings.USE_SEPARATE_REMINDER_CHANNEL:
         logger.info(f"Reminder mode: Separate channel (#{Settings.REMINDER_CHANNEL_NAME})")
@@ -88,36 +100,36 @@ def main() -> None:
     log_level = get_log_level_from_env()
     log_to_file = should_log_to_file()
     setup_logging(log_level=log_level, log_to_file=log_to_file)
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Validate configuration
     if not Settings.validate_required_settings():
         logger.error("Configuration validation failed. Please check your environment variables.")
         print("❌ Configuration invalide! Vérifiez vos variables d'environnement.")
         sys.exit(1)
-    
+
     # Log configuration
     Settings.log_configuration()
-    
+
     # Validate Discord token
     if not Settings.TOKEN:
         logger.error("Discord token is missing! Set the DISCORD_TOKEN environment variable")
         print("❌ Token Discord manquant! Définissez la variable DISCORD_TOKEN")
         print("📖 Guide: https://discord.com/developers/applications")
         sys.exit(1)
-    
+
     # Create bot instance
     bot = create_bot()
-    
+
     # Register event handler
     @bot.event
     async def on_ready():
-        await on_ready(bot)
-    
+        await setup_bot_ready(bot)
+
     # Register all commands and event handlers
     register_commands(bot)
-    
+
     # Start the bot
     try:
         logger.info("Starting Discord Reminder Bot...")
