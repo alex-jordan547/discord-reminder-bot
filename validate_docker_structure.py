@@ -92,7 +92,7 @@ def check_dockerfile_files():
 
 def main():
     """Point d'entrée principal."""
-    print("🚀 Validation de la structure pour Docker\\n")
+    print("🚀 Validation de la structure pour Docker\n")
     
     # Changer vers le répertoire du script
     script_dir = Path(__file__).parent

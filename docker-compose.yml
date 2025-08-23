@@ -32,9 +32,9 @@ services:
       # Logs persistence (optional)
       - ./logs:/app/logs
     
-    # Health check
+    # Health check - verify Discord bot can import core modules and instantiate
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "python", "-c", "import discord; from bot import create_bot; bot = create_bot(); print('Health check passed'); import sys; sys.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 3
