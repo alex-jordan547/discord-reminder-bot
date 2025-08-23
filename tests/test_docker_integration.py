@@ -7,7 +7,6 @@ Tests to validate the Docker environment and container functionality.
 
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 
