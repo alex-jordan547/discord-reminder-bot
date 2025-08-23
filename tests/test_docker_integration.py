@@ -8,9 +8,10 @@ Tests to validate the Docker environment and container functionality.
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 
-def test_docker_build():
+def test_docker_build() -> Optional[bool]:
     """Test that Docker image builds successfully."""
     print("🐳 Testing Docker build...")
     
@@ -33,7 +34,7 @@ def test_docker_build():
         return None
 
 
-def test_docker_structure_validation():
+def test_docker_structure_validation() -> Optional[bool]:
     """Test the validate_docker_structure.py script."""
     print("🔍 Testing Docker structure validation...")
     
@@ -53,14 +54,14 @@ def test_docker_structure_validation():
         return False
 
 
-def test_container_health_check():
+def test_container_health_check() -> Optional[bool]:
     """Test that container health check works (without actually running Discord bot)."""
     print("🏥 Testing container health check...")
     
     try:
         # Test the health check command directly
         result = subprocess.run([
-            'python', '-c', 'import discord; from bot import create_bot; import sys; sys.exit(0)'
+            'python', '-c', 'import discord; from bot import create_bot; bot = create_bot(); print("Health check passed"); import sys; sys.exit(0)'
         ], capture_output=True, text=True, timeout=15)
         
         if result.returncode == 0:
@@ -74,7 +75,7 @@ def test_container_health_check():
         return False
 
 
-def test_required_files():
+def test_required_files() -> bool:
     """Test that all required Docker files exist."""
     print("📁 Testing required Docker files...")
     
@@ -101,7 +102,7 @@ def test_required_files():
         return True
 
 
-def main():
+def main() -> int:
     """Run all Docker integration tests."""
     print("🚀 Running Docker Integration Tests\n")
     

@@ -28,9 +28,9 @@ RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
 USER app
 
-# Health check - verify Discord bot can import core modules
+# Health check - verify Discord bot can import core modules and instantiate
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import discord; from bot import create_bot; import sys; sys.exit(0)"
+    CMD python -c "import discord; from bot import create_bot; bot = create_bot(); print('Health check passed'); import sys; sys.exit(0)"
 
 # Run the bot
 CMD ["python", "-u", "bot.py"]
