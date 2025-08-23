@@ -210,7 +210,10 @@ def with_retry(config_name: str = 'api_call', config: Optional[RetryConfig] = No
                     await asyncio.sleep(delay)
             
             # Toutes les tentatives ont échoué
-            raise last_exception
+            if last_exception:
+                raise last_exception
+            else:
+                raise RuntimeError(f"Function {func_name} failed but no exception was captured")
             
         return wrapper
     return decorator
@@ -297,12 +300,12 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            start_time = datetime.now()
             last_exception = None
             func_name = f"{func.__module__}.{func.__qualname__}"
             
             for attempt in range(config.max_attempts):
                 try:
+                    logger.debug(f"Attempting {func_name} (attempt {attempt + 1}/{config.max_attempts})")
                     result = await func(*args, **kwargs)
                     
                     # Enregistrer les statistiques de succès
@@ -311,6 +314,7 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                         retries=attempt
                     )
                     
+                    # Log successful retry
                     if attempt > 0:
                         logger.info(f"✅ {func_name} succeeded on attempt {attempt + 1}")
                     
@@ -320,7 +324,26 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                     last_exception = e
                     severity = classify_discord_error(e)
                     
-                    if severity == ErrorSeverity.PERMANENT or attempt == config.max_attempts - 1:
+                    # Log l'erreur avec contexte
+                    logger.warning(
+                        f"❌ {func_name} failed on attempt {attempt + 1}/{config.max_attempts}: "
+                        f"{type(e).__name__}: {str(e)} (severity: {severity.value})"
+                    )
+                    
+                    # Ne pas retry les erreurs permanentes
+                    if severity == ErrorSeverity.PERMANENT:
+                        logger.error(f"🚫 Permanent error in {func_name}, not retrying: {str(e)}")
+                        # Enregistrer les statistiques d'échec
+                        retry_stats.record_call(
+                            success=False,
+                            error_type=type(e).__name__,
+                            retries=attempt
+                        )
+                        raise e
+                    
+                    # Si c'est la dernière tentative, lever l'exception
+                    if attempt == config.max_attempts - 1:
+                        logger.error(f"💥 {func_name} failed after {config.max_attempts} attempts")
                         # Enregistrer les statistiques d'échec
                         retry_stats.record_call(
                             success=False,
@@ -329,11 +352,16 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                         )
                         break
                     
-                    if attempt < config.max_attempts - 1:
-                        delay = await calculate_delay(e, attempt, config)
-                        await asyncio.sleep(delay)
+                    # Calculer et attendre le délai avant retry
+                    delay = await calculate_delay(e, attempt, config)
+                    logger.info(f"⏳ Retrying {func_name} in {delay:.1f}s...")
+                    await asyncio.sleep(delay)
             
-            raise last_exception
+            # Toutes les tentatives ont échoué
+            if last_exception:
+                raise last_exception
+            else:
+                raise RuntimeError(f"Function {func_name} failed but no exception was captured")
             
         return wrapper
     return decorator

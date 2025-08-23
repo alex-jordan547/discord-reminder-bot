@@ -18,6 +18,7 @@ from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission, get_permission_error_message
 from utils.message_parser import parse_message_link, get_parsing_error_message, extract_message_title
 from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
+from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
 
 # Get logger for this module
@@ -48,21 +49,6 @@ def reschedule_reminders() -> None:
         logger.debug("No matches to watch, system entering sleep mode")
         print("😴 Aucun match à surveiller, mise en veille du système")
 
-
-async def sync_slash_commands_logic(bot: commands.Bot) -> List[discord.app_commands.AppCommand]:
-    """
-    Logique de synchronisation des commandes slash (utilisée par !sync et /sync).
-    
-    Args:
-        bot: Le bot Discord
-        
-    Returns:
-        List[discord.app_commands.AppCommand]: Liste des commandes synchronisées
-        
-    Raises:
-        Exception: Si la synchronisation échoue
-    """
-    return await bot.tree.sync()
 
 
 async def sync_slash_commands(ctx: commands.Context) -> None:
@@ -774,55 +760,11 @@ def register_commands(bot: commands.Bot) -> None:
             return
         
         stats = retry_stats.get_summary()
+        embed = create_health_embed(stats)
         
-        embed = discord.Embed(
-            title="🏥 État de santé du bot",
-            color=discord.Color.green() if stats['success_rate_percent'] >= 95 else 
-                  discord.Color.orange() if stats['success_rate_percent'] >= 80 else
-                  discord.Color.red(),
-            timestamp=datetime.now()
-        )
-        
-        embed.add_field(
-            name="📊 Statistiques générales",
-            value=f"**⏱️ Uptime**: {stats['uptime_hours']:.1f}h\n"
-                  f"**📞 Total appels**: {stats['total_calls']}\n"
-                  f"**✅ Taux de succès**: {stats['success_rate_percent']}%",
-            inline=True
-        )
-        
-        # Recovery statistics
-        recovery_text = f"**❌ Échecs**: {stats['failed_calls']}\n**🔁 Retries**: {stats['retried_calls']}"
-        if stats.get('recovered_calls', 0) > 0:
-            recovery_text += f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n**📈 Taux de récupération**: {stats.get('recovery_rate_percent', 0):.1f}%"
-        else:
-            # Fallback calculation for backward compatibility
-            recovery_rate = ((stats['retried_calls'] - stats['failed_calls']) / max(stats['retried_calls'], 1) * 100)
-            recovery_text += f"\n**📈 Récupération**: {recovery_rate:.1f}%"
-
-        embed.add_field(
-            name="🔄 Récupération d'erreurs",
-            value=recovery_text,
-            inline=True
-        )
-        
-        if stats['most_common_errors']:
-            error_list = "\n".join([f"• {error}: {count}" for error, count in stats['most_common_errors']])
-            embed.add_field(
-                name="🐛 Erreurs fréquentes",
-                value=error_list[:1024],  # Limiter la longueur
-                inline=False
-            )
-        
-        # Status indicator
-        if stats['success_rate_percent'] >= 95:
-            embed.add_field(name="🟢 État", value="Excellent", inline=True)
-        elif stats['success_rate_percent'] >= 80:
-            embed.add_field(name="🟡 État", value="Dégradé", inline=True)
-        else:
-            embed.add_field(name="🔴 État", value="Critique", inline=True)
-        
+        # Ajouter footer spécifique à la commande prefix
         embed.set_footer(text="Utilisez !health reset pour remettre à zéro les statistiques")
+        
         await ctx.send(embed=embed)
     
     @bot.command(name='sync')
