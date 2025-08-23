@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from typing import Set, List, Dict, Any, Optional
 
 
-class MatchReminder:
+class Reminder:
     """
-    Represents a match being watched for user availability responses.
+    Represents an item being watched for user availability responses.
 
     This class stores all the information needed to track user reactions
     to a Discord message and send automated reminders.
@@ -20,14 +20,14 @@ class MatchReminder:
         message_id (int): The Discord message ID being watched
         channel_id (int): The Discord channel ID where the message is located
         guild_id (int): The Discord guild (server) ID
-        title (str): The title/description of the match
+        title (str): The title/description of the reminder
         required_reactions (List[str]): List of emoji reactions to track
         last_reminder (datetime): When the last reminder was sent
         users_who_reacted (Set[int]): Set of user IDs who have reacted
         all_users (Set[int]): Set of all user IDs in the server (excluding bots)
-        interval_minutes (int): Reminder interval in minutes for this specific match
-        is_paused (bool): Whether reminders are paused for this match
-        created_at (datetime): When this match was first added to watch
+        interval_minutes (int): Reminder interval in minutes for this specific reminder
+        is_paused (bool): Whether reminders are paused for this item
+        created_at (datetime): When this reminder was first added to watch
     """
 
     def __init__(
@@ -40,13 +40,13 @@ class MatchReminder:
         required_reactions: Optional[List[str]] = None
     ) -> None:
         """
-        Initialize a new MatchReminder instance.
+        Initialize a new Reminder instance.
 
         Args:
             message_id: The Discord message ID to watch
             channel_id: The Discord channel ID containing the message
             guild_id: The Discord guild (server) ID
-            title: The title or description of the match
+            title: The title or description of the reminder
             interval_minutes: Reminder interval in minutes (default: 60)
             required_reactions: List of emoji reactions to track (defaults to ['✅', '❌', '❓'])
         """
@@ -66,7 +66,7 @@ class MatchReminder:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert the MatchReminder instance to a dictionary for JSON serialization.
+        Convert the Reminder instance to a dictionary for JSON serialization.
 
         Returns:
             Dict containing all instance data in serializable format
@@ -88,13 +88,13 @@ class MatchReminder:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'MatchReminder':
         """
-        Create a MatchReminder instance from a dictionary (JSON deserialization).
+        Create a Reminder instance from a dictionary (JSON deserialization).
 
         Args:
-            data: Dictionary containing the serialized MatchReminder data
+            data: Dictionary containing the serialized Reminder data
 
         Returns:
-            MatchReminder instance reconstructed from the dictionary
+            Reminder instance reconstructed from the dictionary
         """
         # Handle backward compatibility - convert hours to minutes if needed
         interval_minutes = data.get('interval_minutes')
@@ -120,7 +120,7 @@ class MatchReminder:
 
     def get_missing_users(self) -> Set[int]:
         """
-        Get the set of user IDs who haven't reacted to the match.
+        Get the set of user IDs who haven't reacted to the message.
 
         Returns:
             Set of user IDs who are in all_users but not in users_who_reacted
@@ -174,7 +174,7 @@ class MatchReminder:
 
     def is_reminder_due(self) -> bool:
         """
-        Check if a reminder is due for this match.
+        Check if a reminder is due for this item.
 
         Returns:
             bool: True if a reminder should be sent now
@@ -191,28 +191,28 @@ class MatchReminder:
         logger = logging.getLogger(__name__)
         if is_due:
             time_diff = current_time - next_reminder_time
-            logger.debug(f"Match {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}")
+            logger.debug(f"Reminder {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}")
         else:
             time_until = next_reminder_time - current_time
-            logger.debug(f"Match {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}")
+            logger.debug(f"Reminder {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}")
 
         return is_due
 
     def pause_reminders(self) -> None:
         """
-        Pause reminders for this match.
+        Pause reminders for this item.
         """
         self.is_paused = True
 
     def resume_reminders(self) -> None:
         """
-        Resume reminders for this match.
+        Resume reminders for this item.
         """
         self.is_paused = False
 
     def set_interval(self, interval_minutes: int) -> None:
         """
-        Set a new reminder interval for this match.
+        Set a new reminder interval for this item.
         Uses centralized validation that accounts for test mode.
 
         Args:
@@ -223,7 +223,7 @@ class MatchReminder:
 
     def get_status_summary(self) -> Dict[str, Any]:
         """
-        Get a comprehensive status summary for this match.
+        Get a comprehensive status summary for this reminder.
 
         Returns:
             Dict containing status information for display
@@ -246,3 +246,8 @@ class MatchReminder:
             'is_overdue': time_until_next.total_seconds() < 0,
             'created_at': self.created_at
         }
+
+
+# Alias pour la compatibilité avec le code existant
+# TODO: Supprimer cet alias après la migration complète
+MatchReminder = Reminder

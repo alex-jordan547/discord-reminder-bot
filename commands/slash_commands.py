@@ -280,7 +280,7 @@ class SlashCommands(commands.Cog):
         else:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
 
-    @app_commands.command(name="list", description="Lister tous les matchs surveillés sur ce serveur")
+    @app_commands.command(name="list", description="Lister tous les rappels surveillés sur ce serveur")
     async def list_matches(self, interaction: discord.Interaction):
         """List all watched matches on this server."""
         # Filter matches for this server only
@@ -324,8 +324,8 @@ class SlashCommands(commands.Cog):
         embed.set_footer(text=f"Total: {len(server_matches)} match(s) surveillé(s)")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="remind", description="Envoyer un rappel manuel pour un match spécifique")
-    @app_commands.describe(message="Lien du message pour lequel envoyer un rappel (optionnel: tous les matchs si omis)")
+    @app_commands.command(name="remind", description="Envoyer un rappel manuel pour un élément spécifique")
+    @app_commands.describe(message="Lien du message pour lequel envoyer un rappel (optionnel: tous les rappels si omis)")
     async def remind(self, interaction: discord.Interaction, message: Optional[str] = None):
         """Send a manual reminder for a specific match or all matches."""
         # Check permissions
@@ -389,7 +389,7 @@ class SlashCommands(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="set_interval", description="Modifier l'intervalle d'un match surveillé")
+    @app_commands.command(name="set_interval", description="Modifier l'intervalle d'un rappel surveillé")
     @app_commands.describe(
         message="Lien du message dont modifier l'intervalle",
         interval="Nouvel intervalle en minutes (min: 5, max: 1440)"
@@ -453,7 +453,7 @@ class SlashCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(f"Updated interval for match {message_id} from {old_interval} to {reminder.interval_minutes} minutes")
 
-    @app_commands.command(name="pause", description="Mettre en pause les rappels d'un match")
+    @app_commands.command(name="pause", description="Mettre en pause les rappels d'un élément")
     @app_commands.describe(message="Lien du message dont mettre en pause les rappels")
     async def pause(self, interaction: discord.Interaction, message: str):
         """Pause reminders for a specific match."""
@@ -499,7 +499,7 @@ class SlashCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(f"Paused reminders for match {message_id}")
 
-    @app_commands.command(name="resume", description="Reprendre les rappels d'un match en pause")
+    @app_commands.command(name="resume", description="Reprendre les rappels d'un élément en pause")
     @app_commands.describe(message="Lien du message dont reprendre les rappels")
     async def resume(self, interaction: discord.Interaction, message: str):
         """Resume reminders for a paused match."""
@@ -550,7 +550,7 @@ class SlashCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(f"Resumed reminders for match {message_id}")
 
-    @app_commands.command(name="status", description="Afficher le statut détaillé d'un match")
+    @app_commands.command(name="status", description="Afficher le statut détaillé d'un rappel")
     @app_commands.describe(message="Lien du message dont afficher le statut")
     async def status(self, interaction: discord.Interaction, message: str):
         """Show detailed status for a specific match."""

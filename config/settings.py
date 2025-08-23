@@ -30,7 +30,7 @@ class Settings:
 
     # Channel Configuration
     USE_SEPARATE_REMINDER_CHANNEL: bool = os.getenv('USE_SEPARATE_REMINDER_CHANNEL', 'false').lower() == 'true'
-    REMINDER_CHANNEL_NAME: str = os.getenv('REMINDER_CHANNEL_NAME', 'rappels-matchs')
+    REMINDER_CHANNEL_NAME: str = os.getenv('REMINDER_CHANNEL_NAME', 'rappels')
 
     # Permission Configuration
     ADMIN_ROLES: List[str] = os.getenv('ADMIN_ROLES', 'Admin,Moderateur,Coach').split(',')
@@ -41,7 +41,7 @@ class Settings:
     MAX_TITLE_LENGTH: int = 100
 
     # Slash Command Configuration
-    DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new matches
+    DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new reminders
     MIN_INTERVAL_MINUTES: int = 5       # Minimum allowed interval
     MAX_INTERVAL_MINUTES: int = 1440    # Maximum allowed interval (24 hours)
 
@@ -52,7 +52,7 @@ class Settings:
     REMINDER_DELAY_SECONDS: int = 2  # Delay between multiple reminder messages
 
     # File Configuration
-    MATCHES_SAVE_FILE: str = 'watched_matches.json'
+    REMINDERS_SAVE_FILE: str = 'watched_reminders.json'
 
     @classmethod
     def validate_interval_minutes(cls, interval_minutes: int) -> int:
@@ -170,7 +170,7 @@ class Settings:
         if cls.USE_SEPARATE_REMINDER_CHANNEL:
             logger.info(f"Reminder mode: Separate channel (#{cls.REMINDER_CHANNEL_NAME})")
         else:
-            logger.info("Reminder mode: Same channel as match")
+            logger.info("Reminder mode: Same channel as original message")
 
         # Log admin roles
         logger.info(f"Admin roles: {', '.join(cls.ADMIN_ROLES)}")
@@ -214,23 +214,23 @@ class Messages:
     MESSAGE_NOT_FOUND = "❌ Message introuvable."
     CHANNEL_NOT_FOUND = "❌ Canal introuvable."
     WRONG_SERVER = "❌ Ce message n'est pas sur ce serveur!"
-    MATCH_NOT_WATCHED = "❌ Ce message n'est pas surveillé."
-    MATCH_NOT_ON_SERVER = "❌ Ce match n'est pas sur ce serveur."
-    NO_MATCHES_TO_REMIND = "📭 Aucun match à rappeler sur ce serveur."
-    NO_WATCHED_MATCHES = "📭 Aucun match surveillé sur ce serveur."
+    REMINDER_NOT_WATCHED = "❌ Ce message n'est pas surveillé."
+    REMINDER_NOT_ON_SERVER = "❌ Ce rappel n'est pas sur ce serveur."
+    NO_REMINDERS_TO_REMIND = "📭 Aucun rappel à envoyer sur ce serveur."
+    NO_WATCHED_REMINDERS = "📭 Aucun rappel surveillé sur ce serveur."
 
     # Success messages
-    MATCH_ADDED = "✅ Match ajouté à la surveillance!"
-    MATCH_REMOVED = "✅ Match **{}** retiré de la surveillance."
+    REMINDER_ADDED = "✅ Rappel ajouté à la surveillance!"
+    REMINDER_REMOVED = "✅ Rappel **{}** retiré de la surveillance."
     REMINDER_SENT = "✅ Rappel envoyé! {} personne(s) notifiée(s) au total."
     CHANNEL_CREATED = "✅ Canal #{} créé sur le serveur {}"
-    INTERVAL_UPDATED = "✅ Intervalle mis à jour : {} pour le match **{}**"
-    MATCH_PAUSED = "⏸️ Match **{}** mis en pause."
-    MATCH_RESUMED = "▶️ Match **{}** repris."
+    INTERVAL_UPDATED = "✅ Intervalle mis à jour : {} pour le rappel **{}**"
+    REMINDER_PAUSED = "⏸️ Rappel **{}** mis en pause."
+    REMINDER_RESUMED = "▶️ Rappel **{}** repris."
 
     # Slash command responses
-    SLASH_WATCH_SUCCESS = "Match ajouté avec succès!"
-    SLASH_UNWATCH_SUCCESS = "Match retiré de la surveillance."
+    SLASH_WATCH_SUCCESS = "Rappel ajouté avec succès!"
+    SLASH_UNWATCH_SUCCESS = "Rappel retiré de la surveillance."
     SLASH_REMIND_SUCCESS = "Rappel envoyé!"
     SLASH_INTERVAL_SUCCESS = "Intervalle mis à jour."
     SLASH_PAUSE_SUCCESS = "Rappels mis en pause."
@@ -239,8 +239,20 @@ class Messages:
     # Info messages
     NO_SAVE_FILE = "ℹ️ Aucune sauvegarde trouvée, démarrage avec une liste vide"
     BOT_CONNECTED = "✅ Bot connecté en tant que {}"
-    MATCHES_LOADED = "✅ {} match(s) chargés depuis la sauvegarde"
+    REMINDERS_LOADED = "✅ {} rappel(s) chargés depuis la sauvegarde"
 
     # Warning messages
     NO_CHANNEL_PERMISSIONS = "⚠️ Pas les permissions pour créer le canal #{}"
     MENTION_LIMIT_EXCEEDED = "⚠️ +{} autres personnes non mentionnées (limite Discord)"
+
+    # Alias pour la compatibilité avec le code existant
+    # TODO: Supprimer ces alias après la migration complète
+    MATCH_ADDED = REMINDER_ADDED
+    MATCH_REMOVED = REMINDER_REMOVED
+    MATCH_PAUSED = REMINDER_PAUSED
+    MATCH_RESUMED = REMINDER_RESUMED
+    MATCH_NOT_WATCHED = REMINDER_NOT_WATCHED
+    MATCH_NOT_ON_SERVER = REMINDER_NOT_ON_SERVER
+    NO_MATCHES_TO_REMIND = NO_REMINDERS_TO_REMIND
+    NO_WATCHED_MATCHES = NO_WATCHED_REMINDERS
+    MATCHES_LOADED = REMINDERS_LOADED
