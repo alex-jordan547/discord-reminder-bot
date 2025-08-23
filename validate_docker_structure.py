@@ -53,12 +53,12 @@ def check_module_structure():
             errors.append(f"❌ Erreur dans {module_path}: {e}")
     
     if errors:
-        print("\\n❌ Erreurs détectées:")
+        print("\n❌ Erreurs détectées:")
         for error in errors:
             print(f"  {error}")
         return False
     else:
-        print("\\n✅ Tous les modules ont une structure valide!")
+        print("\n✅ Tous les modules ont une structure valide!")
         return True
 
 def check_dockerfile_files():
@@ -71,7 +71,7 @@ def check_dockerfile_files():
         '.dockerignore'
     ]
     
-    print("\\n🐳 Vérification des fichiers Docker...")
+    print("\n🐳 Vérification des fichiers Docker...")
     
     missing_files = []
     
@@ -82,12 +82,12 @@ def check_dockerfile_files():
             print(f"✅ {file_path}")
     
     if missing_files:
-        print("\\n❌ Fichiers manquants:")
+        print("\n❌ Fichiers manquants:")
         for file_path in missing_files:
             print(f"  ❌ {file_path}")
         return False
     else:
-        print("\\n✅ Tous les fichiers Docker sont présents!")
+        print("\n✅ Tous les fichiers Docker sont présents!")
         return True
 
 def main():
@@ -102,11 +102,11 @@ def main():
     docker_files_ok = check_dockerfile_files()
     
     if structure_ok and docker_files_ok:
-        print("\\n🎉 Structure modulaire prête pour Docker!")
+        print("\n🎉 Structure modulaire prête pour Docker!")
         print("   Vous pouvez maintenant construire l'image avec: docker build -t discord-reminder-bot .")
         return 0
     else:
-        print("\\n❌ Des problèmes ont été détectés. Veuillez les corriger avant de construire l'image Docker.")
+        print("\n❌ Des problèmes ont été détectés. Veuillez les corriger avant de construire l'image Docker.")
         return 1
 
 if __name__ == "__main__":

@@ -4,8 +4,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies if needed
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+# (No additional system packages required for this Discord bot)
 
 # Copy and install Python dependencies first (for better Docker layer caching)
 COPY requirements.txt .
