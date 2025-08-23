@@ -8,7 +8,7 @@ functionality for managing match reminders.
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import discord
 from discord.ext import commands, tasks
@@ -17,6 +17,8 @@ from models.reminder import MatchReminder
 from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission, get_permission_error_message
 from utils.message_parser import parse_message_link, get_parsing_error_message, extract_message_title
+from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
+from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
 
 # Get logger for this module
@@ -48,6 +50,7 @@ def reschedule_reminders() -> None:
         print("😴 Aucun match à surveiller, mise en veille du système")
 
 
+
 async def sync_slash_commands(ctx: commands.Context) -> None:
     """
     Synchronise manuellement les commandes slash avec Discord (commande de développement).
@@ -60,7 +63,7 @@ async def sync_slash_commands(ctx: commands.Context) -> None:
         return
     
     try:
-        synced = await ctx.bot.tree.sync()
+        synced = await sync_slash_commands_logic(ctx.bot)
         await ctx.send(f"✅ {len(synced)} commande(s) slash synchronisée(s) avec Discord !")
         logger.info(f"Manual slash command sync: {len(synced)} commands")
     except Exception as e:
@@ -149,7 +152,13 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
             logger.error(f"Could not find match channel {reminder.channel_id}")
             return 0
 
-        message = await match_channel.fetch_message(reminder.message_id)
+        message = await safe_fetch_message(match_channel, reminder.message_id)
+        if not message:
+            logger.error(f"Could not fetch message {reminder.message_id} from channel {reminder.channel_id}")
+            # Update timestamp to avoid repeated attempts
+            reminder.last_reminder = datetime.now()
+            save_matches(watched_matches)
+            return 0
 
         # Update the list of users who have reacted
         reminder.users_who_reacted.clear()
@@ -216,8 +225,11 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
         if remaining > 0:
             embed.set_footer(text=Messages.MENTION_LIMIT_EXCEEDED.format(remaining))
 
-        # Send the reminder
-        await channel.send(content=mentions, embed=embed)
+        # Send the reminder with retry mechanism
+        sent_message = await safe_send_message(channel, content=mentions, embed=embed)
+        if not sent_message:
+            logger.error(f"Failed to send reminder for match {reminder.message_id} to channel {channel.name}")
+            return 0
 
         # Update reminder timestamp
         reminder.last_reminder = datetime.now()
@@ -227,20 +239,8 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
 
         return len(users_to_mention)
 
-    except discord.NotFound as e:
-        logger.error(f"Message or channel not found for match {reminder.message_id}: {e}")
-        # Update timestamp to avoid repeated attempts
-        reminder.last_reminder = datetime.now()
-        save_matches(watched_matches)
-        return 0
-    except discord.Forbidden as e:
-        logger.error(f"Permission denied for sending reminder for match {reminder.message_id}: {e}")
-        # Update timestamp to avoid spamming failed attempts
-        reminder.last_reminder = datetime.now()
-        save_matches(watched_matches)
-        return 0
     except Exception as e:
-        logger.error(f"Unexpected error sending reminder for match {reminder.message_id}: {e}")
+        logger.error(f"Unexpected error in send_reminder for match {reminder.message_id}: {e}")
         # Update timestamp even on error to prevent retry loop
         reminder.last_reminder = datetime.now()
         save_matches(watched_matches)
@@ -292,7 +292,10 @@ def register_commands(bot: commands.Bot) -> None:
                 await ctx.send(Messages.CHANNEL_NOT_FOUND)
                 return
 
-            message = await channel.fetch_message(link_info.message_id)
+            message = await safe_fetch_message(channel, link_info.message_id)
+            if not message:
+                await ctx.send(Messages.MESSAGE_NOT_FOUND)
+                return
 
             # Extract title from message content
             title = extract_message_title(message.content, Settings.MAX_TITLE_LENGTH)
@@ -365,10 +368,6 @@ def register_commands(bot: commands.Bot) -> None:
             await ctx.send(embed=embed)
             logger.info(f"Added match {link_info.message_id} to watch list on guild {ctx.guild.id} with {validated_interval}min interval (original: {original_interval})")
 
-        except discord.NotFound:
-            await ctx.send(Messages.MESSAGE_NOT_FOUND)
-        except discord.Forbidden as e:
-            await send_error_to_user(ctx, e, "l'accès au message")
         except Exception as e:
             await send_error_to_user(ctx, e, "l'ajout du match à la surveillance")
 
@@ -752,6 +751,21 @@ def register_commands(bot: commands.Bot) -> None:
         
         # Lancer la tâche périodique
         asyncio.create_task(periodic_check())
+    
+    @bot.command(name='health')
+    async def health_check(ctx: commands.Context) -> None:
+        """Affiche les statistiques de santé et de récupération d'erreurs du bot."""
+        if not has_admin_permission(ctx.author):
+            await ctx.send(get_permission_error_message())
+            return
+        
+        stats = retry_stats.get_summary()
+        embed = create_health_embed(stats)
+        
+        # Ajouter footer spécifique à la commande prefix
+        embed.set_footer(text="Utilisez !health reset pour remettre à zéro les statistiques")
+        
+        await ctx.send(embed=embed)
     
     @bot.command(name='sync')
     async def sync_commands(ctx: commands.Context) -> None:
