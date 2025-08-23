@@ -1,21 +1,58 @@
-
 version: '3.8'
 
 services:
   discord-reminder-bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: discord-reminder-bot
     restart: unless-stopped
     environment:
+      # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      
+      # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
-      - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}
       - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
       - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-matchs}
+      
+      # Permission Configuration
+      - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}
+      
+      # Logging Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_TO_FILE=${LOG_TO_FILE:-true}
+      
+      # Test Mode (optional)
+      - TEST_MODE=${TEST_MODE:-false}
+      
     volumes:
+      # Data persistence
       - ./data:/app/data
+      # Logs persistence (optional)
+      - ./logs:/app/logs
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
     networks:
       - bot-network
+    
+    # Security
+    user: "1000:1000"
+    
+    # Resource limits (optional, adjust as needed)
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
 networks:
   bot-network:

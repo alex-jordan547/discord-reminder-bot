@@ -491,8 +491,7 @@ def register_commands(bot: commands.Bot) -> None:
     bot.watched_matches_global = watched_matches
     
     # Load matches on startup
-    global watched_matches
-    watched_matches = load_matches()
+    watched_matches.update(load_matches())
     
     # Register slash commands
     from commands.slash_commands import register_slash_commands
