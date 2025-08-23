@@ -18,6 +18,7 @@ from models.reminder import MatchReminder
 from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission
 from utils.message_parser import parse_message_link, extract_message_title
+from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message
 from config.settings import Settings, Messages
 
 # Get logger for this module
@@ -117,7 +118,10 @@ class SlashCommands(commands.Cog):
                 await interaction.followup.send(Messages.CHANNEL_NOT_FOUND, ephemeral=True)
                 return
 
-            discord_message = await channel.fetch_message(link_info.message_id)
+            discord_message = await safe_fetch_message(channel, link_info.message_id)
+            if not discord_message:
+                await interaction.followup.send(Messages.MESSAGE_NOT_FOUND, ephemeral=True)
+                return
 
             # Check if this is an existing watch being modified
             is_existing_watch = link_info.message_id in watched_matches
@@ -231,10 +235,6 @@ class SlashCommands(commands.Cog):
             else:
                 logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {original_interval})")
 
-        except discord.NotFound:
-            await interaction.followup.send(Messages.MESSAGE_NOT_FOUND, ephemeral=True)
-        except discord.Forbidden as e:
-            await send_error_to_user(interaction, e, "l'accès au message")
         except Exception as e:
             await send_error_to_user(interaction, e, "l'ajout du match à la surveillance")
 
