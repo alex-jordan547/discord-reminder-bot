@@ -26,7 +26,7 @@ Thumbs.db
 # Logs
 *.log
 
-# Match data (optional - comment out if you want to track it)
-#watched_matches.json
+# Match data (changes frequently in local development)
+watched_matches.json
 
 .coverage
