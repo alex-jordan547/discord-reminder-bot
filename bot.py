@@ -68,8 +68,15 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         from commands.slash_commands import SlashCommands
         await bot.add_cog(SlashCommands(bot))
         logger.info("Slash commands cog registered successfully")
+        
+        # Synchronize slash commands with Discord
+        logger.info("Synchronizing slash commands with Discord...")
+        synced = await bot.tree.sync()
+        logger.info(f"Synchronized {len(synced)} slash command(s) with Discord")
+        print(f"⚡ {len(synced)} commande(s) slash synchronisée(s) avec Discord")
     except Exception as e:
-        logger.error(f"Failed to register slash commands cog: {e}")
+        logger.error(f"Failed to register or sync slash commands: {e}")
+        print(f"❌ Erreur lors de la synchronisation des commandes slash: {e}")
 
     # Start the dynamic reminder system
     if hasattr(bot, 'start_dynamic_reminder_system'):

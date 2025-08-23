@@ -48,6 +48,26 @@ def reschedule_reminders() -> None:
         print("😴 Aucun match à surveiller, mise en veille du système")
 
 
+async def sync_slash_commands(ctx: commands.Context) -> None:
+    """
+    Synchronise manuellement les commandes slash avec Discord (commande de développement).
+    
+    Args:
+        ctx: Le contexte de la commande Discord
+    """
+    if not has_admin_permission(ctx.author):
+        await ctx.send(get_permission_error_message())
+        return
+    
+    try:
+        synced = await ctx.bot.tree.sync()
+        await ctx.send(f"✅ {len(synced)} commande(s) slash synchronisée(s) avec Discord !")
+        logger.info(f"Manual slash command sync: {len(synced)} commands")
+    except Exception as e:
+        await ctx.send(f"❌ Erreur lors de la synchronisation: {str(e)}")
+        logger.error(f"Manual slash command sync failed: {e}")
+
+
 async def send_error_to_user(channel_or_interaction, error: Exception, context: str = "") -> None:
     """
     Send a descriptive error message to the user.
@@ -732,6 +752,11 @@ def register_commands(bot: commands.Bot) -> None:
         
         # Lancer la tâche périodique
         asyncio.create_task(periodic_check())
+    
+    @bot.command(name='sync')
+    async def sync_commands(ctx: commands.Context) -> None:
+        """Synchronise les commandes slash avec Discord (commande de développement)."""
+        await sync_slash_commands(ctx)
 
     # Expose the dynamic reminder functions and global variables for bot.py
     bot.start_dynamic_reminder_system = start_dynamic_reminder_system

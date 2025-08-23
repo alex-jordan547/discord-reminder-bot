@@ -119,39 +119,53 @@ class SlashCommands(commands.Cog):
 
             discord_message = await channel.fetch_message(link_info.message_id)
 
+            # Check if this is an existing watch being modified
+            is_existing_watch = link_info.message_id in watched_matches
+            old_interval = None
+            if is_existing_watch:
+                old_interval = watched_matches[link_info.message_id].interval_minutes
+
             # Extract title from message content
             title = extract_message_title(discord_message.content, Settings.MAX_TITLE_LENGTH)
             if title == "Match sans titre":
                 title = f"Match #{link_info.message_id}"
 
-            # Create the reminder
-            reminder = MatchReminder(
-                link_info.message_id,
-                link_info.channel_id,
-                link_info.guild_id,
-                title,
-                validated_interval,
-                Settings.DEFAULT_REACTIONS
-            )
+            # Create the reminder (or update existing)
+            if is_existing_watch:
+                # Update existing reminder
+                reminder = watched_matches[link_info.message_id]
+                reminder.set_interval(validated_interval)
+            else:
+                # Create new reminder
+                reminder = MatchReminder(
+                    link_info.message_id,
+                    link_info.channel_id,
+                    link_info.guild_id,
+                    title,
+                    validated_interval,
+                    Settings.DEFAULT_REACTIONS
+                )
 
-            # Get all server members who can access this specific channel (excluding bots)
-            guild = interaction.guild
-            accessible_users = set()
-            for member in guild.members:
-                if not member.bot:
-                    # Check if user can view and send messages in the channel
-                    permissions = channel.permissions_for(member)
-                    if permissions.view_channel and permissions.send_messages:
-                        accessible_users.add(member.id)
+            # Only scan for users and reactions if this is a new watch
+            if not is_existing_watch:
+                # Get all server members who can access this specific channel (excluding bots)
+                guild = interaction.guild
+                accessible_users = set()
+                for member in guild.members:
+                    if not member.bot:
+                        # Check if user can view and send messages in the channel
+                        permissions = channel.permissions_for(member)
+                        if permissions.view_channel and permissions.send_messages:
+                            accessible_users.add(member.id)
 
-            reminder.all_users = accessible_users
+                reminder.all_users = accessible_users
 
-            # Check existing reactions
-            for reaction in discord_message.reactions:
-                if reaction.emoji in reminder.required_reactions:
-                    async for user in reaction.users():
-                        if not user.bot:
-                            reminder.users_who_reacted.add(user.id)
+                # Check existing reactions
+                for reaction in discord_message.reactions:
+                    if reaction.emoji in reminder.required_reactions:
+                        async for user in reaction.users():
+                            if not user.bot:
+                                reminder.users_who_reacted.add(user.id)
 
             # Save the reminder
             watched_matches[link_info.message_id] = reminder
@@ -161,14 +175,29 @@ class SlashCommands(commands.Cog):
             from commands.handlers import reschedule_reminders
             reschedule_reminders()
 
-            # Create success embed
-            embed = discord.Embed(
-                title="✅ Match ajouté à la surveillance",
-                color=discord.Color.green(),
-                timestamp=datetime.now()
-            )
+            # Create success embed - different for new watch vs edit
+            if is_existing_watch:
+                embed = discord.Embed(
+                    title="🔄 Match modifié",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+            else:
+                embed = discord.Embed(
+                    title="✅ Match ajouté à la surveillance",
+                    color=discord.Color.green(),
+                    timestamp=datetime.now()
+                )
             embed.add_field(name="📌 Match", value=title, inline=False)
-            embed.add_field(name="⏰ Intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
+            
+            if is_existing_watch and old_interval != validated_interval:
+                # Show interval change for edits
+                embed.add_field(name="⏰ Ancien intervalle", value=Settings.format_interval_display(old_interval), inline=True)
+                embed.add_field(name="⏰ Nouvel intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
+            else:
+                # Show single interval for new watches or when interval unchanged
+                embed.add_field(name="⏰ Intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
+            
             embed.add_field(name="✅ Ont répondu", value=str(reminder.get_response_count()), inline=True)
             embed.add_field(name="❌ Manquants", value=str(reminder.get_missing_count()), inline=True)
             embed.add_field(name="👥 Total", value=str(reminder.get_total_users_count()), inline=True)
@@ -196,7 +225,11 @@ class SlashCommands(commands.Cog):
                     )
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {original_interval})")
+            
+            if is_existing_watch:
+                logger.info(f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {original_interval})")
+            else:
+                logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {original_interval})")
 
         except discord.NotFound:
             await interaction.followup.send(Messages.MESSAGE_NOT_FOUND, ephemeral=True)
