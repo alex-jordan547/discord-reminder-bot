@@ -1,0 +1,22 @@
+
+version: '3.8'
+
+services:
+  discord-reminder-bot:
+    build: .
+    container_name: discord-reminder-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
+      - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}
+      - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
+      - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-matchs}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
