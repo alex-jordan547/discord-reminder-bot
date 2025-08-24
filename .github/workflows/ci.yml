@@ -275,6 +275,7 @@ jobs:
       run: |
         pytest tests/integration/ -v --tb=short
       env:
+        PYTHONPATH: .
         DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN_TEST }}
         TEST_MODE: true
         LOG_LEVEL: DEBUG
