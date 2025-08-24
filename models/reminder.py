@@ -25,7 +25,7 @@ class Reminder:
         last_reminder (datetime): When the last reminder was sent
         users_who_reacted (Set[int]): Set of user IDs who have reacted
         all_users (Set[int]): Set of all user IDs in the server (excluding bots)
-        interval_minutes (int): Reminder interval in minutes for this specific reminder
+        interval_minutes (float): Reminder interval in minutes for this specific reminder
         is_paused (bool): Whether reminders are paused for this item
         created_at (datetime): When this reminder was first added to watch
     """
@@ -36,7 +36,7 @@ class Reminder:
         channel_id: int,
         guild_id: int,
         title: str,
-        interval_minutes: int = 60,
+        interval_minutes: float = 60,
         required_reactions: Optional[List[str]] = None
     ) -> None:
         """
@@ -56,7 +56,7 @@ class Reminder:
         self.title: str = title
         # Use centralized validation that accounts for test mode
         from config.settings import Settings
-        self.interval_minutes: int = Settings.validate_interval_minutes(interval_minutes)
+        self.interval_minutes: float = Settings.validate_interval_minutes(interval_minutes)
         self.required_reactions: List[str] = required_reactions or ['✅', '❌', '❓']
         self.last_reminder: datetime = datetime.now()
         self.users_who_reacted: Set[int] = set()
@@ -210,7 +210,7 @@ class Reminder:
         """
         self.is_paused = False
 
-    def set_interval(self, interval_minutes: int) -> None:
+    def set_interval(self, interval_minutes: float) -> None:
         """
         Set a new reminder interval for this item.
         Uses centralized validation that accounts for test mode.
