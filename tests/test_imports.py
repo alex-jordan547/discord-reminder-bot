@@ -2,31 +2,38 @@
 Test basic imports and module loading.
 """
 
+
 def test_core_imports():
     """Test that all core modules can be imported."""
     try:
         import discord
-        assert hasattr(discord, 'Client'), "discord.Client should be available"
+
+        assert hasattr(discord, "Client"), "discord.Client should be available"
         print("✅ Discord.py import successful")
     except ImportError as e:
         assert False, f"Failed to import discord: {e}"
 
     try:
         from config.settings import Settings
-        assert hasattr(Settings, 'get_reminder_interval_minutes'), "Settings should have reminder interval method"
+
+        assert hasattr(
+            Settings, "get_reminder_interval_minutes"
+        ), "Settings should have reminder interval method"
         print("✅ Settings import successful")
     except ImportError as e:
         assert False, f"Failed to import Settings: {e}"
 
     try:
         from models.reminder import Reminder
-        assert hasattr(Reminder, 'to_dict'), "Reminder should have to_dict method"
+
+        assert hasattr(Reminder, "to_dict"), "Reminder should have to_dict method"
         print("✅ Reminder model import successful")
     except ImportError as e:
         assert False, f"Failed to import Reminder: {e}"
 
     try:
         from utils.logging_config import setup_logging
+
         assert callable(setup_logging), "setup_logging should be callable"
         print("✅ Logging utils import successful")
     except ImportError as e:
@@ -38,8 +45,8 @@ def test_configuration_loading():
     import os
 
     # Set test environment
-    os.environ['TEST_MODE'] = 'true'
-    os.environ['DISCORD_TOKEN'] = 'test_token_for_pytest'
+    os.environ["TEST_MODE"] = "true"
+    os.environ["DISCORD_TOKEN"] = "test_token_for_pytest"
 
     try:
         from config.settings import Settings

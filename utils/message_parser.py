@@ -52,6 +52,10 @@ def parse_message_link(message_link: str) -> Optional[MessageLinkInfo]:
     Returns:
         MessageLinkInfo if parsing successful, None if invalid format
     """
+    if not message_link:
+        logger.warning("Message link is None or empty")
+        return None
+        
     # Clean the input string
     message_link = message_link.strip()
 

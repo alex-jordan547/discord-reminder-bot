@@ -16,7 +16,7 @@ def sample_reminder():
         guild_id=111111111,
         title="Test Reminder",
         interval_minutes=60,
-        required_reactions=["✅", "❌", "❓"]
+        required_reactions=["✅", "❌", "❓"],
     )
 
 
@@ -80,7 +80,7 @@ def test_pause_unpause(sample_reminder):
     sample_reminder.pause_reminders()
     assert sample_reminder.is_paused
 
-    sample_reminder.unpause_reminders()
+    sample_reminder.resume_reminders()
     assert not sample_reminder.is_paused
 
 

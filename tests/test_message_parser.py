@@ -40,7 +40,9 @@ def test_invalid_message_links():
 def test_edge_cases():
     """Test edge cases for message link parsing."""
     # Test with very large IDs (Discord snowflakes can be large)
-    large_id_link = "https://discord.com/channels/999999999999999999/888888888888888888/777777777777777777"
+    large_id_link = (
+        "https://discord.com/channels/999999999999999999/888888888888888888/777777777777777777"
+    )
     result = parse_message_link(large_id_link)
     assert result is not None
 
