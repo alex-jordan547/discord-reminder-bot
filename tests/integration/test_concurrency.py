@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 # Remove sys.path manipulation - use proper test runner instead
 
 # Set up test environment
-os.environ['DISCORD_TOKEN'] = 'test_token'
-os.environ['TEST_MODE'] = 'true'
+os.environ["DISCORD_TOKEN"] = "test_token"
+os.environ["TEST_MODE"] = "true"
 
 from models.reminder import Reminder
 from persistence.storage import save_matches, load_matches
@@ -33,7 +33,7 @@ class TestConcurrency:
     @pytest.fixture
     def temp_storage_file(self):
         """Create a temporary storage file for testing."""
-        fd, path = tempfile.mkstemp(suffix='.json')
+        fd, path = tempfile.mkstemp(suffix=".json")
         os.close(fd)
         yield path
         if os.path.exists(path):
@@ -43,7 +43,7 @@ class TestConcurrency:
     async def test_concurrent_reminder_additions(self, temp_storage_file):
         """Test adding multiple reminders concurrently."""
         # Mock storage path
-        with patch('persistence.storage.STORAGE_FILE', temp_storage_file):
+        with patch("persistence.storage.STORAGE_FILE", temp_storage_file):
             watched_matches.clear()
 
             # Create mock reminders
@@ -54,7 +54,7 @@ class TestConcurrency:
                     channel_id=987654321,
                     guild_id=111111111,
                     title=f"Test Match {i}",
-                    reminder_interval_seconds=3600
+                    reminder_interval_seconds=3600,
                 )
                 reminders.append(reminder)
 
@@ -78,7 +78,7 @@ class TestConcurrency:
     @pytest.mark.asyncio
     async def test_concurrent_storage_operations(self, temp_storage_file):
         """Test concurrent read/write operations to storage."""
-        with patch('persistence.storage.STORAGE_FILE', temp_storage_file):
+        with patch("persistence.storage.STORAGE_FILE", temp_storage_file):
             watched_matches.clear()
 
             # Create initial data
@@ -87,7 +87,7 @@ class TestConcurrency:
                 channel_id=987654321,
                 guild_id=111111111,
                 title="Initial Match",
-                reminder_interval_seconds=3600
+                reminder_interval_seconds=3600,
             )
             watched_matches["initial"] = initial_reminder
             save_matches(watched_matches)
@@ -105,7 +105,7 @@ class TestConcurrency:
                     channel_id=987654321,
                     guild_id=111111111,
                     title=f"Concurrent Match {message_id}",
-                    reminder_interval_seconds=3600
+                    reminder_interval_seconds=3600,
                 )
                 current_data[message_id] = reminder
                 save_matches(current_data)

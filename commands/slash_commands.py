@@ -21,16 +21,15 @@ from utils.error_recovery import safe_fetch_message, retry_stats
 from utils.message_parser import parse_message_link, extract_message_title
 from utils.permissions import has_admin_permission
 from utils.reminder_manager import reminder_manager
-from utils.validation import (
-    validate_message_link, ValidationError,
-    get_validation_error_embed
-)
+from utils.validation import validate_message_link, ValidationError, get_validation_error_embed
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
 
-async def send_error_to_user(interaction: discord.Interaction, error: Exception, context: str = "") -> None:
+async def send_error_to_user(
+    interaction: discord.Interaction, error: Exception, context: str = ""
+) -> None:
     """
     Send a descriptive error message to the user via interaction.
 
@@ -67,31 +66,35 @@ class SlashCommands(commands.Cog):
         """Called when the cog is loaded."""
         logger.info("Slash commands cog loaded")
 
-    @app_commands.command(name="watch", description="Surveiller les réactions d'un message avec rappels automatiques")
+    @app_commands.command(
+        name="watch", description="Surveiller les réactions d'un message avec rappels automatiques"
+    )
     @app_commands.describe(
         message="Lien du message Discord à surveiller",
-        interval="Intervalle des rappels (défaut: 1h, test: à partir de 30s)"
+        interval="Intervalle des rappels (défaut: 1h, test: à partir de 30s)",
     )
-    @app_commands.choices(interval=[
-        app_commands.Choice(name="30 secondes (test)", value=30),
-        app_commands.Choice(name="1 minute (test)", value=60),
-        app_commands.Choice(name="2 minutes (test)", value=120),
-        app_commands.Choice(name="5 minutes", value=300),
-        app_commands.Choice(name="15 minutes", value=900),
-        app_commands.Choice(name="30 minutes", value=1800),
-        app_commands.Choice(name="1 heure", value=3600),
-        app_commands.Choice(name="2 heures", value=7200),
-        app_commands.Choice(name="6 heures", value=21600),
-        app_commands.Choice(name="12 heures", value=43200),
-        app_commands.Choice(name="24 heures", value=86400),
-    ])
+    @app_commands.choices(
+        interval=[
+            app_commands.Choice(name="30 secondes (test)", value=30),
+            app_commands.Choice(name="1 minute (test)", value=60),
+            app_commands.Choice(name="2 minutes (test)", value=120),
+            app_commands.Choice(name="5 minutes", value=300),
+            app_commands.Choice(name="15 minutes", value=900),
+            app_commands.Choice(name="30 minutes", value=1800),
+            app_commands.Choice(name="1 heure", value=3600),
+            app_commands.Choice(name="2 heures", value=7200),
+            app_commands.Choice(name="6 heures", value=21600),
+            app_commands.Choice(name="12 heures", value=43200),
+            app_commands.Choice(name="24 heures", value=86400),
+        ]
+    )
     async def watch(self, interaction: discord.Interaction, message: str, interval: int = 3600):
         """Add a match message to watch for availability responses."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -151,7 +154,9 @@ class SlashCommands(commands.Cog):
                 existing_reminder.set_interval(validated_interval)
                 success = await reminder_manager.update_reminder(existing_reminder)
                 if not success:
-                    await interaction.followup.send("❌ Erreur lors de la mise à jour du rappel.", ephemeral=True)
+                    await interaction.followup.send(
+                        "❌ Erreur lors de la mise à jour du rappel.", ephemeral=True
+                    )
                     return
                 reminder = existing_reminder
             else:
@@ -162,7 +167,7 @@ class SlashCommands(commands.Cog):
                     link_info.guild_id,
                     title,
                     validated_interval,
-                    Settings.DEFAULT_REACTIONS
+                    Settings.DEFAULT_REACTIONS,
                 )
 
                 # Get all server members who can access this specific channel (excluding bots)
@@ -187,45 +192,64 @@ class SlashCommands(commands.Cog):
                 # Add to reminder manager
                 success = await reminder_manager.add_reminder(reminder)
                 if not success:
-                    await interaction.followup.send("❌ Erreur lors de l'ajout du rappel.", ephemeral=True)
+                    await interaction.followup.send(
+                        "❌ Erreur lors de l'ajout du rappel.", ephemeral=True
+                    )
                     return
 
             # Replanifier les rappels après ajout/modification
             from commands.handlers import reschedule_reminders
+
             reschedule_reminders()
 
             # Create success embed - different for new watch vs edit
             if is_existing_watch:
                 embed = discord.Embed(
-                    title="🔄 Match modifié",
-                    color=discord.Color.blue(),
-                    timestamp=datetime.now()
+                    title="🔄 Match modifié", color=discord.Color.blue(), timestamp=datetime.now()
                 )
             else:
                 embed = discord.Embed(
                     title="✅ Match ajouté à la surveillance",
                     color=discord.Color.green(),
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
                 )
             embed.add_field(name="📌 Match", value=title, inline=False)
 
             if is_existing_watch and old_interval != validated_interval:
                 # Show interval change for edits
-                embed.add_field(name="⏰ Ancien intervalle", value=Settings.format_interval_display(old_interval), inline=True)
-                embed.add_field(name="⏰ Nouvel intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
+                embed.add_field(
+                    name="⏰ Ancien intervalle",
+                    value=Settings.format_interval_display(old_interval),
+                    inline=True,
+                )
+                embed.add_field(
+                    name="⏰ Nouvel intervalle",
+                    value=Settings.format_interval_display(validated_interval),
+                    inline=True,
+                )
             else:
                 # Show single interval for new watches or when interval unchanged
-                embed.add_field(name="⏰ Intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
+                embed.add_field(
+                    name="⏰ Intervalle",
+                    value=Settings.format_interval_display(validated_interval),
+                    inline=True,
+                )
 
-            embed.add_field(name="✅ Ont répondu", value=str(reminder.get_response_count()), inline=True)
-            embed.add_field(name="❌ Manquants", value=str(reminder.get_missing_count()), inline=True)
-            embed.add_field(name="👥 Total", value=str(reminder.get_total_users_count()), inline=True)
+            embed.add_field(
+                name="✅ Ont répondu", value=str(reminder.get_response_count()), inline=True
+            )
+            embed.add_field(
+                name="❌ Manquants", value=str(reminder.get_missing_count()), inline=True
+            )
+            embed.add_field(
+                name="👥 Total", value=str(reminder.get_total_users_count()), inline=True
+            )
 
             next_reminder = reminder.get_next_reminder_time()
             embed.add_field(
                 name="📅 Prochain rappel",
                 value=f"<t:{int(next_reminder.timestamp())}:R>",
-                inline=False
+                inline=False,
             )
 
             # Add warning if interval was adjusted
@@ -234,21 +258,25 @@ class SlashCommands(commands.Cog):
                     embed.add_field(
                         name="⚠️ Intervalle ajusté (Mode Test)",
                         value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite test: 30s-7 jours)",
-                        inline=False
+                        inline=False,
                     )
                 else:
                     embed.add_field(
                         name="⚠️ Intervalle ajusté",
                         value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite: {Settings.MIN_INTERVAL_MINUTES}-{Settings.MAX_INTERVAL_MINUTES} min)",
-                        inline=False
+                        inline=False,
                     )
 
             await interaction.followup.send(embed=embed, ephemeral=True)
 
             if is_existing_watch:
-                logger.info(f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {Settings.format_interval_display(original_interval_minutes)})")
+                logger.info(
+                    f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {Settings.format_interval_display(original_interval_minutes)})"
+                )
             else:
-                logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {Settings.format_interval_display(original_interval_minutes)})")
+                logger.info(
+                    f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {Settings.format_interval_display(original_interval_minutes)})"
+                )
 
         except Exception as e:
             await send_error_to_user(interaction, e, "l'ajout du match à la surveillance")
@@ -261,7 +289,7 @@ class SlashCommands(commands.Cog):
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -280,18 +308,21 @@ class SlashCommands(commands.Cog):
             success = await reminder_manager.remove_reminder(message_id)
 
             if not success:
-                await interaction.response.send_message("❌ Erreur lors de la suppression du rappel.", ephemeral=True)
+                await interaction.response.send_message(
+                    "❌ Erreur lors de la suppression du rappel.", ephemeral=True
+                )
                 return
 
             # Replanifier les rappels après suppression
             from commands.handlers import reschedule_reminders
+
             reschedule_reminders()
 
             embed = discord.Embed(
                 title="✅ Match retiré de la surveillance",
                 description=f"**{title}** ne sera plus surveillé.",
                 color=discord.Color.orange(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -299,7 +330,9 @@ class SlashCommands(commands.Cog):
         else:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
 
-    @app_commands.command(name="list", description="Lister tous les rappels surveillés sur ce serveur")
+    @app_commands.command(
+        name="list", description="Lister tous les rappels surveillés sur ce serveur"
+    )
     async def list_matches(self, interaction: discord.Interaction):
         """List all watched matches on this server."""
         # Utiliser le système thread-safe au lieu de l'ancien système
@@ -315,7 +348,7 @@ class SlashCommands(commands.Cog):
         embed = discord.Embed(
             title=f"📋 Évènements surveillés sur {interaction.guild.name}",
             color=discord.Color.blue(),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         for match_id, reminder in server_matches.items():
@@ -344,26 +377,30 @@ class SlashCommands(commands.Cog):
             embed.add_field(
                 name=f"{status_emoji} {reminder.title[:50]}",
                 value=f"📍 {channel_mention}\n"
-                      f"⏰ Intervalle: {Settings.format_interval_display(reminder.interval_minutes)}\n"
-                      f"✅ Réponses: {reminder.get_response_count()}/{reminder.get_total_users_count()} "
-                      f"({reminder.get_status_summary()['response_percentage']}%)\n"
-                      f"📅 Prochain: {next_reminder_text}\n"
-                      f"🔗 [Lien](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{match_id})",
-                inline=False
+                f"⏰ Intervalle: {Settings.format_interval_display(reminder.interval_minutes)}\n"
+                f"✅ Réponses: {reminder.get_response_count()}/{reminder.get_total_users_count()} "
+                f"({reminder.get_status_summary()['response_percentage']}%)\n"
+                f"📅 Prochain: {next_reminder_text}\n"
+                f"🔗 [Lien](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{match_id})",
+                inline=False,
             )
 
         embed.set_footer(text=f"Total: {len(server_matches)} match(s) surveillé(s)")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="remind", description="Envoyer un rappel manuel pour un élément spécifique")
-    @app_commands.describe(message="Lien du message pour lequel envoyer un rappel (optionnel: tous les rappels si omis)")
+    @app_commands.command(
+        name="remind", description="Envoyer un rappel manuel pour un élément spécifique"
+    )
+    @app_commands.describe(
+        message="Lien du message pour lequel envoyer un rappel (optionnel: tous les rappels si omis)"
+    )
     async def remind(self, interaction: discord.Interaction, message: Optional[str] = None):
         """Send a manual reminder for a specific match or all matches."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -416,36 +453,40 @@ class SlashCommands(commands.Cog):
             title="✅ Rappel envoyé",
             description=f"{total_reminded} personne(s) notifiée(s) au total.",
             color=discord.Color.green(),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="set_interval", description="Modifier l'intervalle d'un rappel surveillé")
+    @app_commands.command(
+        name="set_interval", description="Modifier l'intervalle d'un rappel surveillé"
+    )
     @app_commands.describe(
         message="Lien du message dont modifier l'intervalle",
-        interval="Nouvel intervalle (test: à partir de 30s, prod: à partir de 5min)"
+        interval="Nouvel intervalle (test: à partir de 30s, prod: à partir de 5min)",
     )
-    @app_commands.choices(interval=[
-        app_commands.Choice(name="30 secondes (test)", value=30),
-        app_commands.Choice(name="1 minute (test)", value=60),
-        app_commands.Choice(name="2 minutes (test)", value=120),
-        app_commands.Choice(name="5 minutes", value=300),
-        app_commands.Choice(name="15 minutes", value=900),
-        app_commands.Choice(name="30 minutes", value=1800),
-        app_commands.Choice(name="1 heure", value=3600),
-        app_commands.Choice(name="2 heures", value=7200),
-        app_commands.Choice(name="6 heures", value=21600),
-        app_commands.Choice(name="12 heures", value=43200),
-        app_commands.Choice(name="24 heures", value=86400),
-    ])
+    @app_commands.choices(
+        interval=[
+            app_commands.Choice(name="30 secondes (test)", value=30),
+            app_commands.Choice(name="1 minute (test)", value=60),
+            app_commands.Choice(name="2 minutes (test)", value=120),
+            app_commands.Choice(name="5 minutes", value=300),
+            app_commands.Choice(name="15 minutes", value=900),
+            app_commands.Choice(name="30 minutes", value=1800),
+            app_commands.Choice(name="1 heure", value=3600),
+            app_commands.Choice(name="2 heures", value=7200),
+            app_commands.Choice(name="6 heures", value=21600),
+            app_commands.Choice(name="12 heures", value=43200),
+            app_commands.Choice(name="24 heures", value=86400),
+        ]
+    )
     async def set_interval(self, interaction: discord.Interaction, message: str, interval: int):
         """Set a new reminder interval for a watched match."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -475,29 +516,40 @@ class SlashCommands(commands.Cog):
         # Update using thread-safe manager
         success = await reminder_manager.update_reminder(reminder)
         if not success:
-            await interaction.response.send_message("❌ Erreur lors de la mise à jour de l'intervalle.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Erreur lors de la mise à jour de l'intervalle.", ephemeral=True
+            )
             return
 
         # Replanifier les rappels après modification
         from commands.handlers import reschedule_reminders
+
         reschedule_reminders()
 
         embed = discord.Embed(
-            title="✅ Intervalle mis à jour",
-            color=discord.Color.green(),
-            timestamp=datetime.now()
+            title="✅ Intervalle mis à jour", color=discord.Color.green(), timestamp=datetime.now()
         )
         embed.add_field(name="📌 Match", value=reminder.title, inline=False)
-        embed.add_field(name="⏰ Ancien intervalle", value=Settings.format_interval_display(old_interval), inline=True)
-        embed.add_field(name="⏰ Nouvel intervalle", value=Settings.format_interval_display(reminder.interval_minutes), inline=True)
+        embed.add_field(
+            name="⏰ Ancien intervalle",
+            value=Settings.format_interval_display(old_interval),
+            inline=True,
+        )
+        embed.add_field(
+            name="⏰ Nouvel intervalle",
+            value=Settings.format_interval_display(reminder.interval_minutes),
+            inline=True,
+        )
         embed.add_field(
             name="📅 Prochain rappel",
             value=f"<t:{int(reminder.get_next_reminder_time().timestamp())}:R>",
-            inline=False
+            inline=False,
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        logger.info(f"Updated interval for match {message_id} from {Settings.format_interval_display(old_interval)} to {Settings.format_interval_display(reminder.interval_minutes)}")
+        logger.info(
+            f"Updated interval for match {message_id} from {Settings.format_interval_display(old_interval)} to {Settings.format_interval_display(reminder.interval_minutes)}"
+        )
 
     @app_commands.command(name="pause", description="Mettre en pause les rappels d'un élément")
     @app_commands.describe(message="Lien du message dont mettre en pause les rappels")
@@ -507,7 +559,7 @@ class SlashCommands(commands.Cog):
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -538,18 +590,21 @@ class SlashCommands(commands.Cog):
         # Update using thread-safe manager
         success = await reminder_manager.update_reminder(reminder)
         if not success:
-            await interaction.response.send_message("❌ Erreur lors de la mise en pause du rappel.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Erreur lors de la mise en pause du rappel.", ephemeral=True
+            )
             return
 
         # Replanifier les rappels après modification
         from commands.handlers import reschedule_reminders
+
         reschedule_reminders()
 
         embed = discord.Embed(
             title="⏸️ Rappels mis en pause",
             description=f"Les rappels pour **{reminder.title}** sont maintenant en pause.",
             color=discord.Color.orange(),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -563,7 +618,7 @@ class SlashCommands(commands.Cog):
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -586,7 +641,9 @@ class SlashCommands(commands.Cog):
             return
 
         if not reminder.is_paused:
-            await interaction.response.send_message("⚠️ Ce match n'est pas en pause.", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠️ Ce match n'est pas en pause.", ephemeral=True
+            )
             return
 
         reminder.resume_reminders()
@@ -594,23 +651,26 @@ class SlashCommands(commands.Cog):
         # Update using thread-safe manager
         success = await reminder_manager.update_reminder(reminder)
         if not success:
-            await interaction.response.send_message("❌ Erreur lors de la reprise du rappel.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Erreur lors de la reprise du rappel.", ephemeral=True
+            )
             return
 
         # Replanifier les rappels après modification
         from commands.handlers import reschedule_reminders
+
         reschedule_reminders()
 
         embed = discord.Embed(
             title="▶️ Rappels repris",
             description=f"Les rappels pour **{reminder.title}** sont maintenant actifs.",
             color=discord.Color.green(),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         embed.add_field(
             name="📅 Prochain rappel",
             value=f"<t:{int(reminder.get_next_reminder_time().timestamp())}:R>",
-            inline=False
+            inline=False,
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -641,10 +701,10 @@ class SlashCommands(commands.Cog):
         status = reminder.get_status_summary()
 
         # Determine status color and emoji
-        if status['is_paused']:
+        if status["is_paused"]:
             color = discord.Color.orange()
             status_emoji = "⏸️"
-        elif status['is_overdue']:
+        elif status["is_overdue"]:
             color = discord.Color.red()
             status_emoji = "🚨"
         else:
@@ -655,17 +715,17 @@ class SlashCommands(commands.Cog):
             title=f"{status_emoji} Statut du Match",
             description=f"**{status['title']}**",
             color=color,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         # Channel information
-        channel = self.bot.get_channel(status['channel_id'])
+        channel = self.bot.get_channel(status["channel_id"])
         channel_mention = f"<#{status['channel_id']}>" if channel else "Canal inconnu"
         embed.add_field(name="📍 Canal", value=channel_mention, inline=True)
 
         # Interval and pause status
-        interval_text = Settings.format_interval_display(status['interval_minutes'])
-        if status['is_paused']:
+        interval_text = Settings.format_interval_display(status["interval_minutes"])
+        if status["is_paused"]:
             interval_text += " (En pause)"
         embed.add_field(name="⏰ Intervalle", value=interval_text, inline=True)
 
@@ -673,13 +733,13 @@ class SlashCommands(commands.Cog):
         embed.add_field(
             name="📊 Participation",
             value=f"✅ {status['response_count']}/{status['total_count']} ({status['response_percentage']}%)",
-            inline=True
+            inline=True,
         )
 
         # Next reminder timing
-        if status['is_paused']:
+        if status["is_paused"]:
             next_reminder_text = "En pause"
-        elif status['is_overdue']:
+        elif status["is_overdue"]:
             next_reminder_text = "En retard!"
         else:
             next_reminder_text = f"<t:{int(status['next_reminder'].timestamp())}:R>"
@@ -688,28 +748,29 @@ class SlashCommands(commands.Cog):
 
         # Created date
         embed.add_field(
-            name="📅 Créé le",
-            value=f"<t:{int(status['created_at'].timestamp())}:F>",
-            inline=True
+            name="📅 Créé le", value=f"<t:{int(status['created_at'].timestamp())}:F>", inline=True
         )
 
         # Message link
         embed.add_field(
             name="🔗 Lien vers le message",
             value=f"[Cliquer ici](https://discord.com/channels/{status['guild_id']}/{status['channel_id']}/{status['message_id']})",
-            inline=False
+            inline=False,
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="health", description="Afficher les statistiques de santé et de récupération d'erreurs du bot")
+    @app_commands.command(
+        name="health",
+        description="Afficher les statistiques de santé et de récupération d'erreurs du bot",
+    )
     async def health(self, interaction: discord.Interaction):
         """Show bot health and error recovery statistics."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -718,7 +779,9 @@ class SlashCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="help", description="Afficher l'aide complète d'utilisation du bot Discord Reminder")
+    @app_commands.command(
+        name="help", description="Afficher l'aide complète d'utilisation du bot Discord Reminder"
+    )
     async def help(self, interaction: discord.Interaction):
         """Show comprehensive help for Discord Reminder Bot."""
 
@@ -726,9 +789,9 @@ class SlashCommands(commands.Cog):
         embed = discord.Embed(
             title="🤖 Discord Reminder Bot - Guide d'utilisation",
             description="**Bot de rappels automatiques pour vos événements**\n\n"
-                       "Ce bot surveille les réactions sur vos messages et envoie des rappels automatiques aux participants qui n'ont pas encore répondu.",
+            "Ce bot surveille les réactions sur vos messages et envoie des rappels automatiques aux participants qui n'ont pas encore répondu.",
             color=discord.Color.blue(),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         # Ajouter l'icône du bot comme thumbnail si disponible
@@ -745,7 +808,7 @@ class SlashCommands(commands.Cog):
                 "**`/remind`** - Envoyer un rappel manuel\n"
                 "**`/status`** - Statut détaillé d'un rappel\n"
             ),
-            inline=False
+            inline=False,
         )
 
         # Section gestion des rappels
@@ -756,7 +819,7 @@ class SlashCommands(commands.Cog):
                 "**`/pause`** - Mettre en pause un rappel\n"
                 "**`/resume`** - Reprendre un rappel en pause\n"
             ),
-            inline=False
+            inline=False,
         )
 
         # Section administration
@@ -767,7 +830,7 @@ class SlashCommands(commands.Cog):
                 "**`/health`** - Statistiques de santé du bot\n"
                 "**`/sync`** - Synchroniser les commandes slash\n"
             ),
-            inline=False
+            inline=False,
         )
 
         # Section intervalles disponibles
@@ -781,11 +844,7 @@ class SlashCommands(commands.Cog):
         else:
             interval_text += "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h"
 
-        embed.add_field(
-            name="⏰ Intervalles de rappel",
-            value=interval_text,
-            inline=False
-        )
+        embed.add_field(name="⏰ Intervalles de rappel", value=interval_text, inline=False)
 
         # Section permissions
         embed.add_field(
@@ -794,7 +853,7 @@ class SlashCommands(commands.Cog):
                 f"**Rôles administrateurs:** {Settings.get_admin_roles_str()}\n"
                 "Les utilisateurs avec ces rôles peuvent gérer tous les rappels."
             ),
-            inline=False
+            inline=False,
         )
 
         # Section fonctionnement
@@ -807,7 +866,7 @@ class SlashCommands(commands.Cog):
                 "4️⃣ Le bot enverra des rappels aux non-répondants\n"
                 "5️⃣ Les rappels s'arrêtent quand tout le monde a répondu"
             ),
-            inline=False
+            inline=False,
         )
 
         # Section exemples
@@ -821,7 +880,7 @@ class SlashCommands(commands.Cog):
                 "**Lister tous les rappels:**\n"
                 "`/list`"
             ),
-            inline=False
+            inline=False,
         )
 
         # Section tips & tricks
@@ -834,7 +893,7 @@ class SlashCommands(commands.Cog):
                 "• Vous pouvez modifier l'intervalle d'un rappel existant\n"
                 "• Les rappels en pause peuvent être repris à tout moment"
             ),
-            inline=False
+            inline=False,
         )
 
         # Footer avec informations supplémentaires
@@ -842,12 +901,16 @@ class SlashCommands(commands.Cog):
             # En serveur : afficher les statistiques du serveur using thread-safe manager
             server_matches = await reminder_manager.get_guild_reminders(interaction.guild.id)
             server_count = len(server_matches)
-            footer_text = f"Bot développé avec discord.py • {server_count} rappel(s) actifs sur ce serveur"
+            footer_text = (
+                f"Bot développé avec discord.py • {server_count} rappel(s) actifs sur ce serveur"
+            )
         else:
             # En DM : afficher les statistiques globales using thread-safe manager
             all_reminders = reminder_manager.reminders
             total_matches = len(all_reminders)
-            footer_text = f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
+            footer_text = (
+                f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
+            )
 
         embed.set_footer(text=footer_text)
 
@@ -857,43 +920,46 @@ class SlashCommands(commands.Cog):
         guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
         logger.info(f"Help command used by user {interaction.user.id} in {guild_info}")
 
-    @app_commands.command(name="autodelete", description="Configure l'auto-suppression des messages de rappel")
+    @app_commands.command(
+        name="autodelete", description="Configure l'auto-suppression des messages de rappel"
+    )
     @app_commands.describe(
         action="Action à effectuer (status, enable, disable)",
-        delay_hours="Délai en heures avant suppression (si action=enable)"
+        delay_hours="Délai en heures avant suppression (si action=enable)",
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="status - Voir la configuration", value="status"),
-        app_commands.Choice(name="enable - Activer l'auto-suppression", value="enable"),
-        app_commands.Choice(name="disable - Désactiver l'auto-suppression", value="disable")
-    ])
-    @app_commands.choices(delay_hours=[
-        app_commands.Choice(name="1 minute", value=1/60),
-        app_commands.Choice(name="2 minutes", value=2/60),
-        app_commands.Choice(name="3 minutes", value=0.05),
-        app_commands.Choice(name="5 minutes", value=0.08),
-        app_commands.Choice(name="10 minutes", value=0.17),
-        app_commands.Choice(name="15 minutes", value=0.25),
-        app_commands.Choice(name="30 minutes", value=0.5),
-        app_commands.Choice(name="1 heure", value=1.0),
-        app_commands.Choice(name="2 heures", value=2.0),
-        app_commands.Choice(name="6 heures", value=6.0),
-        app_commands.Choice(name="12 heures", value=12.0),
-        app_commands.Choice(name="24 heures", value=24.0),
-        app_commands.Choice(name="48 heures", value=48.0)
-    ])
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="status - Voir la configuration", value="status"),
+            app_commands.Choice(name="enable - Activer l'auto-suppression", value="enable"),
+            app_commands.Choice(name="disable - Désactiver l'auto-suppression", value="disable"),
+        ]
+    )
+    @app_commands.choices(
+        delay_hours=[
+            app_commands.Choice(name="1 minute", value=1 / 60),
+            app_commands.Choice(name="2 minutes", value=2 / 60),
+            app_commands.Choice(name="3 minutes", value=0.05),
+            app_commands.Choice(name="5 minutes", value=0.08),
+            app_commands.Choice(name="10 minutes", value=0.17),
+            app_commands.Choice(name="15 minutes", value=0.25),
+            app_commands.Choice(name="30 minutes", value=0.5),
+            app_commands.Choice(name="1 heure", value=1.0),
+            app_commands.Choice(name="2 heures", value=2.0),
+            app_commands.Choice(name="6 heures", value=6.0),
+            app_commands.Choice(name="12 heures", value=12.0),
+            app_commands.Choice(name="24 heures", value=24.0),
+            app_commands.Choice(name="48 heures", value=48.0),
+        ]
+    )
     async def autodelete(
-        self,
-        interaction: discord.Interaction,
-        action: str,
-        delay_hours: Optional[float] = None
+        self, interaction: discord.Interaction, action: str, delay_hours: Optional[float] = None
     ):
         """Configure auto-deletion of reminder messages."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -904,7 +970,7 @@ class SlashCommands(commands.Cog):
             embed = discord.Embed(
                 title="🗑️ Configuration Auto-suppression",
                 color=discord.Color.blue(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             status = "✅ Activée" if Settings.AUTO_DELETE_REMINDERS else "❌ Désactivée"
@@ -918,15 +984,15 @@ class SlashCommands(commands.Cog):
                 auto_delete_mgr = get_auto_delete_manager()
                 if auto_delete_mgr:
                     pending_count = auto_delete_mgr.get_pending_count()
-                    embed.add_field(name="📝 Messages programmés", value=str(pending_count), inline=True)
+                    embed.add_field(
+                        name="📝 Messages programmés", value=str(pending_count), inline=True
+                    )
 
             # Show available delay choices
-            choices_text = ", ".join([Settings.format_auto_delete_display(h) for h in Settings.AUTO_DELETE_CHOICES[:8]])
-            embed.add_field(
-                name="💡 Délais suggérés",
-                value=f"{choices_text}...",
-                inline=False
+            choices_text = ", ".join(
+                [Settings.format_auto_delete_display(h) for h in Settings.AUTO_DELETE_CHOICES[:8]]
             )
+            embed.add_field(name="💡 Délais suggérés", value=f"{choices_text}...", inline=False)
 
             embed.set_footer(text="Utilisez /autodelete enable [délai] ou /autodelete disable")
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -948,18 +1014,20 @@ class SlashCommands(commands.Cog):
                 title="✅ Auto-suppression activée",
                 description=f"Les messages de rappel s'auto-détruiront après **{delay_text}**",
                 color=discord.Color.green(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             if validated_delay != delay_hours:
                 embed.add_field(
                     name="⚠️ Délai ajusté",
                     value=f"Le délai demandé ({delay_hours}h) a été ajusté à {validated_delay}h",
-                    inline=False
+                    inline=False,
                 )
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            logger.info(f"Auto-deletion enabled by {interaction.user} with delay: {validated_delay}h")
+            logger.info(
+                f"Auto-deletion enabled by {interaction.user} with delay: {validated_delay}h"
+            )
 
         elif action == "disable":
             Settings.AUTO_DELETE_REMINDERS = False
@@ -976,14 +1044,14 @@ class SlashCommands(commands.Cog):
                 title="❌ Auto-suppression désactivée",
                 description="Les messages de rappel ne seront plus supprimés automatiquement",
                 color=discord.Color.red(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             if cancelled_count > 0:
                 embed.add_field(
                     name="📝 Suppressions annulées",
                     value=f"{cancelled_count} message(s) programmé(s) pour suppression ont été annulés",
-                    inline=False
+                    inline=False,
                 )
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -991,16 +1059,21 @@ class SlashCommands(commands.Cog):
 
         # Log sécurisé avec gestion des DM
         guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
-        logger.info(f"Autodelete {action} command used by user {interaction.user.id} in {guild_info}")
+        logger.info(
+            f"Autodelete {action} command used by user {interaction.user.id} in {guild_info}"
+        )
 
-    @app_commands.command(name="sync", description="Synchroniser les commandes slash avec Discord (commande de développement)")
+    @app_commands.command(
+        name="sync",
+        description="Synchroniser les commandes slash avec Discord (commande de développement)",
+    )
     async def sync(self, interaction: discord.Interaction):
         """Synchronize slash commands with Discord (development command)."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
                 f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -1014,18 +1087,20 @@ class SlashCommands(commands.Cog):
                 title="✅ Synchronisation réussie",
                 description=f"**{len(synced)}** commande(s) slash synchronisée(s) avec Discord.",
                 color=discord.Color.green(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Slash commands synced successfully via /sync command: {len(synced)} commands")
+            logger.info(
+                f"Slash commands synced successfully via /sync command: {len(synced)} commands"
+            )
 
         except Exception as e:
             embed = discord.Embed(
                 title="❌ Erreur de synchronisation",
                 description=f"Erreur lors de la synchronisation: {str(e)}",
                 color=discord.Color.red(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
             logger.error(f"Failed to sync slash commands via /sync: {e}")
@@ -1049,4 +1124,3 @@ def register_slash_commands(bot: commands.Bot) -> None:
     # No need to load from old storage system anymore - using thread-safe reminder_manager
 
     logger.info("Slash commands setup prepared - using thread-safe reminder_manager")
-

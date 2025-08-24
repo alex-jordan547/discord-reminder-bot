@@ -22,6 +22,7 @@ class MessageLinkInfo(NamedTuple):
         channel_id: The Discord channel ID
         message_id: The Discord message ID
     """
+
     guild_id: int
     channel_id: int
     message_id: int
@@ -31,8 +32,8 @@ class MessageLinkInfo(NamedTuple):
 # Matches: https://discord.com/channels/GUILD_ID/CHANNEL_ID/MESSAGE_ID
 # Also matches: https://discordapp.com/channels/... (legacy format)
 MESSAGE_LINK_PATTERN = re.compile(
-    r'(?:https?://)?(?:discord(?:app)?\.com/channels/|discord://channels/)(\d+)/(\d+)/(\d+)',
-    re.IGNORECASE
+    r"(?:https?://)?(?:discord(?:app)?\.com/channels/|discord://channels/)(\d+)/(\d+)/(\d+)",
+    re.IGNORECASE,
 )
 
 
@@ -65,11 +66,7 @@ def parse_message_link(message_link: str) -> Optional[MessageLinkInfo]:
     try:
         guild_id, channel_id, message_id = map(int, match.groups())
 
-        link_info = MessageLinkInfo(
-            guild_id=guild_id,
-            channel_id=channel_id,
-            message_id=message_id
-        )
+        link_info = MessageLinkInfo(guild_id=guild_id, channel_id=channel_id, message_id=message_id)
 
         logger.debug(f"Successfully parsed message link: {link_info}")
         return link_info
@@ -114,10 +111,12 @@ def get_parsing_error_message() -> str:
     Returns:
         str: User-friendly error message with usage instructions
     """
-    return ("❌ Format de lien invalide. Pour obtenir le lien d'un message:\n"
-            "1. Faites clic droit sur le message\n"
-            "2. Sélectionnez 'Copier le lien du message'\n"
-            "3. Collez le lien complet dans la commande")
+    return (
+        "❌ Format de lien invalide. Pour obtenir le lien d'un message:\n"
+        "1. Faites clic droit sur le message\n"
+        "2. Sélectionnez 'Copier le lien du message'\n"
+        "3. Collez le lien complet dans la commande"
+    )
 
 
 def extract_message_title(message_content: str, max_length: int = 100) -> str:
@@ -138,7 +137,7 @@ def extract_message_title(message_content: str, max_length: int = 100) -> str:
         return "Match sans titre"
 
     # Split into lines and find the first meaningful line
-    lines = [line.strip() for line in message_content.split('\n') if line.strip()]
+    lines = [line.strip() for line in message_content.split("\n") if line.strip()]
 
     if not lines:
         return "Match sans titre"
@@ -146,21 +145,21 @@ def extract_message_title(message_content: str, max_length: int = 100) -> str:
     # Filter out bot commands and very short messages
     for line in lines:
         # Skip bot commands (starting with ! or /) and very short content
-        if not line.startswith(('!', '/', '@')) and len(line) > 5:
+        if not line.startswith(("!", "/", "@")) and len(line) > 5:
             # Truncate if too long
             if len(line) > max_length:
-                return line[:max_length - 3] + "..."
+                return line[: max_length - 3] + "..."
             return line
 
     # If no meaningful content found, create a better default title
     first_line = lines[0]
-    if first_line.startswith(('!', '/')):
+    if first_line.startswith(("!", "/")):
         # For commands, create a more user-friendly title
-        command_name = first_line.split()[0] if ' ' in first_line else first_line
+        command_name = first_line.split()[0] if " " in first_line else first_line
         return f"Match avec commande {command_name}"
 
     # For mentions or other short content, be more descriptive
-    if first_line.startswith('@'):
+    if first_line.startswith("@"):
         return "Match avec mentions"
 
     # Default fallback
@@ -169,6 +168,6 @@ def extract_message_title(message_content: str, max_length: int = 100) -> str:
 
     # Truncate if too long
     if len(first_line) > max_length:
-        return first_line[:max_length - 3] + "..."
+        return first_line[: max_length - 3] + "..."
 
     return first_line

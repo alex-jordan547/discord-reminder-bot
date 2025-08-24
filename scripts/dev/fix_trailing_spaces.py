@@ -6,11 +6,12 @@ Script pour corriger automatiquement les espaces en fin de ligne dans les fichie
 import os
 import sys
 
+
 def fix_trailing_spaces(file_path):
     """Corriger les espaces en fin de ligne dans un fichier."""
     print(f"🔧 Traitement de {file_path}...")
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     fixed_lines = []
@@ -18,11 +19,11 @@ def fix_trailing_spaces(file_path):
 
     for i, line in enumerate(lines, 1):
         original_line = line
-        fixed_line = line.rstrip() + '\n' if line.strip() else '\n'
+        fixed_line = line.rstrip() + "\n" if line.strip() else "\n"
 
         # Garder le dernier saut de ligne du fichier si nécessaire
-        if i == len(lines) and not line.endswith('\n'):
-            fixed_line = fixed_line.rstrip('\n')
+        if i == len(lines) and not line.endswith("\n"):
+            fixed_line = fixed_line.rstrip("\n")
 
         if original_line != fixed_line:
             changes_count += 1
@@ -30,7 +31,7 @@ def fix_trailing_spaces(file_path):
         fixed_lines.append(fixed_line)
 
     # Écrire le fichier corrigé
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.writelines(fixed_lines)
 
     if changes_count > 0:
@@ -39,6 +40,7 @@ def fix_trailing_spaces(file_path):
         print(f"  ✅ Aucune correction nécessaire")
 
     return changes_count
+
 
 def main():
     """Fonction principale."""
@@ -49,12 +51,14 @@ def main():
     python_files = []
 
     # Chercher tous les fichiers .py récursivement
-    for root, dirs, files in os.walk('.'):
+    for root, dirs, files in os.walk("."):
         # Ignorer certains dossiers
-        dirs[:] = [d for d in dirs if d not in ['.git', '__pycache__', '.pytest_cache', 'venv', 'env']]
+        dirs[:] = [
+            d for d in dirs if d not in [".git", "__pycache__", ".pytest_cache", "venv", "env"]
+        ]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith(".py"):
                 python_files.append(os.path.join(root, file))
 
     total_changes = 0
@@ -78,6 +82,7 @@ def main():
         print("✨ Tous les fichiers étaient déjà propres !")
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

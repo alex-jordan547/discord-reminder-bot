@@ -20,7 +20,12 @@ load_dotenv()
 
 from commands.handlers import setup_bot_handlers
 from config.settings import Settings, Messages
-from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file, should_use_colors
+from utils.logging_config import (
+    setup_logging,
+    get_log_level_from_env,
+    should_log_to_file,
+    should_use_colors,
+)
 from utils.validation import validate_environment_config
 from utils.auto_delete import init_auto_delete_manager
 
@@ -68,6 +73,7 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
     # Setup slash commands when bot is ready
     try:
         from commands.slash_commands import SlashCommands
+
         await bot.add_cog(SlashCommands(bot))
         logger.info("Slash commands cog registered successfully")
 
@@ -81,7 +87,7 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         print(f"❌ Erreur lors de la synchronisation des commandes slash: {e}")
 
     # Load reminders from storage using thread-safe manager
-    if hasattr(bot, 'reminder_manager'):
+    if hasattr(bot, "reminder_manager"):
         success = await bot.reminder_manager.load_from_storage()
         if success:
             total_loaded = len(bot.reminder_manager.reminders)
@@ -96,7 +102,7 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
     await auto_delete_mgr.start()
 
     # Start the dynamic reminder system (after auto-delete manager is ready)
-    if hasattr(bot, 'start_dynamic_reminder_system'):
+    if hasattr(bot, "start_dynamic_reminder_system"):
         await bot.start_dynamic_reminder_system()
 
         # Display reminder interval information
@@ -108,8 +114,12 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
             print(f"⏰ Système de rappels dynamique activé")
 
     if Settings.AUTO_DELETE_REMINDERS:
-        logger.info(f"Auto-deletion enabled: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
-        print(f"🗑️ Auto-suppression activée: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
+        logger.info(
+            f"Auto-deletion enabled: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
+        )
+        print(
+            f"🗑️ Auto-suppression activée: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
+        )
     else:
         logger.info("Auto-deletion disabled")
         print("🗑️ Auto-suppression désactivée")

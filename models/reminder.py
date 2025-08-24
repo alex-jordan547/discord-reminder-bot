@@ -37,7 +37,7 @@ class Reminder:
         guild_id: int,
         title: str,
         interval_minutes: float = 60,
-        required_reactions: Optional[List[str]] = None
+        required_reactions: Optional[List[str]] = None,
     ) -> None:
         """
         Initialize a new Reminder instance.
@@ -56,8 +56,9 @@ class Reminder:
         self.title: str = title
         # Use centralized validation that accounts for test mode
         from config.settings import Settings
+
         self.interval_minutes: float = Settings.validate_interval_minutes(interval_minutes)
-        self.required_reactions: List[str] = required_reactions or ['✅', '❌', '❓']
+        self.required_reactions: List[str] = required_reactions or ["✅", "❌", "❓"]
         self.last_reminder: datetime = datetime.now()
         self.users_who_reacted: Set[int] = set()
         self.all_users: Set[int] = set()
@@ -72,21 +73,21 @@ class Reminder:
             Dict containing all instance data in serializable format
         """
         return {
-            'message_id': self.message_id,
-            'channel_id': self.channel_id,
-            'guild_id': self.guild_id,
-            'title': self.title,
-            'interval_minutes': self.interval_minutes,
-            'required_reactions': self.required_reactions,
-            'last_reminder': self.last_reminder.isoformat(),
-            'users_who_reacted': list(self.users_who_reacted),
-            'all_users': list(self.all_users),
-            'is_paused': self.is_paused,
-            'created_at': self.created_at.isoformat()
+            "message_id": self.message_id,
+            "channel_id": self.channel_id,
+            "guild_id": self.guild_id,
+            "title": self.title,
+            "interval_minutes": self.interval_minutes,
+            "required_reactions": self.required_reactions,
+            "last_reminder": self.last_reminder.isoformat(),
+            "users_who_reacted": list(self.users_who_reacted),
+            "all_users": list(self.all_users),
+            "is_paused": self.is_paused,
+            "created_at": self.created_at.isoformat(),
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Reminder':
+    def from_dict(cls, data: Dict[str, Any]) -> "Reminder":
         """
         Create a Reminder instance from a dictionary (JSON deserialization).
 
@@ -97,25 +98,28 @@ class Reminder:
             Reminder instance reconstructed from the dictionary
         """
         # Handle backward compatibility - convert hours to minutes if needed
-        interval_minutes = data.get('interval_minutes')
+        interval_minutes = data.get("interval_minutes")
         if interval_minutes is None:
             # Try to convert from old REMINDER_INTERVAL_HOURS if present
             from config.settings import Settings
+
             interval_minutes = Settings.get_reminder_interval_minutes()
 
         reminder = cls(
-            data['message_id'],
-            data['channel_id'],
-            data.get('guild_id', 0),  # Backward compatibility with older saves
-            data['title'],
+            data["message_id"],
+            data["channel_id"],
+            data.get("guild_id", 0),  # Backward compatibility with older saves
+            data["title"],
             interval_minutes,
-            data['required_reactions']
+            data["required_reactions"],
         )
-        reminder.last_reminder = datetime.fromisoformat(data['last_reminder'])
-        reminder.users_who_reacted = set(data['users_who_reacted'])
-        reminder.all_users = set(data['all_users'])
-        reminder.is_paused = data.get('is_paused', False)
-        reminder.created_at = datetime.fromisoformat(data.get('created_at', reminder.last_reminder.isoformat()))
+        reminder.last_reminder = datetime.fromisoformat(data["last_reminder"])
+        reminder.users_who_reacted = set(data["users_who_reacted"])
+        reminder.all_users = set(data["all_users"])
+        reminder.is_paused = data.get("is_paused", False)
+        reminder.created_at = datetime.fromisoformat(
+            data.get("created_at", reminder.last_reminder.isoformat())
+        )
         return reminder
 
     def get_missing_users(self) -> Set[int]:
@@ -188,13 +192,18 @@ class Reminder:
 
         # Debug logging
         import logging
+
         logger = logging.getLogger(__name__)
         if is_due:
             time_diff = current_time - next_reminder_time
-            logger.debug(f"Reminder {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}")
+            logger.debug(
+                f"Reminder {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}"
+            )
         else:
             time_until = next_reminder_time - current_time
-            logger.debug(f"Reminder {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}")
+            logger.debug(
+                f"Reminder {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}"
+            )
 
         return is_due
 
@@ -219,6 +228,7 @@ class Reminder:
             interval_minutes: New interval in minutes (validation depends on mode)
         """
         from config.settings import Settings
+
         self.interval_minutes = Settings.validate_interval_minutes(interval_minutes)
 
     def get_status_summary(self) -> Dict[str, Any]:
@@ -231,20 +241,22 @@ class Reminder:
         time_until_next = self.get_time_until_next_reminder()
 
         return {
-            'title': self.title,
-            'message_id': self.message_id,
-            'channel_id': self.channel_id,
-            'guild_id': self.guild_id,
-            'interval_minutes': self.interval_minutes,
-            'is_paused': self.is_paused,
-            'response_count': self.get_response_count(),
-            'missing_count': self.get_missing_count(),
-            'total_count': self.get_total_users_count(),
-            'response_percentage': round((self.get_response_count() / max(1, self.get_total_users_count())) * 100, 1),
-            'next_reminder': self.get_next_reminder_time(),
-            'time_until_next': time_until_next,
-            'is_overdue': time_until_next.total_seconds() < 0,
-            'created_at': self.created_at
+            "title": self.title,
+            "message_id": self.message_id,
+            "channel_id": self.channel_id,
+            "guild_id": self.guild_id,
+            "interval_minutes": self.interval_minutes,
+            "is_paused": self.is_paused,
+            "response_count": self.get_response_count(),
+            "missing_count": self.get_missing_count(),
+            "total_count": self.get_total_users_count(),
+            "response_percentage": round(
+                (self.get_response_count() / max(1, self.get_total_users_count())) * 100, 1
+            ),
+            "next_reminder": self.get_next_reminder_time(),
+            "time_until_next": time_until_next,
+            "is_overdue": time_until_next.total_seconds() < 0,
+            "created_at": self.created_at,
         }
 
 

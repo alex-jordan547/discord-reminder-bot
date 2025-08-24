@@ -6,6 +6,7 @@ Development script to validate that all imports work correctly.
 import os
 import importlib.util
 
+
 def validate_module(module_path, module_name):
     """Validate that a module can be imported."""
     try:
@@ -18,6 +19,7 @@ def validate_module(module_path, module_name):
         return True, "Import successful"
     except Exception as e:
         return False, str(e)
+
 
 def main():
     """Main function."""
@@ -58,6 +60,7 @@ def main():
     else:
         print("⚠️  Some imports failed.")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

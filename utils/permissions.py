@@ -17,7 +17,9 @@ from config.settings import Settings
 logger = logging.getLogger(__name__)
 
 
-def has_admin_permission(user: Union[discord.Member, discord.User], admin_roles: List[str] = None) -> bool:
+def has_admin_permission(
+    user: Union[discord.Member, discord.User], admin_roles: List[str] = None
+) -> bool:
     """
     Check if a user has administrator permissions for bot commands.
 
@@ -118,6 +120,7 @@ class AdminRequired:
         Returns:
             The wrapped function with permission checking
         """
+
         async def wrapper(ctx: commands.Context, *args, **kwargs):
             if not has_admin_permission(ctx.author, self.admin_roles):
                 await ctx.send(get_permission_error_message(self.admin_roles))

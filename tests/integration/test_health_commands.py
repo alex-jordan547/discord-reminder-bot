@@ -61,7 +61,7 @@ async def test_error_recovery_tracking():
         "connection_timeout",
         "discord_server_error",
         "permission_denied",
-        "message_not_found"
+        "message_not_found",
     ]
 
     # Add test data
@@ -97,6 +97,7 @@ async def test_bot_health_monitoring():
 
     # Simulate uptime
     import time
+
     start_time = time.time() - 3600  # 1 hour ago
     uptime_seconds = time.time() - start_time
     uptime_hours = uptime_seconds / 3600
@@ -107,7 +108,7 @@ async def test_bot_health_monitoring():
         "latency_ms": mock_bot.latency * 1000,
         "uptime_hours": uptime_hours,
         "memory_usage": "Normal",  # Would be calculated in real implementation
-        "active_reminders": 5  # Example value
+        "active_reminders": 5,  # Example value
     }
 
     print(f"  🟢 Bot ready: {indicators['bot_ready']}")
@@ -135,7 +136,7 @@ async def test_performance_metrics():
         "commands_processed": 250,
         "reminders_sent": 18,
         "errors_handled": 3,
-        "cache_hit_rate": 85.5
+        "cache_hit_rate": 85.5,
     }
 
     print(f"  ⚡ Average response time: {performance_metrics['avg_response_time_ms']}ms")
@@ -162,7 +163,7 @@ def main():
         test_health_stats_functionality,
         test_error_recovery_tracking,
         test_bot_health_monitoring,
-        test_performance_metrics
+        test_performance_metrics,
     ]
 
     async def run_tests():

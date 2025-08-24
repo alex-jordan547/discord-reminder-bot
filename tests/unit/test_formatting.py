@@ -6,23 +6,26 @@ Unit tests for code formatting validation.
 import os
 import re
 
+
 def check_file_formatting(file_path):
     """Check formatting issues in a file."""
     issues = []
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
-        lines = content.split('\n')
+        lines = content.split("\n")
 
     # Check for double backslashes in strings
     double_backslash_pattern = r'["\'].*?\\\\n.*?["\']'
     matches = re.findall(double_backslash_pattern, content)
     if matches:
-        issues.append({
-            'type': 'double_backslashes',
-            'count': len(matches),
-            'examples': matches[:3]  # First 3 examples
-        })
+        issues.append(
+            {
+                "type": "double_backslashes",
+                "count": len(matches),
+                "examples": matches[:3],  # First 3 examples
+            }
+        )
 
     # Check for trailing spaces
     trailing_spaces = []
@@ -31,13 +34,16 @@ def check_file_formatting(file_path):
             trailing_spaces.append(i)
 
     if trailing_spaces:
-        issues.append({
-            'type': 'trailing_spaces',
-            'count': len(trailing_spaces),
-            'lines': trailing_spaces[:5]  # First 5 lines
-        })
+        issues.append(
+            {
+                "type": "trailing_spaces",
+                "count": len(trailing_spaces),
+                "lines": trailing_spaces[:5],  # First 5 lines
+            }
+        )
 
     return issues
+
 
 def main():
     """Main function."""
@@ -46,11 +52,11 @@ def main():
 
     # Files to check (adjust paths for test location)
     files_to_check = [
-        '../../commands/handlers.py',
-        '../../commands/slash_commands.py',
-        '../../bot.py',
-        '../../config/settings.py',
-        '../../models/reminder.py'
+        "../../commands/handlers.py",
+        "../../commands/slash_commands.py",
+        "../../bot.py",
+        "../../config/settings.py",
+        "../../models/reminder.py",
     ]
 
     total_issues = 0
@@ -68,15 +74,15 @@ def main():
         if issues:
             files_with_issues += 1
             for issue in issues:
-                total_issues += issue['count']
+                total_issues += issue["count"]
 
-                if issue['type'] == 'double_backslashes':
+                if issue["type"] == "double_backslashes":
                     print(f"  ❌ {issue['count']} double backslashes found:")
-                    for example in issue['examples']:
+                    for example in issue["examples"]:
                         print(f"    → {example}")
-                elif issue['type'] == 'trailing_spaces':
+                elif issue["type"] == "trailing_spaces":
                     print(f"  ❌ {issue['count']} lines with trailing spaces:")
-                    for line_num in issue['lines']:
+                    for line_num in issue["lines"]:
                         print(f"    → Line {line_num}")
         else:
             print("  ✅ No formatting issues detected")
@@ -95,6 +101,7 @@ def main():
     else:
         print("⚠️  Some formatting issues remain to be fixed.")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

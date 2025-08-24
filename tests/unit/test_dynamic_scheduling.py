@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
+
 def test_dynamic_scheduling_logic():
     """Test de la logique de planification dynamique."""
     print("🧪 Test de la logique de planification dynamique...")
@@ -24,7 +25,9 @@ def test_dynamic_scheduling_logic():
     next_reminder_2 = current_time + timedelta(minutes=2)
     time_until_2 = (next_reminder_2 - current_time).total_seconds()
     time_until_2 = max(5, time_until_2 - 5)
-    print(f"  ✅ Rappel dans 2min → Attente calculée: {time_until_2:.1f}s ({time_until_2/60:.1f}min)")
+    print(
+        f"  ✅ Rappel dans 2min → Attente calculée: {time_until_2:.1f}s ({time_until_2/60:.1f}min)"
+    )
 
     # Test case 3: Limitation du temps d'attente
     max_wait_test = 300  # 5 minutes en mode test
@@ -38,6 +41,7 @@ def test_dynamic_scheduling_logic():
     print(f"  ✅ Marge de sécurité: {very_short}s → {with_margin}s (minimum 5s)")
 
     return True
+
 
 def test_precision_comparison():
     """Comparaison de précision entre ancien et nouveau système."""
@@ -60,6 +64,7 @@ def test_precision_comparison():
 
     return True
 
+
 def test_interval_scenarios():
     """Test de différents scénarios d'intervalles."""
     print("⏰ Test des scénarios d'intervalles...")
@@ -80,7 +85,9 @@ def test_interval_scenarios():
         # Nouveau système: 1 vérification précise
         new_checks_per_interval = 1
 
-        efficiency_gain = (old_checks_per_interval - new_checks_per_interval) / old_checks_per_interval * 100
+        efficiency_gain = (
+            (old_checks_per_interval - new_checks_per_interval) / old_checks_per_interval * 100
+        )
 
         print(f"  📋 {scenario['description']}:")
         print(f"    - Ancien: {old_checks_per_interval:.1f} vérifications")
@@ -88,6 +95,7 @@ def test_interval_scenarios():
         print(f"    - Gain d'efficacité: {efficiency_gain:.1f}%")
 
     return True
+
 
 def main():
     """Fonction principale de test."""
@@ -128,6 +136,7 @@ def main():
     else:
         print("⚠️  Certains tests ont échoué.")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

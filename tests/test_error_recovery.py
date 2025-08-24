@@ -21,7 +21,7 @@ from utils.error_recovery import (
     with_retry_stats,
     safe_send_message,
     safe_fetch_message,
-    retry_stats
+    retry_stats,
 )
 
 
@@ -113,7 +113,8 @@ class TestRetryDecorator:
     @pytest.mark.asyncio
     async def test_retry_success_on_first_attempt(self):
         """Test success on first attempt."""
-        @with_retry('api_call', RetryConfig(max_attempts=3))
+
+        @with_retry("api_call", RetryConfig(max_attempts=3))
         async def mock_function():
             return "success"
 
@@ -125,7 +126,7 @@ class TestRetryDecorator:
         """Test success after multiple retries."""
         call_count = 0
 
-        @with_retry('api_call', RetryConfig(max_attempts=3, base_delay=0.01))
+        @with_retry("api_call", RetryConfig(max_attempts=3, base_delay=0.01))
         async def mock_function():
             nonlocal call_count
             call_count += 1
@@ -142,7 +143,7 @@ class TestRetryDecorator:
         """Test that permanent errors are not retried."""
         call_count = 0
 
-        @with_retry('api_call', RetryConfig(max_attempts=3))
+        @with_retry("api_call", RetryConfig(max_attempts=3))
         async def mock_function():
             nonlocal call_count
             call_count += 1
@@ -158,7 +159,7 @@ class TestRetryDecorator:
         """Test exceeding maximum number of attempts."""
         call_count = 0
 
-        @with_retry('api_call', RetryConfig(max_attempts=2, base_delay=0.01))
+        @with_retry("api_call", RetryConfig(max_attempts=2, base_delay=0.01))
         async def mock_function():
             nonlocal call_count
             call_count += 1
@@ -211,7 +212,9 @@ class TestSafeHelpers:
     async def test_safe_fetch_message_not_found(self):
         """Test fetching message not found."""
         mock_channel = AsyncMock()
-        mock_channel.fetch_message.side_effect = discord.NotFound(response=MagicMock(), message="Not Found")
+        mock_channel.fetch_message.side_effect = discord.NotFound(
+            response=MagicMock(), message="Not Found"
+        )
 
         result = await safe_fetch_message(mock_channel, 123456)
 
@@ -229,31 +232,31 @@ class TestRetryStats:
         """Test statistics initialization."""
         stats = retry_stats.get_summary()
 
-        assert stats['total_calls'] == 0
-        assert stats['success_rate_percent'] == 0
-        assert stats['failed_calls'] == 0
-        assert stats['retried_calls'] == 0
-        assert len(stats['most_common_errors']) == 0
+        assert stats["total_calls"] == 0
+        assert stats["success_rate_percent"] == 0
+        assert stats["failed_calls"] == 0
+        assert stats["retried_calls"] == 0
+        assert len(stats["most_common_errors"]) == 0
 
     def test_record_successful_call(self):
         """Test recording successful call."""
         retry_stats.record_call(success=True, retries=2)
 
         stats = retry_stats.get_summary()
-        assert stats['total_calls'] == 1
-        assert stats['successful_calls'] == 1
-        assert stats['success_rate_percent'] == 100.0
-        assert stats['retried_calls'] == 1  # Had retries
+        assert stats["total_calls"] == 1
+        assert stats["successful_calls"] == 1
+        assert stats["success_rate_percent"] == 100.0
+        assert stats["retried_calls"] == 1  # Had retries
 
     def test_record_failed_call(self):
         """Test recording failed call."""
         retry_stats.record_call(success=False, error_type="HTTPException")
 
         stats = retry_stats.get_summary()
-        assert stats['total_calls'] == 1
-        assert stats['failed_calls'] == 1
-        assert stats['success_rate_percent'] == 0.0
-        assert ('HTTPException', 1) in stats['most_common_errors']
+        assert stats["total_calls"] == 1
+        assert stats["failed_calls"] == 1
+        assert stats["success_rate_percent"] == 0.0
+        assert ("HTTPException", 1) in stats["most_common_errors"]
 
     def test_mixed_calls_statistics(self):
         """Test statistics with mixed calls."""
@@ -264,10 +267,10 @@ class TestRetryStats:
         retry_stats.record_call(success=False, error_type="TimeoutError")
 
         stats = retry_stats.get_summary()
-        assert stats['total_calls'] == 4
-        assert stats['success_rate_percent'] == 75.0
-        assert stats['retried_calls'] == 1
-        assert stats['failed_calls'] == 1
+        assert stats["total_calls"] == 4
+        assert stats["success_rate_percent"] == 75.0
+        assert stats["retried_calls"] == 1
+        assert stats["failed_calls"] == 1
 
 
 @pytest.mark.asyncio
@@ -275,7 +278,7 @@ async def test_with_retry_stats_decorator():
     """Test decorator with statistics."""
     retry_stats.reset()
 
-    @with_retry_stats('test', RetryConfig(max_attempts=2, base_delay=0.01))
+    @with_retry_stats("test", RetryConfig(max_attempts=2, base_delay=0.01))
     async def test_function():
         return "success"
 
@@ -283,8 +286,8 @@ async def test_with_retry_stats_decorator():
 
     assert result == "success"
     stats = retry_stats.get_summary()
-    assert stats['total_calls'] == 1
-    assert stats['success_rate_percent'] == 100.0
+    assert stats["total_calls"] == 1
+    assert stats["success_rate_percent"] == 100.0
 
 
 @pytest.mark.asyncio
@@ -293,12 +296,12 @@ async def test_integration_scenario():
     retry_stats.reset()
 
     # Simulate 3 calls: 1 immediate success, 1 success after retry, 1 failure
-    @with_retry_stats('integration', RetryConfig(max_attempts=2, base_delay=0.01))
+    @with_retry_stats("integration", RetryConfig(max_attempts=2, base_delay=0.01))
     async def api_call(should_fail=False, retry_once=False):
         if should_fail:
             raise discord.Forbidden(response=MagicMock(), message="Forbidden")  # Permanent error
         if retry_once:
-            api_call.call_count = getattr(api_call, 'call_count', 0) + 1
+            api_call.call_count = getattr(api_call, "call_count", 0) + 1
             if api_call.call_count == 1:
                 raise ConnectionError("Temporary error")
         return "success"
@@ -317,7 +320,7 @@ async def test_integration_scenario():
 
     # Check final statistics
     stats = retry_stats.get_summary()
-    assert stats['total_calls'] == 3
-    assert stats['success_rate_percent'] == pytest.approx(66.67, abs=0.1)
-    assert stats['retried_calls'] == 1
-    assert stats['failed_calls'] == 1
+    assert stats["total_calls"] == 3
+    assert stats["success_rate_percent"] == pytest.approx(66.67, abs=0.1)
+    assert stats["retried_calls"] == 1
+    assert stats["failed_calls"] == 1

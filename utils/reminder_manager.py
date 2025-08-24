@@ -17,7 +17,7 @@ from utils.concurrency import (
     with_guild_lock,
     schedule_reaction_update,
     persistence_manager,
-    concurrency_stats
+    concurrency_stats,
 )
 from utils.error_recovery import safe_fetch_message
 from config.settings import Settings
@@ -54,6 +54,7 @@ class ReminderManager:
         Returns:
             bool: True if added successfully, False otherwise
         """
+
         async def _add_operation():
             self._reminders[reminder.message_id] = reminder
 
@@ -62,7 +63,9 @@ class ReminderManager:
                 self._guild_reminders[reminder.guild_id] = set()
             self._guild_reminders[reminder.guild_id].add(reminder.message_id)
 
-            logger.info(f"Added reminder for message {reminder.message_id} in guild {reminder.guild_id}")
+            logger.info(
+                f"Added reminder for message {reminder.message_id} in guild {reminder.guild_id}"
+            )
             return True
 
         try:
@@ -161,7 +164,7 @@ class ReminderManager:
         async def _update_operation():
             # Get the Discord message
             channel = bot.get_channel(reminder.channel_id)
-            if not channel or not hasattr(channel, 'fetch_message'):
+            if not channel or not hasattr(channel, "fetch_message"):
                 logger.error(f"Could not find text channel {reminder.channel_id}")
                 return False
 
@@ -178,20 +181,24 @@ class ReminderManager:
                         if not user.bot:
                             reminder.users_who_reacted.add(user.id)
 
-            logger.debug(f"Updated reactions for reminder {message_id}: {len(reminder.users_who_reacted)} users")
+            logger.debug(
+                f"Updated reactions for reminder {message_id}: {len(reminder.users_who_reacted)} users"
+            )
             return True
 
         try:
             result = await with_guild_lock(reminder.guild_id, _update_operation)
             if result:
                 await self._save_reminders_safe()
-                concurrency_stats.increment_stat('reaction_updates_processed')
+                concurrency_stats.increment_stat("reaction_updates_processed")
             return result
         except Exception as e:
             logger.error(f"Failed to update reactions for message {message_id}: {e}")
             return False
 
-    async def schedule_reaction_update_debounced(self, message_id: int, bot: discord.Client) -> None:
+    async def schedule_reaction_update_debounced(
+        self, message_id: int, bot: discord.Client
+    ) -> None:
         """
         Schedule a debounced reaction update to prevent rapid successive updates.
 
@@ -200,12 +207,9 @@ class ReminderManager:
             bot: The Discord bot client
         """
         await schedule_reaction_update(
-            message_id,
-            self.update_reminder_reactions_safe,
-            message_id,
-            bot
+            message_id, self.update_reminder_reactions_safe, message_id, bot
         )
-        concurrency_stats.increment_stat('reaction_updates_debounced')
+        concurrency_stats.increment_stat("reaction_updates_debounced")
 
     async def pause_reminder(self, message_id: int) -> bool:
         """
@@ -284,7 +288,9 @@ class ReminderManager:
 
         async def _update_interval_operation():
             reminder.interval_minutes = validated_interval
-            logger.info(f"Updated interval for reminder {message_id} to {validated_interval} minutes")
+            logger.info(
+                f"Updated interval for reminder {message_id} to {validated_interval} minutes"
+            )
             return True
 
         try:
@@ -355,11 +361,10 @@ class ReminderManager:
         """
         try:
             result = await persistence_manager.save_reminders_safe(
-                self._reminders,
-                Settings.REMINDERS_SAVE_FILE
+                self._reminders, Settings.REMINDERS_SAVE_FILE
             )
             if result:
-                concurrency_stats.increment_stat('save_operations')
+                concurrency_stats.increment_stat("save_operations")
             return result
         except Exception as e:
             logger.error(f"Failed to save reminders: {e}")
@@ -385,14 +390,13 @@ class ReminderManager:
         paused_reminders = sum(1 for r in self._reminders.values() if r.is_paused)
 
         return {
-            'total_reminders': len(self._reminders),
-            'active_reminders': active_reminders,
-            'paused_reminders': paused_reminders,
-            'guilds_with_reminders': len(self._guild_reminders),
-            'average_reminders_per_guild': (
-                len(self._reminders) / len(self._guild_reminders)
-                if self._guild_reminders else 0
-            )
+            "total_reminders": len(self._reminders),
+            "active_reminders": active_reminders,
+            "paused_reminders": paused_reminders,
+            "guilds_with_reminders": len(self._guild_reminders),
+            "average_reminders_per_guild": (
+                len(self._reminders) / len(self._guild_reminders) if self._guild_reminders else 0
+            ),
         }
 
 
