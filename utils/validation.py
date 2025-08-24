@@ -87,12 +87,43 @@ def validate_message_id(message_id: Union[int, str]) -> bool:
         ) from e
 
 
+def _validate_all_message_ids(link_info: MessageLinkInfo) -> None:
+    """
+    Valide tous les IDs d'un MessageLinkInfo en une seule fois pour éviter la redondance.
+    
+    Args:
+        link_info: Informations du lien contenant les IDs à valider
+        
+    Raises:
+        ValidationError: Si un des IDs est invalide
+    """
+    validate_message_id(link_info.guild_id)
+    validate_message_id(link_info.channel_id)
+    validate_message_id(link_info.message_id)
+
+
+def _validate_role_characters(role: str) -> None:
+    """
+    Valide les caractères d'un nom de rôle pour éviter la duplication de code.
+    
+    Args:
+        role: Nom du rôle à valider
+        
+    Raises:
+        ValidationError: Si le rôle contient des caractères interdits
+    """
+    forbidden_chars = ['@', '#', ':', '```', '\n', '\r']
+    for char in forbidden_chars:
+        if char in role:
+            raise ValidationError(f"Le rôle '{role}' contient des caractères interdits: '{char}'")
+
+
 async def validate_message_link(
     bot: commands.Bot, 
     link: str, 
     user: discord.User,
     require_permissions: bool = True
-) -> Tuple[bool, str, Optional[MessageLinkInfo]]:
+) -> MessageLinkInfo:
     """
     Valide un lien de message et les permissions utilisateur.
     
@@ -103,73 +134,62 @@ async def validate_message_link(
         require_permissions: Si True, vérifie les permissions utilisateur
         
     Returns:
-        Tuple[bool, str, Optional[MessageLinkInfo]]: 
-            - bool: True si valide, False sinon
-            - str: Message d'erreur ou de succès
-            - MessageLinkInfo: Informations du lien si valide, None sinon
+        MessageLinkInfo: Informations du lien validé
+        
+    Raises:
+        ValidationError: Si la validation échoue avec message descriptif
     """
+    # Parser le lien pour extraire les IDs
+    link_info = parse_message_link(link)
+    if not link_info:
+        raise ValidationError("Format de lien invalide. Utilisez un lien Discord valide.")
+    
+    # Valider tous les IDs en une fois pour éviter la redondance
+    _validate_all_message_ids(link_info)
+        
+    # Vérifier l'accès au serveur
+    guild = bot.get_guild(link_info.guild_id)
+    if not guild:
+        raise ValidationError("Serveur introuvable ou bot non présent sur ce serveur")
+        
+    # Vérifier l'accès au canal
+    channel = guild.get_channel(link_info.channel_id)
+    if not channel:
+        raise ValidationError("Canal introuvable ou supprimé")
+        
+    if not isinstance(channel, discord.TextChannel):
+        raise ValidationError("Le canal doit être un canal textuel")
+    
+    # Vérifier les permissions utilisateur (si requises) - éviter répétition de get_member
+    if require_permissions:
+        member = guild.get_member(user.id)
+        if not member:
+            raise ValidationError("Vous n'avez pas accès à ce serveur")
+        
+        permissions = channel.permissions_for(member)
+        if not permissions.view_channel:
+            raise ValidationError("Vous n'avez pas la permission de voir ce canal")
+        if not permissions.read_message_history:
+            raise ValidationError("Vous n'avez pas la permission de lire l'historique de ce canal")
+        
+    # Vérifier l'existence du message avec gestion d'erreurs spécifiques
     try:
-        # Parser le lien pour extraire les IDs
-        link_info = parse_message_link(link)
-        if not link_info:
-            return False, "❌ Format de lien invalide. Utilisez un lien Discord valide.", None
-        
-        # Valider les IDs extraits
-        try:
-            validate_message_id(link_info.guild_id)
-            validate_message_id(link_info.channel_id) 
-            validate_message_id(link_info.message_id)
-        except ValidationError as e:
-            return False, f"❌ {e.message}", None
-        
-        # Vérifier l'accès au serveur
-        guild = bot.get_guild(link_info.guild_id)
-        if not guild:
-            return False, "❌ Serveur introuvable ou bot non présent sur ce serveur", None
-            
-        # Vérifier si l'utilisateur a accès au serveur (si permissions requises)
-        if require_permissions:
-            member = guild.get_member(user.id)
-            if not member:
-                return False, "❌ Vous n'avez pas accès à ce serveur", None
-        
-        # Vérifier l'accès au canal
-        channel = guild.get_channel(link_info.channel_id)
-        if not channel:
-            return False, "❌ Canal introuvable ou supprimé", None
-            
-        if not isinstance(channel, discord.TextChannel):
-            return False, "❌ Le canal doit être un canal textuel", None
-        
-        # Vérifier les permissions utilisateur sur le canal (si requises)
-        if require_permissions:
-            member = guild.get_member(user.id)
-            if member:
-                permissions = channel.permissions_for(member)
-                if not permissions.view_channel:
-                    return False, "❌ Vous n'avez pas la permission de voir ce canal", None
-                if not permissions.read_message_history:
-                    return False, "❌ Vous n'avez pas la permission de lire l'historique de ce canal", None
-        
-        # Vérifier l'existence du message (avec gestion des erreurs)
-        try:
-            message = await channel.fetch_message(link_info.message_id)
-            if not message:
-                return False, "❌ Message introuvable (peut-être supprimé)", None
-        except discord.NotFound:
-            return False, "❌ Message introuvable (peut-être supprimé)", None
-        except discord.Forbidden:
-            return False, "❌ Permissions insuffisantes pour accéder au message", None
-        except discord.HTTPException as e:
-            logger.error(f"HTTP error fetching message {link_info.message_id}: {e}")
-            return False, f"❌ Erreur lors de la récupération du message: {str(e)}", None
-        
-        logger.debug(f"Message link validation passed for {link}")
-        return True, "✅ Lien validé avec succès", link_info
-        
-    except Exception as e:
-        logger.error(f"Unexpected error validating message link {link}: {e}")
-        return False, f"❌ Erreur inattendue lors de la validation: {str(e)}", None
+        message = await channel.fetch_message(link_info.message_id)
+        if not message:
+            raise ValidationError("Message introuvable (peut-être supprimé)")
+    except discord.NotFound:
+        raise ValidationError("Message introuvable (peut-être supprimé)")
+    except discord.Forbidden:
+        raise ValidationError("Permissions insuffisantes pour accéder au message")
+    except discord.HTTPException as e:
+        logger.error(f"HTTP error fetching message {link_info.message_id}: {e}")
+        raise ValidationError(
+            "Erreur lors de la récupération du message",
+            f"HTTP error: {str(e)}"
+        )
+    
+    logger.debug(f"Message link validation passed for {link}")
+    return link_info
 
 
 def validate_interval_minutes(interval: Union[int, str, float], test_mode: bool = False) -> int:
@@ -200,9 +220,9 @@ def validate_interval_minutes(interval: Union[int, str, float], test_mode: bool 
             min_interval = 5      # 5 minutes minimum en production
             max_interval = 1440   # 24 heures maximum en production
         
-        if interval <= 0:
+        if interval < 0:
             raise ValidationError(
-                "❌ L'intervalle doit être un nombre positif",
+                "❌ L'intervalle ne peut pas être négatif",
                 f"Valeur reçue: {interval}"
             )
         
@@ -248,23 +268,16 @@ def validate_environment_config() -> List[str]:
     except (ValueError, TypeError):
         errors.append("REMINDER_INTERVAL_HOURS doit être un nombre")
     
-    # Valider ADMIN_ROLES
+    # Valider ADMIN_ROLES en utilisant la fonction dédiée pour éviter duplication
     admin_roles_str = os.getenv('ADMIN_ROLES', '')
     if not admin_roles_str.strip():
         errors.append("ADMIN_ROLES ne peut pas être vide")
     else:
-        # Vérifier que les rôles ne contiennent pas de caractères problématiques
         admin_roles = [role.strip() for role in admin_roles_str.split(',')]
-        for role in admin_roles:
-            if not role:
-                errors.append("ADMIN_ROLES contient des rôles vides")
-                break
-            if len(role) > 100:  # Discord limite les noms de rôles
-                errors.append(f"Rôle admin '{role}' trop long (max 100 caractères)")
-            # Vérifier les caractères interdits basiques
-            forbidden_chars = ['@', '#', ':', '```']
-            if any(char in role for char in forbidden_chars):
-                errors.append(f"Rôle admin '{role}' contient des caractères interdits")
+        try:
+            validate_admin_roles_list(admin_roles)
+        except ValidationError as e:
+            errors.append(f"ADMIN_ROLES invalide: {e.message}")
     
     # Valider USE_SEPARATE_REMINDER_CHANNEL
     separate_channel = os.getenv('USE_SEPARATE_REMINDER_CHANNEL', 'false').lower()
@@ -302,37 +315,32 @@ def validate_environment_config() -> List[str]:
     return errors
 
 
-def validate_admin_roles_list(roles: List[str]) -> Tuple[bool, str]:
+def validate_admin_roles_list(roles: List[str]) -> None:
     """
     Valide une liste de rôles administrateurs.
     
     Args:
         roles: Liste des noms de rôles à valider
         
-    Returns:
-        Tuple[bool, str]: (is_valid, error_message)
+    Raises:
+        ValidationError: Si la validation échoue avec message descriptif
     """
     if not roles:
-        return False, "La liste des rôles admin ne peut pas être vide"
+        raise ValidationError("La liste des rôles admin ne peut pas être vide")
     
     for role in roles:
         if not isinstance(role, str):
-            return False, f"Le rôle doit être une chaîne de caractères: {role}"
+            raise ValidationError(f"Le rôle doit être une chaîne de caractères: {role}")
         
         role = role.strip()
         if not role:
-            return False, "Les rôles admin ne peuvent pas être vides"
+            raise ValidationError("Les rôles admin ne peuvent pas être vides")
         
         if len(role) > 100:
-            return False, f"Le rôle '{role}' est trop long (max 100 caractères)"
+            raise ValidationError(f"Le rôle '{role}' est trop long (max 100 caractères)")
         
-        # Vérifier les caractères problématiques
-        forbidden_chars = ['@', '#', ':', '```', '\n', '\r']
-        for char in forbidden_chars:
-            if char in role:
-                return False, f"Le rôle '{role}' contient des caractères interdits: '{char}'"
-    
-    return True, "Rôles admin valides"
+        # Utiliser la fonction commune pour éviter la duplication
+        _validate_role_characters(role)
 
 
 def get_validation_error_embed(error: ValidationError, title: str = "Erreur de validation") -> discord.Embed:

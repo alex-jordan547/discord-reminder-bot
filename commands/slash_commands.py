@@ -103,9 +103,11 @@ class SlashCommands(commands.Cog):
         interval_adjusted = validated_interval != original_interval
 
         # Validate message link with permissions
-        is_valid, error_msg, link_info = await validate_message_link(self.bot, message, interaction.user)
-        if not is_valid:
-            await interaction.response.send_message(error_msg, ephemeral=True)
+        try:
+            link_info = await validate_message_link(self.bot, message, interaction.user)
+        except ValidationError as e:
+            embed = get_validation_error_embed(e, "Erreur de lien")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # Verify the message is on this server

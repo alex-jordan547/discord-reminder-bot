@@ -292,9 +292,11 @@ def register_commands(bot: commands.Bot) -> None:
             return
 
         # Validate message link with permissions
-        is_valid, error_msg, link_info = await validate_message_link(bot, message_link, ctx.author)
-        if not is_valid:
-            await ctx.send(error_msg)
+        try:
+            link_info = await validate_message_link(bot, message_link, ctx.author)
+        except ValidationError as e:
+            embed = get_validation_error_embed(e, "Erreur de lien")
+            await ctx.send(embed=embed)
             return
 
         # Verify the message is on this server

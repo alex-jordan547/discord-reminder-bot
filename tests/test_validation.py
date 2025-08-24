@@ -113,12 +113,10 @@ class TestValidateMessageLink:
         """Test validation of a valid Discord message link."""
         valid_link = "https://discord.com/channels/123456789/987654321/555666777"
         
-        is_valid, message, link_info = await validate_message_link(
+        link_info = await validate_message_link(
             mock_bot, valid_link, mock_user
         )
         
-        assert is_valid == True
-        assert "validé avec succès" in message
         assert link_info is not None
         assert link_info.guild_id == 123456789
         assert link_info.channel_id == 987654321
@@ -135,12 +133,12 @@ class TestValidateMessageLink:
         ]
         
         for link in invalid_links:
-            is_valid, message, link_info = await validate_message_link(
-                mock_bot, link, mock_user
-            )
-            assert is_valid == False
-            assert "invalide" in message
-            assert link_info is None
+            with pytest.raises(ValidationError) as exc_info:
+                await validate_message_link(
+                    mock_bot, link, mock_user
+                )
+            
+            assert "invalide" in str(exc_info.value).lower() or "format" in str(exc_info.value).lower()
     
     @pytest.mark.asyncio
     async def test_guild_not_found(self, mock_user):
@@ -150,13 +148,12 @@ class TestValidateMessageLink:
         
         link = "https://discord.com/channels/123456789/987654321/555666777"
         
-        is_valid, message, link_info = await validate_message_link(
-            bot, link, mock_user
-        )
+        with pytest.raises(ValidationError) as exc_info:
+            await validate_message_link(
+                bot, link, mock_user
+            )
         
-        assert is_valid == False
-        assert "introuvable" in message
-        assert link_info is None
+        assert "introuvable" in str(exc_info.value)
     
     @pytest.mark.asyncio
     async def test_no_permissions(self, mock_bot, mock_user):
@@ -167,13 +164,12 @@ class TestValidateMessageLink:
         
         link = "https://discord.com/channels/123456789/987654321/555666777"
         
-        is_valid, message, link_info = await validate_message_link(
-            mock_bot, link, mock_user
-        )
+        with pytest.raises(ValidationError) as exc_info:
+            await validate_message_link(
+                mock_bot, link, mock_user
+            )
         
-        assert is_valid == False
-        assert "accès à ce serveur" in message
-        assert link_info is None
+        assert "accès à ce serveur" in str(exc_info.value)
 
 
 class TestValidateIntervalMinutes:
@@ -300,31 +296,30 @@ class TestValidateAdminRolesList:
     def test_valid_roles_list(self):
         """Test that valid admin roles pass validation."""
         valid_roles = ['Admin', 'Moderator', 'Coach']
-        is_valid, message = validate_admin_roles_list(valid_roles)
-        assert is_valid == True
-        assert 'valides' in message
+        # Should not raise exception for valid roles
+        validate_admin_roles_list(valid_roles)
     
     def test_empty_roles_list(self):
         """Test that empty roles list fails validation."""
-        is_valid, message = validate_admin_roles_list([])
-        assert is_valid == False
-        assert 'vide' in message
+        with pytest.raises(ValidationError) as exc_info:
+            validate_admin_roles_list([])
+        assert 'vide' in str(exc_info.value)
     
     def test_roles_with_forbidden_characters(self):
         """Test that roles with forbidden characters fail validation."""
         invalid_roles = ['Role@WithAt', 'Role#WithHash', 'Role:WithColon']
         
         for roles in [[role] for role in invalid_roles]:
-            is_valid, message = validate_admin_roles_list(roles)
-            assert is_valid == False
-            assert 'interdits' in message
+            with pytest.raises(ValidationError) as exc_info:
+                validate_admin_roles_list(roles)
+            assert 'interdits' in str(exc_info.value)
     
     def test_too_long_role_names(self):
         """Test that overly long role names fail validation."""
         long_role = 'x' * 101  # Over 100 characters
-        is_valid, message = validate_admin_roles_list([long_role])
-        assert is_valid == False
-        assert 'trop long' in message
+        with pytest.raises(ValidationError) as exc_info:
+            validate_admin_roles_list([long_role])
+        assert 'trop long' in str(exc_info.value)
 
 
 class TestUtilityFunctions:
@@ -388,9 +383,8 @@ class TestIntegration:
         
         # Test valid link
         valid_link = "https://discord.com/channels/123456789012345678/987654321012345678/555666777012345678"
-        is_valid, msg, link_info = await validate_message_link(bot, valid_link, user)
+        link_info = await validate_message_link(bot, valid_link, user)
         
-        assert is_valid == True
         assert link_info is not None
         
         # Validate the extracted IDs
@@ -402,7 +396,7 @@ class TestIntegration:
         """Test integration between environment and interval validation."""
         # Test that test mode affects interval validation
         env_vars = {
-            'DISCORD_TOKEN': 'valid_token_' + 'x' * 30,
+            'DISCORD_TOKEN': 'valid_token_' + 'x' * 50,
             'REMINDER_INTERVAL_HOURS': '0.5',  # 30 minutes, enables test mode
             'ADMIN_ROLES': 'Admin',
             'TEST_MODE': 'true',
