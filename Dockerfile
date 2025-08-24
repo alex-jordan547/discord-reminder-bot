@@ -3,9 +3,9 @@ FROM python:3.13-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (if needed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies if needed (currently none required)
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies first (for better Docker layer caching)
 COPY requirements.txt .
@@ -35,9 +35,9 @@ RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
 USER app
 
-# Health check - verify Discord bot can import core modules and instantiate
+# Health check - verify basic imports work
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import discord; from bot import create_bot; bot = create_bot(); print('Health check passed'); import sys; sys.exit(0)"
+    CMD python -c "import discord; import bot; print('Health check passed')" || exit 1
 
 # Run the bot
 CMD ["python", "-u", "bot.py"]

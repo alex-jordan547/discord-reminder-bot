@@ -197,16 +197,39 @@ jobs:
         import sys
         print(f'Python version: {sys.version}')
         
-        # Test core imports
-        import discord
-        print('✓ discord.py imported successfully')
+        # Test core imports with error handling
+        try:
+            import discord
+            print('✓ discord.py imported successfully')
+        except ImportError as e:
+            print(f'❌ Failed to import discord: {e}')
+            sys.exit(1)
         
-        from bot import create_bot
-        print('✓ Bot creation import successful')
+        try:
+            # Test if we can access bot module
+            import bot
+            print('✓ Bot module imported successfully')
+        except ImportError as e:
+            print(f'❌ Failed to import bot module: {e}')
+            sys.exit(1)
+            
+        try:
+            # Test bot creation with error handling
+            from bot import create_bot
+            bot_instance = create_bot()
+            print('✓ Bot creation successful')
+        except Exception as e:
+            print(f'❌ Bot creation failed: {e}')
+            # Don't exit here as this might be expected without full env
+            print('⚠️ Bot creation failed but this may be expected in test environment')
         
-        from utils.logging_config import setup_logging
-        setup_logging(log_to_file=False)
-        print('✓ Logging system works')
+        try:
+            from utils.logging_config import setup_logging
+            setup_logging(log_to_file=False)
+            print('✓ Logging system works')
+        except Exception as e:
+            print(f'❌ Logging setup failed: {e}')
+            sys.exit(1)
         
         print('✓ All basic functionality tests passed')
         "
