@@ -322,8 +322,8 @@ class ReminderManager:
             bool: True if loaded successfully, False otherwise
         """
         try:
-            from persistence.storage import load_matches
-            loaded_reminders = load_matches()
+            from persistence.storage import load_matches_safe
+            loaded_reminders = await load_matches_safe()
             
             self._reminders = loaded_reminders
             self._guild_reminders.clear()
@@ -358,6 +358,15 @@ class ReminderManager:
         except Exception as e:
             logger.error(f"Failed to save reminders: {e}")
             return False
+    
+    async def save(self) -> bool:
+        """
+        Trigger a manual save of all reminders.
+        
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        return await self._save_reminders_safe()
     
     def get_stats(self) -> Dict[str, Any]:
         """

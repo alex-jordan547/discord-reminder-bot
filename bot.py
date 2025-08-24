@@ -78,6 +78,17 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         logger.error(f"Failed to register or sync slash commands: {e}")
         print(f"❌ Erreur lors de la synchronisation des commandes slash: {e}")
 
+    # Load reminders from storage using thread-safe manager
+    if hasattr(bot, 'reminder_manager'):
+        success = await bot.reminder_manager.load_from_storage()
+        if success:
+            total_loaded = len(bot.reminder_manager.reminders)
+            logger.info(f"Loaded {total_loaded} reminders from storage")
+            print(f"📥 Chargé {total_loaded} rappel(s) depuis le stockage")
+        else:
+            logger.warning("Failed to load reminders from storage")
+            print("⚠️ Échec du chargement des rappels depuis le stockage")
+
     # Start the dynamic reminder system
     if hasattr(bot, 'start_dynamic_reminder_system'):
         await bot.start_dynamic_reminder_system()

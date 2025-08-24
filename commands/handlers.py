@@ -42,14 +42,16 @@ def reschedule_reminders() -> None:
         _dynamic_reminder_task.cancel()
         logger.debug("Previous reminder task cancelled for rescheduling")
     
-    if watched_matches:
-        logger.debug(f"Rescheduling reminders for {len(watched_matches)} watched match(es)")
-        print(f"🔄 Replanification des rappels pour {len(watched_matches)} match(s)")
+    # Check if there are reminders to watch using thread-safe manager
+    total_reminders = len(reminder_manager.reminders)
+    if total_reminders > 0:
+        logger.debug(f"Rescheduling reminders for {total_reminders} watched reminder(s)")
+        print(f"🔄 Replanification des rappels pour {total_reminders} rappel(s)")
         print("⏰ Le système se réactivera dans quelques secondes...")
         # La replanification sera gérée par une tâche qui se déclenchera automatiquement
     else:
-        logger.debug("No matches to watch, system entering sleep mode")
-        print("😴 Aucun match à surveiller, mise en veille du système")
+        logger.debug("No reminders to watch, system entering sleep mode")
+        print("😴 Aucun rappel à surveiller, mise en veille du système")
 
 
 
@@ -159,7 +161,7 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
             logger.error(f"Could not fetch message {reminder.message_id} from channel {reminder.channel_id}")
             # Update timestamp to avoid repeated attempts
             reminder.last_reminder = datetime.now()
-            save_matches(watched_matches)
+            await reminder_manager.save()
             return 0
 
         # Update the list of users who have reacted
@@ -235,7 +237,7 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
 
         # Update reminder timestamp
         reminder.last_reminder = datetime.now()
-        save_matches(watched_matches)
+        await reminder_manager.save()
 
         logger.info(f"Sent reminder for match {reminder.message_id} to {len(users_to_mention)} users")
 
@@ -245,7 +247,7 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
         logger.error(f"Unexpected error in send_reminder for match {reminder.message_id}: {e}")
         # Update timestamp even on error to prevent retry loop
         reminder.last_reminder = datetime.now()
-        save_matches(watched_matches)
+        await reminder_manager.save()
         return 0
 
 
@@ -333,9 +335,11 @@ def register_commands(bot: commands.Bot) -> None:
                         if not user.bot:
                             reminder.users_who_reacted.add(user.id)
 
-            # Save the reminder
-            watched_matches[link_info.message_id] = reminder
-            save_matches(watched_matches)
+            # Save the reminder using thread-safe manager
+            success = await reminder_manager.add_reminder(reminder)
+            if not success:
+                await ctx.send("❌ Erreur lors de l'ajout du match à surveiller.")
+                return
             
             # Replanifier les rappels après ajout
             reschedule_reminders()
@@ -397,10 +401,14 @@ def register_commands(bot: commands.Bot) -> None:
                 await send_error_to_user(ctx, e, "l'analyse de l'ID du message")
                 return
 
-        if message_id in watched_matches:
-            title = watched_matches[message_id].title
-            del watched_matches[message_id]
-            save_matches(watched_matches)
+        # Check if reminder exists using thread-safe manager
+        reminder = await reminder_manager.get_reminder(message_id)
+        if reminder:
+            title = reminder.title
+            success = await reminder_manager.remove_reminder(message_id)
+            if not success:
+                await ctx.send("❌ Erreur lors de la suppression du match.")
+                return
             
             # Replanifier les rappels après suppression
             reschedule_reminders()
@@ -413,8 +421,8 @@ def register_commands(bot: commands.Bot) -> None:
     @bot.command(name='list')
     async def list_matches(ctx: commands.Context) -> None:
         """List all watched matches on this server."""
-        # Filter matches for this server only
-        server_matches = {k: v for k, v in watched_matches.items() if v.guild_id == ctx.guild.id}
+        # Filter matches for this server only using thread-safe manager
+        server_matches = await reminder_manager.get_guild_reminders(ctx.guild.id)
 
         if not server_matches:
             await ctx.send(Messages.NO_WATCHED_MATCHES)
@@ -468,16 +476,18 @@ def register_commands(bot: commands.Bot) -> None:
                     await send_error_to_user(ctx, e, "l'analyse de l'ID du message")
                     return
 
-            if message_id not in watched_matches:
+            # Check if reminder exists using thread-safe manager
+            reminder = await reminder_manager.get_reminder(message_id)
+            if not reminder:
                 await ctx.send(Messages.MATCH_NOT_WATCHED)
                 return
-            if watched_matches[message_id].guild_id != ctx.guild.id:
+            if reminder.guild_id != ctx.guild.id:
                 await ctx.send(Messages.MATCH_NOT_ON_SERVER)
                 return
-            matches_to_remind = {message_id: watched_matches[message_id]}
+            matches_to_remind = {message_id: reminder}
         else:
-            # Filter matches for this server only
-            matches_to_remind = {k: v for k, v in watched_matches.items() if v.guild_id == ctx.guild.id}
+            # Filter matches for this server only using thread-safe manager
+            matches_to_remind = await reminder_manager.get_guild_reminders(ctx.guild.id)
 
         if not matches_to_remind:
             await ctx.send(Messages.NO_MATCHES_TO_REMIND)
@@ -525,7 +535,9 @@ def register_commands(bot: commands.Bot) -> None:
         embed.add_field(name="⏰ Intervalle", value=interval_text, inline=True)
         embed.add_field(name="👮 Rôles admin", value=Settings.get_admin_roles_str(), inline=True)
 
-        server_matches_count = len([m for m in watched_matches.values() if m.guild_id == ctx.guild.id])
+        # Get server matches count using thread-safe manager
+        server_reminders = await reminder_manager.get_guild_reminders(ctx.guild.id)
+        server_matches_count = len(server_reminders)
         embed.add_field(name="📊 Matchs surveillés", value=str(server_matches_count), inline=True)
 
         await ctx.send(embed=embed)
@@ -852,20 +864,20 @@ def register_commands(bot: commands.Bot) -> None:
         """Synchronise les commandes slash avec Discord (commande de développement)."""
         await sync_slash_commands(ctx)
 
-    # Expose the dynamic reminder functions and global variables for bot.py
+    # Expose the dynamic reminder functions and reminder manager for bot.py
     bot.start_dynamic_reminder_system = start_dynamic_reminder_system
     bot.reschedule_reminders = reschedule_reminders
-    bot.watched_matches_global = watched_matches
+    bot.reminder_manager = reminder_manager
 
-    # Load matches on startup
-    watched_matches.update(load_matches())
+    # Load reminders on startup using thread-safe manager
+    # Note: This will be done asynchronously in the bot's on_ready event
 
     # Register slash commands
     from commands.slash_commands import register_slash_commands
     register_slash_commands(bot)
 
-    # Share the watched_matches dictionary with slash commands
+    # Share the reminder manager with slash commands
     import commands.slash_commands as slash_commands_module
-    slash_commands_module.watched_matches = watched_matches
+    slash_commands_module.reminder_manager = reminder_manager
 
-    logger.info(f"Registered all commands and loaded {len(watched_matches)} matches from storage")
+    logger.info("Registered all commands and configured reminder manager")
