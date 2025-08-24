@@ -6,12 +6,13 @@ correctly and prevents race conditions.
 """
 
 import asyncio
-import pytest
-import tempfile
-import os
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+import os
+import tempfile
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Remove sys.path manipulation - use proper test runner instead
 
@@ -20,7 +21,7 @@ os.environ["DISCORD_TOKEN"] = "test_token"
 os.environ["TEST_MODE"] = "true"
 
 from models.reminder import Reminder
-from persistence.storage import save_matches, load_matches
+from persistence.storage import load_matches, save_matches
 from utils.concurrency import ReminderLockManager
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ modules de commandes pour éviter les dépendances circulaires.
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import discord
 from discord.ext import commands

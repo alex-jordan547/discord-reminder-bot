@@ -4,10 +4,12 @@ Integration tests for health commands functionality.
 """
 
 import asyncio
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
-from utils.error_recovery import retry_stats
+
 from commands.slash_commands import SlashCommands
+from utils.error_recovery import retry_stats
 
 
 @pytest.mark.asyncio
@@ -32,13 +34,13 @@ async def test_health_stats_functionality():
 
     # Test statistics collection instead of slash command
     stats = retry_stats.get_summary()
-    
+
     # Verify statistics are collected correctly
-    assert stats['total_calls'] > 0, "Should have total calls"
-    assert stats['successful_calls'] > 0, "Should have successful calls"
-    assert 'uptime_hours' in stats, "Should track uptime"
-    assert 'success_rate_percent' in stats, "Should calculate success rate"
-    
+    assert stats["total_calls"] > 0, "Should have total calls"
+    assert stats["successful_calls"] > 0, "Should have successful calls"
+    assert "uptime_hours" in stats, "Should track uptime"
+    assert "success_rate_percent" in stats, "Should calculate success rate"
+
     print("  ✅ Statistics collection working correctly")
     print(f"  📊 Total calls: {stats['total_calls']}")
     print(f"  ✅ Successful calls: {stats['successful_calls']}")
@@ -85,8 +87,8 @@ async def test_error_recovery_tracking():
     print(f"  ✅ Successful recoveries: {stats['recovered_calls']}")
 
     # Verify statistics are reasonable
-    assert stats['success_rate_percent'] > 50, "Success rate should be above 50%"
-    assert stats['total_calls'] > 0, "Should have attempted recoveries"
+    assert stats["success_rate_percent"] > 50, "Success rate should be above 50%"
+    assert stats["total_calls"] > 0, "Should have attempted recoveries"
 
     print("  ✅ Error recovery tracking working correctly")
     return True
@@ -125,7 +127,7 @@ async def test_bot_health_monitoring():
     print(f"  📋 Active reminders: {indicators['active_reminders']}")
 
     # Verify health indicators
-    assert indicators["bot_ready"] == True
+    assert indicators["bot_ready"]
     assert indicators["latency_ms"] < 1000, "Latency should be reasonable"
     assert indicators["uptime_hours"] > 0, "Should have positive uptime"
 

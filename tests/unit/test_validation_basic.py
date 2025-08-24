@@ -3,8 +3,8 @@
 Basic validation unit tests.
 """
 
-import sys
 import os
+import sys
 
 # Add project root to Python path when running standalone
 if __name__ == "__main__":

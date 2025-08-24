@@ -9,7 +9,7 @@ import asyncio
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Set, Any
+from typing import Any, Dict, Set
 
 from models.reminder import Reminder
 

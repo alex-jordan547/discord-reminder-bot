@@ -6,7 +6,7 @@ and its associated data including user reactions and timing information.
 """
 
 from datetime import datetime, timedelta
-from typing import Set, List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 class Reminder:

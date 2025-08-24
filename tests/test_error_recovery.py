@@ -5,23 +5,23 @@ Tests retry mechanisms, error classification, and recovery.
 """
 
 import asyncio
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
+import pytest
 
 from utils.error_recovery import (
-    classify_discord_error,
     ErrorSeverity,
-    is_retryable_error,
-    calculate_delay,
     RetryConfig,
+    calculate_delay,
+    classify_discord_error,
+    is_retryable_error,
+    retry_stats,
+    safe_fetch_message,
+    safe_send_message,
     with_retry,
     with_retry_stats,
-    safe_send_message,
-    safe_fetch_message,
-    retry_stats,
 )
 
 

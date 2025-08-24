@@ -3,8 +3,8 @@
 Development script to validate that all imports work correctly.
 """
 
-import os
 import importlib.util
+import os
 
 
 def validate_module(module_path, module_name):

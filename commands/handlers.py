@@ -13,21 +13,21 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from commands.command_utils import sync_slash_commands_logic, create_health_embed
-from config.settings import Settings, Messages
+from commands.command_utils import create_health_embed, sync_slash_commands_logic
+from config.settings import Messages, Settings
 from models.reminder import Reminder
 from utils.auto_delete import get_auto_delete_manager
 from utils.concurrency import get_concurrency_stats
-from utils.error_recovery import safe_send_message, safe_fetch_message, retry_stats
-from utils.message_parser import parse_message_link, extract_message_title
-from utils.permissions import has_admin_permission, get_permission_error_message
+from utils.error_recovery import retry_stats, safe_fetch_message, safe_send_message
+from utils.message_parser import extract_message_title, parse_message_link
+from utils.permissions import get_permission_error_message, has_admin_permission
 from utils.reminder_manager import reminder_manager
 from utils.validation import (
-    validate_message_id,
-    validate_message_link,
     ValidationError,
     get_validation_error_embed,
     safe_int_conversion,
+    validate_message_id,
+    validate_message_link,
 )
 
 # Get logger for this module
@@ -227,8 +227,6 @@ async def start_dynamic_reminder_system() -> None:
 
 def reschedule_reminders() -> None:
     """Replanifie les rappels après ajout/suppression d'un match."""
-    global _dynamic_reminder_task
-
     # Annuler la tâche précédente
     if _dynamic_reminder_task and not _dynamic_reminder_task.done():
         _dynamic_reminder_task.cancel()

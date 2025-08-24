@@ -13,7 +13,7 @@ import threading
 from datetime import datetime
 from enum import Enum
 from functools import wraps
-from typing import Callable, Any, Optional, Dict
+from typing import Any, Callable, Dict, Optional
 
 import discord
 

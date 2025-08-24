@@ -2,8 +2,10 @@
 Tests for reminder model functionality.
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from models.reminder import Reminder
 
 

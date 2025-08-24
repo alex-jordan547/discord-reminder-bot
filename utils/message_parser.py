@@ -5,9 +5,9 @@ This module provides functions to parse Discord message links and extract
 relevant IDs and information.
 """
 
-import re
 import logging
-from typing import Optional, Tuple, NamedTuple
+import re
+from typing import NamedTuple, Optional, Tuple
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def parse_message_link(message_link: str) -> Optional[MessageLinkInfo]:
     if not message_link:
         logger.warning("Message link is None or empty")
         return None
-        
+
     # Clean the input string
     message_link = message_link.strip()
 

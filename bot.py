@@ -19,15 +19,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from commands.handlers import setup_bot_handlers
-from config.settings import Settings, Messages
+from config.settings import Messages, Settings
+from utils.auto_delete import init_auto_delete_manager
 from utils.logging_config import (
-    setup_logging,
     get_log_level_from_env,
+    setup_logging,
     should_log_to_file,
     should_use_colors,
 )
 from utils.validation import validate_environment_config
-from utils.auto_delete import init_auto_delete_manager
 
 
 def create_bot() -> commands.Bot:

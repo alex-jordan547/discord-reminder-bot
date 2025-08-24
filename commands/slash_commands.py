@@ -8,20 +8,20 @@ enhanced reminder system with minute-based intervals and advanced features.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from commands.command_utils import sync_slash_commands_logic, create_health_embed
-from config.settings import Settings, Messages
+from commands.command_utils import create_health_embed, sync_slash_commands_logic
+from config.settings import Messages, Settings
 from models.reminder import Reminder
-from utils.error_recovery import safe_fetch_message, retry_stats
-from utils.message_parser import parse_message_link, extract_message_title
+from utils.error_recovery import retry_stats, safe_fetch_message
+from utils.message_parser import extract_message_title, parse_message_link
 from utils.permissions import has_admin_permission
 from utils.reminder_manager import reminder_manager
-from utils.validation import validate_message_link, ValidationError, get_validation_error_embed
+from utils.validation import ValidationError, get_validation_error_embed, validate_message_link
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -432,7 +432,7 @@ class SlashCommands(commands.Cog):
             return
 
         # Import send_reminder function
-        from commands.handlers import send_reminder, get_or_create_reminder_channel
+        from commands.handlers import get_or_create_reminder_channel, send_reminder
 
         total_reminded = 0
 

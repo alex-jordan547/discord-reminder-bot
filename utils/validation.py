@@ -5,13 +5,14 @@ This module provides comprehensive validation functions for user inputs,
 configuration settings, and Discord-specific data types.
 """
 
-import os
 import logging
-from typing import Optional, Tuple, Union, List
+import os
+from typing import List, Optional, Tuple, Union
+
 import discord
 from discord.ext import commands
 
-from utils.message_parser import parse_message_link, MessageLinkInfo
+from utils.message_parser import MessageLinkInfo, parse_message_link
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
