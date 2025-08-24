@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Script de test pour vérifier que tous les problèmes de formatage ont été corrigés.
+Unit tests for code formatting validation.
 """
 
 import os
 import re
 import sys
+
+# Add project root to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 def check_file_formatting(file_path):
     """Vérifier les problèmes de formatage dans un fichier."""
@@ -45,25 +48,26 @@ def main():
     print("🔍 Vérification du formatage des fichiers Python...")
     print("=" * 60)
 
-    # Fichiers à vérifier
+    # Fichiers à vérifier (adjust paths for test location)
     files_to_check = [
-        'commands/handlers.py',
-        'commands/slash_commands.py',
-        'bot.py',
-        'config/settings.py',
-        'models/reminder.py'
+        '../../commands/handlers.py',
+        '../../commands/slash_commands.py',
+        '../../bot.py',
+        '../../config/settings.py',
+        '../../models/reminder.py'
     ]
 
     total_issues = 0
     files_with_issues = 0
 
     for file_path in files_to_check:
-        if not os.path.exists(file_path):
+        full_path = os.path.join(os.path.dirname(__file__), file_path)
+        if not os.path.exists(full_path):
             print(f"⚠️  {file_path} - Fichier non trouvé")
             continue
 
         print(f"📄 {file_path}")
-        issues = check_file_formatting(file_path)
+        issues = check_file_formatting(full_path)
 
         if issues:
             files_with_issues += 1
