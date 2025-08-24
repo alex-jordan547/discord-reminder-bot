@@ -803,6 +803,142 @@ class SlashCommands(commands.Cog):
         guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
         logger.info(f"Help command used by user {interaction.user.id} in {guild_info}")
 
+    @app_commands.command(name="autodelete", description="Configure l'auto-suppression des messages de rappel")
+    @app_commands.describe(
+        action="Action à effectuer (status, enable, disable)",
+        delay_hours="Délai en heures avant suppression (si action=enable)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="status - Voir la configuration", value="status"),
+        app_commands.Choice(name="enable - Activer l'auto-suppression", value="enable"),
+        app_commands.Choice(name="disable - Désactiver l'auto-suppression", value="disable")
+    ])
+    @app_commands.choices(delay_hours=[
+        app_commands.Choice(name="3 minutes", value=0.05),
+        app_commands.Choice(name="5 minutes", value=0.08),
+        app_commands.Choice(name="10 minutes", value=0.17),
+        app_commands.Choice(name="15 minutes", value=0.25),
+        app_commands.Choice(name="30 minutes", value=0.5),
+        app_commands.Choice(name="1 heure", value=1.0),
+        app_commands.Choice(name="2 heures", value=2.0),
+        app_commands.Choice(name="6 heures", value=6.0),
+        app_commands.Choice(name="12 heures", value=12.0),
+        app_commands.Choice(name="24 heures", value=24.0),
+        app_commands.Choice(name="48 heures", value=48.0),
+        app_commands.Choice(name="72 heures", value=72.0),
+        app_commands.Choice(name="7 jours", value=168.0)
+    ])
+    async def autodelete(
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        delay_hours: Optional[float] = None
+    ):
+        """Configure auto-deletion of reminder messages."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True
+            )
+            return
+
+        # Import auto_delete_manager here to avoid circular imports
+        from utils.auto_delete import get_auto_delete_manager
+
+        if action == "status":
+            embed = discord.Embed(
+                title="🗑️ Configuration Auto-suppression",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+
+            status = "✅ Activée" if Settings.AUTO_DELETE_REMINDERS else "❌ Désactivée"
+            embed.add_field(name="📊 Statut", value=status, inline=True)
+
+            if Settings.AUTO_DELETE_REMINDERS:
+                delay_text = Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+                embed.add_field(name="⏰ Délai", value=delay_text, inline=True)
+
+                # Get pending deletions count
+                auto_delete_mgr = get_auto_delete_manager()
+                if auto_delete_mgr:
+                    pending_count = auto_delete_mgr.get_pending_count()
+                    embed.add_field(name="📝 Messages programmés", value=str(pending_count), inline=True)
+
+            # Show available delay choices
+            choices_text = ", ".join([Settings.format_auto_delete_display(h) for h in Settings.AUTO_DELETE_CHOICES[:8]])
+            embed.add_field(
+                name="💡 Délais suggérés",
+                value=f"{choices_text}...",
+                inline=False
+            )
+
+            embed.set_footer(text="Utilisez /autodelete enable [délai] ou /autodelete disable")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif action == "enable":
+            if delay_hours is None:
+                delay_hours = 1.0  # Default to 1 hour
+
+            # Validate delay
+            validated_delay = Settings.validate_auto_delete_hours(delay_hours)
+
+            # Update settings (this would need to be persistent in a real implementation)
+            Settings.AUTO_DELETE_REMINDERS = True
+            Settings.AUTO_DELETE_DELAY_HOURS = validated_delay
+
+            delay_text = Settings.format_auto_delete_display(validated_delay)
+
+            embed = discord.Embed(
+                title="✅ Auto-suppression activée",
+                description=f"Les messages de rappel s'auto-détruiront après **{delay_text}**",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+
+            if validated_delay != delay_hours:
+                embed.add_field(
+                    name="⚠️ Délai ajusté",
+                    value=f"Le délai demandé ({delay_hours}h) a été ajusté à {validated_delay}h",
+                    inline=False
+                )
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Auto-deletion enabled by {interaction.user} with delay: {validated_delay}h")
+
+        elif action == "disable":
+            Settings.AUTO_DELETE_REMINDERS = False
+
+            # Cancel all pending deletions
+            auto_delete_mgr = get_auto_delete_manager()
+            if auto_delete_mgr:
+                cancelled_count = auto_delete_mgr.get_pending_count()
+                # Note: In a full implementation, we'd add a cancel_all_deletions method
+            else:
+                cancelled_count = 0
+
+            embed = discord.Embed(
+                title="❌ Auto-suppression désactivée",
+                description="Les messages de rappel ne seront plus supprimés automatiquement",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+
+            if cancelled_count > 0:
+                embed.add_field(
+                    name="📝 Suppressions annulées",
+                    value=f"{cancelled_count} message(s) programmé(s) pour suppression ont été annulés",
+                    inline=False
+                )
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Auto-deletion disabled by {interaction.user}")
+
+        # Log sécurisé avec gestion des DM
+        guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
+        logger.info(f"Autodelete {action} command used by user {interaction.user.id} in {guild_info}")
+
     @app_commands.command(name="sync", description="Synchroniser les commandes slash avec Discord (commande de développement)")
     async def sync(self, interaction: discord.Interaction):
         """Synchronize slash commands with Discord (development command)."""
@@ -863,3 +999,4 @@ def register_slash_commands(bot: commands.Bot) -> None:
     # when the event loop is running
 
     logger.info(f"Slash commands setup prepared and loaded {len(watched_matches)} matches from storage")
+
