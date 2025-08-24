@@ -7,24 +7,24 @@ enhanced reminder system with minute-based intervals and advanced features.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Optional, List
+from datetime import datetime
+from typing import Dict, Optional
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
-from models.reminder import MatchReminder
-from persistence.storage import save_matches, load_matches
-from utils.permissions import has_admin_permission
-from utils.message_parser import parse_message_link, extract_message_title
-from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
-from utils.validation import (
-    validate_message_id, validate_message_link, ValidationError,
-    get_validation_error_embed, safe_int_conversion
-)
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
+from models.reminder import MatchReminder
+from persistence.storage import save_matches, load_matches
+from utils.error_recovery import safe_fetch_message, retry_stats
+from utils.message_parser import parse_message_link, extract_message_title
+from utils.permissions import has_admin_permission
+from utils.validation import (
+    validate_message_link, ValidationError,
+    get_validation_error_embed
+)
 
 # Get logger for this module
 logger = logging.getLogger(__name__)

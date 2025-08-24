@@ -3,9 +3,6 @@
 Unit tests for sleep mode logic in dynamic scheduling.
 """
 
-import asyncio
-from datetime import datetime, timedelta
-
 def test_sleep_mode_logic():
     """Test de la logique du mode veille."""
     print("😴 Test du mode veille intelligent...")
