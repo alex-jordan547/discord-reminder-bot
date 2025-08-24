@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from commands.handlers import register_commands
+from commands.handlers import setup_bot_handlers
 from config.settings import Settings, Messages
 from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file
 from utils.validation import validate_environment_config
@@ -91,7 +91,11 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
             logger.warning("Failed to load reminders from storage")
             print("⚠️ Échec du chargement des rappels depuis le stockage")
 
-    # Start the dynamic reminder system
+    # Initialize and start auto-delete manager BEFORE starting reminder system
+    auto_delete_mgr = init_auto_delete_manager(bot)
+    await auto_delete_mgr.start()
+
+    # Start the dynamic reminder system (after auto-delete manager is ready)
     if hasattr(bot, 'start_dynamic_reminder_system'):
         await bot.start_dynamic_reminder_system()
 
@@ -102,10 +106,6 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         else:
             logger.info(f"Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
             print(f"⏰ Système de rappels dynamique activé")
-
-    # Initialize and start auto-delete manager
-    auto_delete_mgr = init_auto_delete_manager(bot)
-    await auto_delete_mgr.start()
 
     if Settings.AUTO_DELETE_REMINDERS:
         logger.info(f"Auto-deletion enabled: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
@@ -168,7 +168,7 @@ def main() -> None:
         await setup_bot_ready(bot)
 
     # Register all commands and event handlers
-    register_commands(bot)
+    setup_bot_handlers(bot)
 
     # Start the bot
     try:
