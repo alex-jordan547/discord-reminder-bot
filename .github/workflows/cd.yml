@@ -29,7 +29,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}
   # Optimize pip and Docker builds
   PIP_DISABLE_PIP_VERSION_CHECK: 1
-  PIP_NO_CACHE_DIR: 0
   PYTHONUNBUFFERED: 1
 
 jobs:
@@ -45,7 +44,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python 3.13
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.13'
         cache: 'pip'
@@ -121,7 +120,7 @@ jobs:
 
     - name: Build and push Docker image
       id: build
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./Dockerfile
@@ -201,7 +200,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
     
     - name: Build and push to Docker Hub
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./Dockerfile
@@ -273,7 +272,7 @@ jobs:
         
         # Stop existing container
         echo "🛑 Stopping existing container..."
-        docker-compose down || true
+        docker compose down || true
         
         # Pull latest image
         echo "📥 Pulling latest image..."
@@ -299,30 +298,30 @@ jobs:
         
         # Start new container
         echo "▶️ Starting new container..."
-        docker-compose up -d
+        docker compose up -d
         
         # Check health
         echo "🔍 Checking container health..."
         sleep 15
         
         # Verify container is running
-        if docker-compose ps discord-reminder-bot | grep -q "Up"; then
+        if docker compose ps discord-reminder-bot | grep -q "Up"; then
             echo "✅ Container is running"
         else
             echo "❌ Container failed to start!"
-            docker-compose logs discord-reminder-bot
+            docker compose logs discord-reminder-bot
             exit 1
         fi
         
         # Basic health check
         echo "🏥 Performing health check..."
         for i in {1..5}; do
-            if docker-compose exec -T discord-reminder-bot python -c "import discord; print('Bot can import discord.py')" 2>/dev/null; then
+            if docker compose exec -T discord-reminder-bot python -c "import discord; print('Bot can import discord.py')" 2>/dev/null; then
                 echo "✅ Health check passed"
                 break
             elif [ $i -eq 5 ]; then
                 echo "❌ Health check failed after 5 attempts"
-                docker-compose logs --tail=50 discord-reminder-bot
+                docker compose logs --tail=50 discord-reminder-bot
                 exit 1
             else
                 echo "⏳ Health check attempt $i failed, retrying..."
@@ -332,10 +331,10 @@ jobs:
         
         echo "🎉 Deployment successful!"
         echo "📋 Container status:"
-        docker-compose ps
+        docker compose ps
         echo ""
         echo "📜 Recent logs:"
-        docker-compose logs --tail=20 discord-reminder-bot
+        docker compose logs --tail=20 discord-reminder-bot
         EOF
         
         chmod +x deployment/deploy.sh
@@ -348,7 +347,7 @@ jobs:
         echo "🔄 Rolling back Discord Reminder Bot"
         
         # Stop current container
-        docker-compose down
+        docker compose down
         
         # Restore data backup if available
         LATEST_BACKUP=$(ls -t watched_reminders.json.backup.* 2>/dev/null | head -n1 || echo "")
@@ -358,7 +357,7 @@ jobs:
         fi
         
         echo "⚠️ Please manually specify the previous image version and restart"
-        echo "Example: docker-compose up -d"
+        echo "Example: docker compose up -d"
         EOF
         
         chmod +x deployment/rollback.sh
