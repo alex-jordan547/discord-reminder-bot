@@ -100,7 +100,7 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 ### Composants principaux
 
 **1. Classe MatchReminder** (`models/reminder.py`)
-- Structure de données centrale pour l'état des matchs
+- Structure de données centrale pour l'état des évènements
 - Sérialisation JSON avec `to_dict()`/`from_dict()`
 - Calcul intelligent des rappels avec `is_reminder_due()`
 - Gestion des permissions de canal
@@ -108,7 +108,7 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 **2. Système de planification dynamique** (`commands/handlers.py`)
 - `schedule_next_reminder_check()` : Planification précise au timestamp
 - `check_reminders_dynamic()` : Vérification des rappels avec replanification
-- **Mode veille intelligent** : 0 vérification quand aucun match surveillé
+- **Mode veille intelligent** : 0 vérification quand aucun évènement surveillé
 - **Précision** : ±5 secondes au lieu de ±30 secondes
 
 **3. Configuration centralisée** (`config/settings.py`)
@@ -166,7 +166,7 @@ check_reminders_dynamic() → send_reminder() → reschedule_next()
 ### Configuration des rappels
 - `REMINDER_INTERVAL_HOURS` : Intervalle par défaut (24)
 - `USE_SEPARATE_REMINDER_CHANNEL` : Canal séparé (false)
-- `REMINDER_CHANNEL_NAME` : Nom du canal (rappels-matchs)
+- `REMINDER_CHANNEL_NAME` : Nom du canal (rappels-event)
 
 ### Développement
 - `TEST_MODE` : Active le mode test (false)
@@ -219,10 +219,10 @@ LOG_LEVEL=DEBUG
 ```
 
 ### Scénarios de test
-1. **Ajout/suppression** de matchs
+1. **Ajout/suppression** d'évènements
 2. **Réactions** en temps réel
 3. **Rappels automatiques** avec intervalles courts
-4. **Mode veille** sans matchs
+4. **Mode veille** sans évènements
 5. **Permissions** multi-serveur
 
 ## 📚 Références importantes

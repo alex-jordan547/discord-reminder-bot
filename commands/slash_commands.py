@@ -303,7 +303,7 @@ class SlashCommands(commands.Cog):
             return
 
         embed = discord.Embed(
-            title=f"📋 Matchs surveillés sur {interaction.guild.name}",
+            title=f"📋 Évènements surveillés sur {interaction.guild.name}",
             color=discord.Color.blue(),
             timestamp=datetime.now()
         )

@@ -14,7 +14,7 @@ services:
       # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
       - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
-      - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-matchs}
+      - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-events}
       
       # Permission Configuration
       - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}

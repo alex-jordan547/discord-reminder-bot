@@ -31,7 +31,7 @@ def test_sleep_mode_logic():
             "cpu_usage": "0%"
         },
         {
-            "name": "Tous les matchs en pause",
+            "name": "Tous les évènements en pause",
             "watched_matches": {"123": {"interval": 60, "paused": True}},
             "expected_behavior": "Mode veille (pas de rappels actifs)",
             "cpu_usage": "0%"
@@ -52,10 +52,10 @@ def test_efficiency_comparison():
     # Simuler 24h sans aucun match
     hours_without_matches = 24
 
-    # Ancien système: vérification toutes les 5 minutes même sans matchs
+    # Ancien système: vérification toutes les 5 minutes même sans évènements
     old_checks_per_day = (hours_without_matches * 60) / 5
 
-    # Nouveau système: 0 vérification quand pas de matchs
+    # Nouveau système: 0 vérification quand pas de évènements
     new_checks_per_day = 0
 
     cpu_cycles_saved = old_checks_per_day * 100  # Estimation des cycles CPU
@@ -73,7 +73,7 @@ def test_reactivation_speed():
     print("🚀 Test de réactivation du système...")
 
     scenarios = [
-        "Bot démarre sans matchs → Mode veille instantané",
+        "Bot démarre sans évènements → Mode veille instantané",
         "Ajout 1er match → Réactivation immédiate (< 1s)",
         "Suppression dernier match → Veille instantanée",
         "Modification d'un match → Replanification immédiate"
@@ -93,7 +93,7 @@ def test_user_experience():
 
     improvements = [
         {
-            "action": "Démarrage du bot sans matchs",
+            "action": "Démarrage du bot sans évènements",
             "before": "😕 'Vérification dans 5 minutes' répétée à l'infini",
             "after": "😊 'Mode veille activé' puis silence"
         },
@@ -147,8 +147,8 @@ def main():
     if passed == total:
         print("🎉 Le mode veille intelligent est validé !")
         print("\n🌟 Améliorations apportées:")
-        print("   • 😴 Mode veille: 0 vérification quand pas de matchs")
-        print("   • ⚡ Réactivation instantanée lors d'ajout de matchs")
+        print("   • 😴 Mode veille: 0 vérification quand pas d'évènements'")
+        print("   • ⚡ Réactivation instantanée lors d'ajout d'évènements")
         print("   • 🎯 Planification précise au lieu d'attentes arbitraires")
         print("   • 💚 Économie massive de ressources CPU")
         print("   • 📱 Messages de statut informatifs pour l'utilisateur")

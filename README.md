@@ -4,7 +4,7 @@ A Discord bot that helps track user availability for matches by monitoring react
 
 ## ✨ Features
 
-- **🎯 Match Tracking**: Monitor Discord message reactions for match availability
+- **🎯 Event Tracking**: Monitor Discord message reactions for match availability
 - **🔔 Automated Reminders**: Send reminders to users who haven't responded
 - **⚡ Dynamic Scheduling**: ±5 second precision instead of ±30 seconds
 - **😴 Smart Sleep Mode**: 0% CPU usage when no matches are being tracked

@@ -130,7 +130,7 @@ async def get_or_create_reminder_channel(guild: discord.Guild) -> Optional[disco
     try:
         channel = await guild.create_text_channel(
             name=Settings.REMINDER_CHANNEL_NAME,
-            topic="📢 Canal automatique pour les rappels de disponibilités matchs"
+            topic="📢 Canal automatique pour les rappels de disponibilités"
         )
         logger.info(Messages.CHANNEL_CREATED.format(Settings.REMINDER_CHANNEL_NAME, guild.name))
         print(Messages.CHANNEL_CREATED.format(Settings.REMINDER_CHANNEL_NAME, guild.name))
@@ -210,7 +210,7 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
 
         embed = discord.Embed(
             title=f"🔔 Rappel: {reminder.title[:Settings.MAX_TITLE_LENGTH]}",
-            description="**Merci de mettre votre disponibilité pour le match!**\n"
+            description="**Merci de mettre votre disponibilité pour l'évènement!**\n"
                        "Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)",
             color=discord.Color.orange(),
             timestamp=datetime.now()
@@ -225,7 +225,7 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
         )
 
         embed.add_field(
-            name="🔗 Lien vers le match",
+            name="🔗 Lien vers l'évènement",
             value=f"[**Cliquez ici pour voir le message**](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{reminder.message_id})",
             inline=False
         )
@@ -452,7 +452,7 @@ def register_commands(bot: commands.Bot) -> None:
             return
 
         embed = discord.Embed(
-            title=f"📋 Matchs surveillés sur {ctx.guild.name}",
+            title=f"📋 Évènements surveillés sur {ctx.guild.name}",
             color=discord.Color.blue(),
             timestamp=datetime.now()
         )
@@ -551,7 +551,7 @@ def register_commands(bot: commands.Bot) -> None:
             timestamp=datetime.now()
         )
 
-        mode = "Canal séparé" if Settings.USE_SEPARATE_REMINDER_CHANNEL else "Même canal que le match"
+        mode = "Canal séparé" if Settings.USE_SEPARATE_REMINDER_CHANNEL else "Même canal que l'évènement"
         embed.add_field(name="📢 Mode de rappel", value=mode, inline=False)
 
         if Settings.USE_SEPARATE_REMINDER_CHANNEL:
@@ -569,7 +569,7 @@ def register_commands(bot: commands.Bot) -> None:
         # Get server matches count using thread-safe manager
         server_reminders = await reminder_manager.get_guild_reminders(ctx.guild.id)
         server_matches_count = len(server_reminders)
-        embed.add_field(name="📊 Matchs surveillés", value=str(server_matches_count), inline=True)
+        embed.add_field(name="📊 Évènements surveillés", value=str(server_matches_count), inline=True)
 
         await ctx.send(embed=embed)
 
@@ -598,7 +598,7 @@ def register_commands(bot: commands.Bot) -> None:
 
         embed.add_field(
             name="!list",
-            value="Liste tous les matchs surveillés sur ce serveur",
+            value="Liste tous les évènements surveillés sur ce serveur",
             inline=False
         )
 

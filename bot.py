@@ -107,8 +107,8 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         logger.info(f"Reminder mode: Separate channel (#{Settings.REMINDER_CHANNEL_NAME})")
         print(f"📢 Mode: Rappels dans un canal séparé (#{Settings.REMINDER_CHANNEL_NAME})")
     else:
-        logger.info("Reminder mode: Same channel as match")
-        print("📢 Mode: Rappels dans le même canal que le match")
+        logger.info("Reminder mode: Same channel as event")
+        print("📢 Mode: Rappels dans le même canal que l'évènement")
 
 
 def main() -> None:
