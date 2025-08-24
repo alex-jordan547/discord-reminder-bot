@@ -40,12 +40,12 @@ _dynamic_reminder_task: Optional[asyncio.Task] = None
 def reschedule_reminders() -> None:
     """Replanifie les rappels après ajout/suppression d'un match."""
     global _dynamic_reminder_task
-    
+
     # Annuler la tâche précédente
     if _dynamic_reminder_task and not _dynamic_reminder_task.done():
         _dynamic_reminder_task.cancel()
         logger.debug("Previous reminder task cancelled for rescheduling")
-    
+
     # Check if there are reminders to watch using thread-safe manager
     total_reminders = len(reminder_manager.reminders)
     if total_reminders > 0:
@@ -62,14 +62,14 @@ def reschedule_reminders() -> None:
 async def sync_slash_commands(ctx: commands.Context) -> None:
     """
     Synchronise manuellement les commandes slash avec Discord (commande de développement).
-    
+
     Args:
         ctx: Le contexte de la commande Discord
     """
     if not has_admin_permission(ctx.author):
         await ctx.send(get_permission_error_message())
         return
-    
+
     try:
         synced = await sync_slash_commands_logic(ctx.bot)
         await ctx.send(f"✅ {len(synced)} commande(s) slash synchronisée(s) avec Discord !")
@@ -281,7 +281,7 @@ def register_commands(bot: commands.Bot) -> None:
         # Validate interval using existing Settings validation
         validated_interval = Settings.validate_interval_minutes(interval_minutes)
         interval_adjusted = validated_interval != original_interval
-        
+
         # Additional validation for completely invalid inputs
         try:
             if not isinstance(interval_minutes, (int, float)) or interval_minutes <= 0:
@@ -355,7 +355,7 @@ def register_commands(bot: commands.Bot) -> None:
             if not success:
                 await ctx.send("❌ Erreur lors de l'ajout du match à surveiller.")
                 return
-            
+
             # Replanifier les rappels après ajout
             reschedule_reminders()
 
@@ -432,10 +432,10 @@ def register_commands(bot: commands.Bot) -> None:
             if not success:
                 await ctx.send("❌ Erreur lors de la suppression du match.")
                 return
-            
+
             # Replanifier les rappels après suppression
             reschedule_reminders()
-            
+
             await ctx.send(Messages.MATCH_REMOVED.format(title))
             logger.info(f"Removed match {message_id} from watch list")
         else:
@@ -629,7 +629,7 @@ def register_commands(bot: commands.Bot) -> None:
     async def on_reaction_add(reaction: discord.Reaction, user: discord.User) -> None:
         """
         Handle reaction add events with thread-safety and debouncing.
-        
+
         This version uses the new reminder manager to prevent race conditions
         and implements debouncing to reduce unnecessary API calls.
         """
@@ -637,16 +637,16 @@ def register_commands(bot: commands.Bot) -> None:
             return
 
         message_id = reaction.message.id
-        
+
         # Check if this message is being watched
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
             return
-        
+
         # Check if this is a valid reaction
         if reaction.emoji not in reminder.required_reactions:
             return
-        
+
         # Schedule a debounced update instead of immediate processing
         # This prevents race conditions when multiple reactions are added quickly
         try:
@@ -659,7 +659,7 @@ def register_commands(bot: commands.Bot) -> None:
     async def on_reaction_remove(reaction: discord.Reaction, user: discord.User) -> None:
         """
         Handle reaction remove events with thread-safety and debouncing.
-        
+
         This version uses the new reminder manager to prevent race conditions
         and implements debouncing to reduce unnecessary API calls.
         """
@@ -667,16 +667,16 @@ def register_commands(bot: commands.Bot) -> None:
             return
 
         message_id = reaction.message.id
-        
+
         # Check if this message is being watched
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
             return
-        
+
         # Check if this was a valid reaction
         if reaction.emoji not in reminder.required_reactions:
             return
-        
+
         # Schedule a debounced update instead of immediate processing
         # This ensures accurate state after reaction removals
         try:
@@ -690,77 +690,77 @@ def register_commands(bot: commands.Bot) -> None:
         Planifie la prochaine vérification de rappel de manière dynamique
         en calculant le temps exact jusqu'au prochain rappel dû.
         Entre en mode veille si aucun rappel n'est surveillé.
-        
+
         Cette version utilise le gestionnaire de rappels thread-safe.
         """
         global _dynamic_reminder_task
-        
+
         # Annuler la tâche précédente si elle existe
         if _dynamic_reminder_task and not _dynamic_reminder_task.done():
             _dynamic_reminder_task.cancel()
-        
+
         # Obtenir les rappels via le gestionnaire thread-safe
         reminders = reminder_manager.reminders
-        
+
         if not reminders:
             logger.debug("No watched reminders - entering sleep mode (no periodic checks)")
             print("😴 Mode veille: Aucun rappel surveillé, arrêt des vérifications périodiques")
             # Ne pas programmer de vérification - le système se réactivera lors de l'ajout d'un rappel
             return
-        
+
         # Trouver le prochain rappel le plus proche
         next_reminder_times = []
         current_time = datetime.now()
-        
+
         for reminder in reminders.values():
             if not reminder.is_paused:
                 next_time = reminder.get_next_reminder_time()
                 if next_time > current_time:  # Seulement les rappels futurs
                     next_reminder_times.append(next_time)
-        
+
         if not next_reminder_times:
             logger.debug("All reminders are paused or overdue - entering sleep mode")
             print("😴 Mode veille: Tous les rappels sont en pause ou en retard")
             # Ne pas programmer de vérification - le système se réactivera lors de modifications
             return
-        
+
         # Calculer le temps jusqu'au prochain rappel
         next_reminder = min(next_reminder_times)
         time_until_next = (next_reminder - current_time).total_seconds()
-        
+
         # Ajouter une petite marge pour éviter les problèmes de timing (5 secondes)
         time_until_next = max(5, time_until_next - 5)
-        
+
         # Limiter à un maximum pour éviter les attentes trop longues
         max_wait = 300 if Settings.is_test_mode() else 1800  # 5 min en test, 30 min en prod
         time_until_next = min(time_until_next, max_wait)
-        
+
         logger.debug(f"Next reminder due at {next_reminder.strftime('%H:%M:%S')}, waiting {time_until_next:.1f} seconds")
         print(f"🕰️ Prochain rappel programmé à {next_reminder.strftime('%H:%M:%S')} (dans {time_until_next:.0f}s)")
-        
+
         _dynamic_reminder_task = asyncio.create_task(
             asyncio.sleep(time_until_next)
         )
-        
+
         try:
             await _dynamic_reminder_task
             await check_reminders_dynamic()
         except asyncio.CancelledError:
             logger.debug("Reminder check cancelled (likely due to rescheduling)")
             pass
-    
+
     async def check_reminders_dynamic() -> None:
         """
         Vérification dynamique des rappels avec planification automatique
         de la prochaine vérification.
-        
+
         Cette version utilise le gestionnaire de rappels thread-safe.
         """
         logger.debug("Dynamic reminder check triggered...")
-        
+
         # Obtenir les rappels dus via le gestionnaire thread-safe
         due_reminders = await reminder_manager.get_due_reminders()
-        
+
         if not due_reminders:
             # Obtenir le nombre total de rappels pour le log
             all_reminders = reminder_manager.reminders
@@ -770,43 +770,43 @@ def register_commands(bot: commands.Bot) -> None:
                 return
             else:
                 logger.debug(f"No reminders due yet. Checked {len(all_reminders)} reminders.")
-        
+
         total_reminded = 0
-        
+
         for reminder in due_reminders:
             logger.info(f"Reminder due for message {reminder.message_id} (interval: {reminder.interval_minutes}min)")
-            
+
             # Trouver la guilde et le canal approprié
             guild = bot.get_guild(reminder.guild_id)
             if not guild:
                 logger.warning(f"Guild {reminder.guild_id} not found for reminder {reminder.message_id}")
                 continue
-            
+
             # Déterminer où envoyer le rappel
             if Settings.USE_SEPARATE_REMINDER_CHANNEL:
                 reminder_channel = await get_or_create_reminder_channel(guild)
             else:
                 reminder_channel = bot.get_channel(reminder.channel_id)
-            
+
             if reminder_channel:
                 count = await send_reminder(reminder, reminder_channel, bot)
                 total_reminded += count
                 await asyncio.sleep(Settings.REMINDER_DELAY_SECONDS)
             else:
                 logger.error(f"Could not find reminder channel for message {reminder.message_id}")
-        
+
         if total_reminded > 0:
             logger.info(f"Dynamic reminders sent: {total_reminded} people notified")
             print(f"✅ Rappels automatiques envoyés: {total_reminded} personnes notifiées")
-        
+
         # Programmer la prochaine vérification
         await schedule_next_reminder_check()
-    
+
     async def start_dynamic_reminder_system() -> None:
         """Démarre le système de planification dynamique des rappels thread-safe."""
         logger.info("Starting dynamic reminder scheduling system with thread-safety")
         print("🎯 Système de planification dynamique des rappels activé (thread-safe)")
-        
+
         # Charger les rappels depuis le stockage
         success = await reminder_manager.load_from_storage()
         if success:
@@ -820,7 +820,7 @@ def register_commands(bot: commands.Bot) -> None:
         else:
             logger.error("Failed to load reminders from storage")
             print("⚠️ Erreur lors du chargement des rappels - démarrage en mode vide")
-        
+
         # Démarrer une tâche périodique simple pour s'assurer que les rappels fonctionnent
         async def periodic_check():
             while True:
@@ -836,25 +836,25 @@ def register_commands(bot: commands.Bot) -> None:
                 except Exception as e:
                     logger.error(f"Error in periodic check: {e}")
                     await asyncio.sleep(60)  # Attendre plus longtemps en cas d'erreur
-        
+
         # Lancer la tâche périodique
         asyncio.create_task(periodic_check())
-    
+
     @bot.command(name='health')
     async def health_check(ctx: commands.Context) -> None:
         """Affiche les statistiques de santé et de récupération d'erreurs du bot avec informations de concurrence."""
         if not has_admin_permission(ctx.author):
             await ctx.send(get_permission_error_message())
             return
-        
+
         # Obtenir les statistiques de récupération d'erreurs
         retry_stats_data = retry_stats.get_summary()
         embed = create_health_embed(retry_stats_data)
-        
+
         # Ajouter les statistiques de concurrence
         concurrency_stats_data = get_concurrency_stats()
         reminder_stats = reminder_manager.get_stats()
-        
+
         # Section concurrence
         concurrency_text = (
             f"🔒 Acquisitions de verrous: {concurrency_stats_data.get('lock_acquisitions', 0)}\n"
@@ -863,13 +863,13 @@ def register_commands(bot: commands.Bot) -> None:
             f"💾 Opérations de sauvegarde: {concurrency_stats_data.get('save_operations', 0)}\n"
             f"⚠️ Conflits détectés: {concurrency_stats_data.get('concurrent_conflicts', 0)}"
         )
-        
+
         embed.add_field(
             name="📊 Statistiques de Concurrence",
             value=concurrency_text,
             inline=False
         )
-        
+
         # Section rappels
         reminder_text = (
             f"📋 Total rappels: {reminder_stats.get('total_reminders', 0)}\n"
@@ -878,18 +878,18 @@ def register_commands(bot: commands.Bot) -> None:
             f"🏰 Serveurs avec rappels: {reminder_stats.get('guilds_with_reminders', 0)}\n"
             f"📈 Moyenne/serveur: {reminder_stats.get('average_reminders_per_guild', 0):.1f}"
         )
-        
+
         embed.add_field(
             name="🎯 Statistiques des Rappels",
             value=reminder_text,
             inline=False
         )
-        
+
         # Ajouter footer spécifique à la commande prefix
         embed.set_footer(text="Utilisez !health reset pour remettre à zéro les statistiques")
-        
+
         await ctx.send(embed=embed)
-    
+
     @bot.command(name='sync')
     async def sync_commands(ctx: commands.Context) -> None:
         """Synchronise les commandes slash avec Discord (commande de développement)."""

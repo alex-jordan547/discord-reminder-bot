@@ -5,30 +5,26 @@ Unit tests for code formatting validation.
 
 import os
 import re
-import sys
-
-# Add project root to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 def check_file_formatting(file_path):
-    """Vérifier les problèmes de formatage dans un fichier."""
+    """Check formatting issues in a file."""
     issues = []
 
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
         lines = content.split('\n')
 
-    # Vérifier les double backslashes dans les chaînes de caractères
+    # Check for double backslashes in strings
     double_backslash_pattern = r'["\'].*?\\\\n.*?["\']'
     matches = re.findall(double_backslash_pattern, content)
     if matches:
         issues.append({
             'type': 'double_backslashes',
             'count': len(matches),
-            'examples': matches[:3]  # Premiers 3 exemples
+            'examples': matches[:3]  # First 3 examples
         })
 
-    # Vérifier les espaces en fin de ligne
+    # Check for trailing spaces
     trailing_spaces = []
     for i, line in enumerate(lines, 1):
         if line.rstrip() != line:
@@ -38,17 +34,17 @@ def check_file_formatting(file_path):
         issues.append({
             'type': 'trailing_spaces',
             'count': len(trailing_spaces),
-            'lines': trailing_spaces[:5]  # Premières 5 lignes
+            'lines': trailing_spaces[:5]  # First 5 lines
         })
 
     return issues
 
 def main():
-    """Fonction principale."""
-    print("🔍 Vérification du formatage des fichiers Python...")
+    """Main function."""
+    print("🔍 Checking Python file formatting...")
     print("=" * 60)
 
-    # Fichiers à vérifier (adjust paths for test location)
+    # Files to check (adjust paths for test location)
     files_to_check = [
         '../../commands/handlers.py',
         '../../commands/slash_commands.py',
@@ -63,7 +59,7 @@ def main():
     for file_path in files_to_check:
         full_path = os.path.join(os.path.dirname(__file__), file_path)
         if not os.path.exists(full_path):
-            print(f"⚠️  {file_path} - Fichier non trouvé")
+            print(f"⚠️  {file_path} - File not found")
             continue
 
         print(f"📄 {file_path}")
@@ -75,29 +71,29 @@ def main():
                 total_issues += issue['count']
 
                 if issue['type'] == 'double_backslashes':
-                    print(f"  ❌ {issue['count']} double backslashes trouvés:")
+                    print(f"  ❌ {issue['count']} double backslashes found:")
                     for example in issue['examples']:
                         print(f"    → {example}")
                 elif issue['type'] == 'trailing_spaces':
-                    print(f"  ❌ {issue['count']} lignes avec espaces en fin:")
+                    print(f"  ❌ {issue['count']} lines with trailing spaces:")
                     for line_num in issue['lines']:
-                        print(f"    → Ligne {line_num}")
+                        print(f"    → Line {line_num}")
         else:
-            print("  ✅ Aucun problème de formatage détecté")
+            print("  ✅ No formatting issues detected")
 
         print()
 
     print("=" * 60)
-    print(f"📊 Résumé:")
-    print(f"  • Fichiers vérifiés: {len(files_to_check)}")
-    print(f"  • Fichiers avec problèmes: {files_with_issues}")
-    print(f"  • Total des problèmes: {total_issues}")
+    print(f"📊 Summary:")
+    print(f"  • Files checked: {len(files_to_check)}")
+    print(f"  • Files with issues: {files_with_issues}")
+    print(f"  • Total issues: {total_issues}")
 
     if total_issues == 0:
-        print("🎉 Tous les fichiers ont un formatage correct !")
+        print("🎉 All files have correct formatting!")
         return 0
     else:
-        print("⚠️  Certains problèmes de formatage restent à corriger.")
+        print("⚠️  Some formatting issues remain to be fixed.")
         return 1
 
 if __name__ == "__main__":

@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 async def sync_slash_commands_logic(bot: commands.Bot) -> List[discord.app_commands.AppCommand]:
     """
     Logique de synchronisation des commandes slash (utilisée par !sync et /sync).
-    
+
     Args:
         bot: Le bot Discord
-        
+
     Returns:
         List[discord.app_commands.AppCommand]: Liste des commandes synchronisées
-        
+
     Raises:
         Exception: Si la synchronisation échoue
     """
@@ -35,11 +35,11 @@ async def sync_slash_commands_logic(bot: commands.Bot) -> List[discord.app_comma
 def create_health_embed(stats: Dict[str, Any]) -> discord.Embed:
     """
     Crée un embed Discord pour les statistiques de santé du bot.
-    
+
     Args:
         stats: Dictionnaire contenant les statistiques de santé
                 (résultat de retry_stats.get_summary())
-                
+
     Returns:
         discord.Embed: Embed configuré avec les statistiques de santé
     """
@@ -53,20 +53,20 @@ def create_health_embed(stats: Dict[str, Any]) -> discord.Embed:
     else:
         color = discord.Color.red()
         status_indicator = "🔴 Critique"
-    
+
     embed = discord.Embed(
         title="🏥 État de santé du bot",
         color=color,
         timestamp=datetime.now()
     )
-    
+
     # Indicateur d'état général
     embed.add_field(
         name="📊 État général",
         value=status_indicator,
         inline=True
     )
-    
+
     # Statistiques générales
     embed.add_field(
         name="📞 Statistiques d'appels",
@@ -75,17 +75,17 @@ def create_health_embed(stats: Dict[str, Any]) -> discord.Embed:
               f"**✅ Taux de succès**: {stats['success_rate_percent']}%",
         inline=True
     )
-    
+
     # Statistiques de récupération
     recovery_text = f"**❌ Échecs**: {stats['failed_calls']}\n**🔁 Retries**: {stats['retried_calls']}"
     recovery_text += f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n**📈 Taux de récupération**: {stats['recovery_rate_percent']:.1f}%"
-    
+
     embed.add_field(
         name="🔄 Récupération d'erreurs",
         value=recovery_text,
         inline=True
     )
-    
+
     # Erreurs les plus fréquentes (si il y en a)
     if stats['most_common_errors']:
         error_list = "\n".join([f"• **{error}**: {count}" for error, count in stats['most_common_errors']])
@@ -94,8 +94,8 @@ def create_health_embed(stats: Dict[str, Any]) -> discord.Embed:
             value=error_list[:1024],  # Limiter la longueur du champ
             inline=False
         )
-    
+
     # Footer avec informations supplémentaires
     embed.set_footer(text="Statistiques depuis le dernier redémarrage")
-    
+
     return embed

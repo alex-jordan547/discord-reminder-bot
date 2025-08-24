@@ -69,7 +69,7 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         from commands.slash_commands import SlashCommands
         await bot.add_cog(SlashCommands(bot))
         logger.info("Slash commands cog registered successfully")
-        
+
         # Synchronize slash commands with Discord
         logger.info("Synchronizing slash commands with Discord...")
         synced = await bot.tree.sync()
@@ -130,7 +130,7 @@ def main() -> None:
         for error in config_errors:
             print(f"  - {error}")
         sys.exit(1)
-    
+
     # Additional basic validation for critical settings
     if not Settings.validate_required_settings():
         logger.error("Critical settings validation failed.")

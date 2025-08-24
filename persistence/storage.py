@@ -134,7 +134,7 @@ def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Opt
 async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool:
     """
     Save the watched matches dictionary atomically to prevent corruption.
-    
+
     This function uses atomic file operations and locks to ensure thread-safety
     and prevents data corruption during concurrent operations.
 
@@ -152,26 +152,26 @@ async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool
             # Create temporary file in same directory to ensure atomic operation
             save_path = Path(SAVE_FILE)
             temp_file = None
-            
+
             try:
                 # Create temporary file
                 with tempfile.NamedTemporaryFile(
-                    mode='w', 
-                    encoding='utf-8', 
-                    dir=save_path.parent, 
+                    mode='w',
+                    encoding='utf-8',
+                    dir=save_path.parent,
                     prefix=f"{save_path.stem}_temp_",
                     suffix=save_path.suffix,
                     delete=False
                 ) as temp_file:
                     json.dump(data, temp_file, indent=2, ensure_ascii=False)
                     temp_file_path = temp_file.name
-                
+
                 # Atomic move - this is atomic on most filesystems
                 os.replace(temp_file_path, SAVE_FILE)
-                
+
                 logger.debug(f"Atomically saved {len(watched_matches)} reminders to {SAVE_FILE}")
                 return True
-                
+
             except Exception as e:
                 # Clean up temporary file if something went wrong
                 if temp_file and os.path.exists(temp_file.name):
@@ -180,7 +180,7 @@ async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool
                     except OSError:
                         pass  # If we can't delete, it's not critical
                 raise e
-                
+
         except IOError as e:
             logger.error(f"Failed to save reminders to {SAVE_FILE}: {e}")
             return False
@@ -195,7 +195,7 @@ async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool
 async def load_matches_safe() -> Dict[int, MatchReminder]:
     """
     Load watched matches from the JSON save file with safety checks.
-    
+
     This function includes retry logic and validation to handle
     concurrent access and potential file corruption.
 
@@ -205,7 +205,7 @@ async def load_matches_safe() -> Dict[int, MatchReminder]:
     """
     max_retries = 3
     retry_delay = 0.1  # 100ms
-    
+
     for attempt in range(max_retries):
         try:
             # Check if migration is needed and run it
@@ -259,17 +259,17 @@ async def load_matches_safe() -> Dict[int, MatchReminder]:
             else:
                 logger.error(f"Failed to load reminders after {max_retries} attempts: {e}")
                 return {}
-    
+
     return {}  # Fallback
 
 
 async def verify_data_integrity(watched_matches: Dict[int, MatchReminder]) -> bool:
     """
     Verify the integrity of reminder data.
-    
+
     Args:
         watched_matches: Dictionary of reminders to verify
-        
+
     Returns:
         bool: True if data is valid, False otherwise
     """
@@ -279,26 +279,26 @@ async def verify_data_integrity(watched_matches: Dict[int, MatchReminder]) -> bo
             if not isinstance(message_id, int):
                 logger.error(f"Invalid message_id type: {type(message_id)}")
                 return False
-            
+
             if not isinstance(reminder, MatchReminder):
                 logger.error(f"Invalid reminder type: {type(reminder)}")
                 return False
-            
+
             # Check required attributes
             required_attrs = ['message_id', 'channel_id', 'guild_id', 'title']
             for attr in required_attrs:
                 if not hasattr(reminder, attr):
                     logger.error(f"Reminder missing required attribute: {attr}")
                     return False
-            
+
             # Validate data consistency
             if reminder.message_id != message_id:
                 logger.error(f"Message ID mismatch: key={message_id}, reminder={reminder.message_id}")
                 return False
-        
+
         logger.debug(f"Data integrity check passed for {len(watched_matches)} reminders")
         return True
-        
+
     except Exception as e:
         logger.error(f"Error during data integrity check: {e}")
         return False
@@ -307,7 +307,7 @@ async def verify_data_integrity(watched_matches: Dict[int, MatchReminder]) -> bo
 def get_file_lock_status() -> Dict[str, bool]:
     """
     Get the current status of file locks for monitoring.
-    
+
     Returns:
         Dict[str, bool]: Lock status information
     """
