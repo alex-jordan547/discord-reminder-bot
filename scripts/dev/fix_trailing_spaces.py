@@ -4,7 +4,6 @@ Script pour corriger automatiquement les espaces en fin de ligne dans les fichie
 """
 
 import os
-import sys
 
 
 def fix_trailing_spaces(file_path):
@@ -37,7 +36,7 @@ def fix_trailing_spaces(file_path):
     if changes_count > 0:
         print(f"  ✅ {changes_count} ligne(s) corrigée(s)")
     else:
-        print(f"  ✅ Aucune correction nécessaire")
+        print("  ✅ Aucune correction nécessaire")
 
     return changes_count
 
@@ -71,7 +70,7 @@ def main():
             files_changed += 1
 
     print("=" * 50)
-    print(f"📊 Résumé:")
+    print("📊 Résumé:")
     print(f"  • Fichiers traités: {len(python_files)}")
     print(f"  • Fichiers modifiés: {files_changed}")
     print(f"  • Total des corrections: {total_changes}")

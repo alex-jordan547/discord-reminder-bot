@@ -5,8 +5,7 @@ Tests retry mechanisms, error classification, and recovery.
 """
 
 import asyncio
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import discord
 import pytest

@@ -3,9 +3,7 @@
 Unit tests for dynamic scheduling logic.
 """
 
-import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
 
 
 def test_dynamic_scheduling_logic():
@@ -26,7 +24,7 @@ def test_dynamic_scheduling_logic():
     time_until_2 = (next_reminder_2 - current_time).total_seconds()
     time_until_2 = max(5, time_until_2 - 5)
     print(
-        f"  ✅ Rappel dans 2min → Attente calculée: {time_until_2:.1f}s ({time_until_2/60:.1f}min)"
+        f"  ✅ Rappel dans 2min → Attente calculée: {time_until_2:.1f}s ({time_until_2 / 60:.1f}min)"
     )
 
     # Test case 3: Limitation du temps d'attente
@@ -53,14 +51,14 @@ def test_precision_comparison():
     # Nouveau système: vérification dynamique
     print("  📊 Ancien système (vérification fixe):")
     print(f"    - Intervalle fixe: {old_system_precision}s")
-    print(f"    - Précision: ±{old_system_precision/2}s")
+    print(f"    - Précision: ±{old_system_precision / 2}s")
     print(f"    - Dérive possible: Oui (si traitement > 0s)")
 
     print("  🎯 Nouveau système (planification dynamique):")
-    print(f"    - Intervalle: Variable selon le besoin")
-    print(f"    - Précision: ±5s (marge de sécurité)")
-    print(f"    - Dérive possible: Non (recalcul automatique)")
-    print(f"    - Performance: Optimisée (pas de vérifications inutiles)")
+    print("    - Intervalle: Variable selon le besoin")
+    print("    - Précision: ±5s (marge de sécurité)")
+    print("    - Dérive possible: Non (recalcul automatique)")
+    print("    - Performance: Optimisée (pas de vérifications inutiles)")
 
     return True
 

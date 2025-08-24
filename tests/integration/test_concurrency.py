@@ -9,12 +9,9 @@ import asyncio
 import logging
 import os
 import tempfile
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-
-# Remove sys.path manipulation - use proper test runner instead
 
 # Set up test environment
 os.environ["DISCORD_TOKEN"] = "test_token"
