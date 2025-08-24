@@ -52,6 +52,19 @@ python verify_imports.py
 
 # Tests d'intégration avec pytest
 pytest tests/
+
+# Test des logs colorisés - Colorisation COMPLÈTE (temporaire)
+FORCE_COLOR=1 python -c "
+import logging
+from utils.logging_config import setup_logging
+setup_logging('DEBUG', False)
+logger = logging.getLogger('test_complet')
+logger.debug('🔧 DEBUG - Timestamp, niveau, logger et message colorisés')
+logger.info('ℹ️ INFO - Hiérarchie visuelle parfaite avec couleurs')
+logger.warning('⚠️ WARNING - Structure complète colorisée')
+logger.error('❌ ERROR - Détection instantanée des erreurs')
+logger.critical('🚨 CRITICAL - Maximum de visibilité')
+"
 ```
 
 ## ⚙️ Configuration de développement
@@ -175,6 +188,35 @@ check_reminders_dynamic() → send_reminder() → reschedule_next()
 - `ADMIN_ROLES` : Rôles admin (Admin,Moderateur,Coach)
 
 ## 🐛 Débogage et logs
+
+### Logs colorisés (NOUVEAU)
+**Colorisation complète** de tous les éléments pour une lecture optimale :
+
+#### 🎨 Couleurs par niveau :
+- **🔧 DEBUG** : Cyan - Niveau en gras + message colorisé
+- **ℹ️ INFO** : Vert - Niveau en gras + message colorisé
+- **⚠️ WARNING** : Jaune - Niveau en gras + message colorisé
+- **❌ ERROR** : Rouge - Niveau en gras + message colorisé
+- **🚨 CRITICAL** : Magenta - Niveau en gras + message colorisé
+
+#### 🏗️ Structure colorisée :
+- **🕐 Timestamp** : Gris foncé (discret)
+- **📍 Séparateurs** ` | ` : Gris foncé (structure subtile)
+- **📂 Nom du logger** : Gris clair (lisible sans distraire)
+
+**Résultat** : Hiérarchie visuelle parfaite pour une détection instantanée des erreurs !
+
+### Contrôle des couleurs
+```bash
+# Forcer l'activation des couleurs
+FORCE_COLOR=1 ./run_dev.sh
+
+# Désactiver les couleurs
+NO_COLOR=1 ./run_dev.sh
+
+# Configuration via .env (optionnel)
+LOG_COLORS=true    # ou false pour désactiver
+```
 
 ### Logs en temps réel
 ```bash

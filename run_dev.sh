@@ -34,6 +34,8 @@ mkdir -p data logs
 echo "🎯 Lancement du bot..."
 echo "💡 Appuyez sur Ctrl+C pour arrêter le bot"
 echo "📝 Les logs détaillés sont disponibles en mode DEBUG"
+echo "🌈 Couleurs des logs : ajoutez FORCE_COLOR=1 avant la commande pour forcer l'activation"
+echo "   Example: FORCE_COLOR=1 ./run_dev.sh"
 echo ""
 
 # Lancer le bot avec gestion des erreurs

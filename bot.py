@@ -20,7 +20,7 @@ load_dotenv()
 
 from commands.handlers import setup_bot_handlers
 from config.settings import Settings, Messages
-from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file
+from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file, should_use_colors
 from utils.validation import validate_environment_config
 from utils.auto_delete import init_auto_delete_manager
 
@@ -130,7 +130,8 @@ def main() -> None:
     # Setup logging first
     log_level = get_log_level_from_env()
     log_to_file = should_log_to_file()
-    setup_logging(log_level=log_level, log_to_file=log_to_file)
+    use_colors = should_use_colors()
+    setup_logging(log_level=log_level, log_to_file=log_to_file, use_colors=use_colors)
 
     logger = logging.getLogger(__name__)
 
