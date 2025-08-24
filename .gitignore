@@ -29,8 +29,8 @@ logs/
 data/logs/
 
 # Runtime data
-watched_matches.json
-data/watched_matches.json
+watched_reminders.json.json
+data/watched_reminders.json
 data/backups/
 
 # Test coverage

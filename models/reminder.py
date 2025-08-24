@@ -86,7 +86,7 @@ class Reminder:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MatchReminder':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Reminder':
         """
         Create a Reminder instance from a dictionary (JSON deserialization).
 
