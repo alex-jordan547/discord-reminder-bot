@@ -55,56 +55,70 @@ class Settings:
     REMINDERS_SAVE_FILE: str = 'watched_reminders.json'
 
     @classmethod
-    def validate_interval_minutes(cls, interval_minutes: int) -> int:
+    def validate_interval_minutes(cls, interval_minutes: float) -> float:
         """
         Validate and clamp an interval value to acceptable range.
-        In test mode, allows more flexible intervals (1-10080 minutes = 1 week).
+        In test mode, allows more flexible intervals including sub-minute intervals.
 
         Args:
-            interval_minutes: The interval to validate
+            interval_minutes: The interval to validate (can be float for sub-minute intervals)
 
         Returns:
-            int: The clamped interval value
+            float: The clamped interval value
         """
         if cls.is_test_mode():
-            # Mode test : intervalles plus flexibles (1 minute à 1 semaine)
-            return max(1, min(10080, interval_minutes))  # 1 min à 7 jours
+            # Mode test : intervalles très flexibles (30 secondes à 1 semaine)
+            return max(0.5, min(10080.0, interval_minutes))  # 30s à 7 jours
         else:
-            # Mode production : intervalles standards
+            # Mode production : intervalles standards (entiers seulement)
+            interval_minutes = int(interval_minutes)  # Convertir en entier pour la production
             return max(cls.MIN_INTERVAL_MINUTES, min(cls.MAX_INTERVAL_MINUTES, interval_minutes))
 
     @classmethod
-    def format_interval_display(cls, minutes: int) -> str:
+    def format_interval_display(cls, minutes: float) -> str:
         """
         Format an interval in minutes for user-friendly display.
-        Supports extended ranges in test mode.
+        Supports sub-minute intervals in test mode and extended ranges.
 
         Args:
-            minutes: Interval in minutes
+            minutes: Interval in minutes (can be float for sub-minute)
 
         Returns:
             str: Formatted interval string
         """
         if minutes < 1:
-            return f"{minutes} minute(s) (⚠️ invalide)"
+            if minutes == 0.5:
+                return "30 secondes"
+            elif minutes < 0.5:
+                seconds = int(minutes * 60)
+                return f"{seconds} seconde(s)"
+            else:
+                seconds = int(minutes * 60)
+                return f"{seconds} seconde(s)"
         elif minutes == 1:
             return "1 minute"
         elif minutes < 60:
-            return f"{minutes} minute(s)"
+            if minutes == int(minutes):
+                return f"{int(minutes)} minute(s)"
+            else:
+                return f"{minutes} minute(s)"
         elif minutes == 60:
             return "1 heure"
         elif minutes < 1440:
-            hours = minutes // 60
+            hours = int(minutes // 60)
             remaining_minutes = minutes % 60
             if remaining_minutes == 0:
                 return f"{hours} heure(s)"
             else:
-                return f"{hours}h{remaining_minutes}m"
+                if remaining_minutes == int(remaining_minutes):
+                    return f"{hours}h{int(remaining_minutes)}m"
+                else:
+                    return f"{hours}h{remaining_minutes}m"
         elif minutes == 1440:
             return "1 jour"
         elif minutes < 10080:  # Moins d'une semaine
-            days = minutes // 1440
-            remaining_hours = (minutes % 1440) // 60
+            days = int(minutes // 1440)
+            remaining_hours = int((minutes % 1440) // 60)
             remaining_mins = minutes % 60
 
             parts = []
@@ -113,12 +127,15 @@ class Settings:
             if remaining_hours > 0:
                 parts.append(f"{remaining_hours}h")
             if remaining_mins > 0:
-                parts.append(f"{remaining_mins}m")
+                if remaining_mins == int(remaining_mins):
+                    parts.append(f"{int(remaining_mins)}m")
+                else:
+                    parts.append(f"{remaining_mins}m")
 
             return "".join(parts) if parts else "0 minutes"
         else:
             # Plus d'une semaine
-            days = minutes // 1440
+            days = int(minutes // 1440)
             return f"{days} jour(s)"
 
     @classmethod
@@ -184,8 +201,14 @@ class Settings:
         Check if the bot is running in test mode (rapid reminders).
 
         Returns:
-            bool: True if reminder interval is less than 1 hour (test mode)
+            bool: True if TEST_MODE environment variable is set to true or reminder interval is less than 1 hour
         """
+        # Check explicit TEST_MODE environment variable first
+        test_mode_env = os.getenv('TEST_MODE', 'false').lower()
+        if test_mode_env in ['true', '1', 'yes', 'on']:
+            return True
+        
+        # Fallback to checking reminder interval for backward compatibility
         return cls.REMINDER_INTERVAL_HOURS < 1
 
     @classmethod

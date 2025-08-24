@@ -73,19 +73,22 @@ class SlashCommands(commands.Cog):
     @app_commands.command(name="watch", description="Surveiller les réactions d'un message avec rappels automatiques")
     @app_commands.describe(
         message="Lien du message Discord à surveiller",
-        interval="Intervalle des rappels en minutes (défaut: 60, min: 5, max: 1440)"
+        interval="Intervalle des rappels (défaut: 1h, test: à partir de 30s)"
     )
     @app_commands.choices(interval=[
-        app_commands.Choice(name="5 minutes", value=5),
-        app_commands.Choice(name="15 minutes", value=15),
-        app_commands.Choice(name="30 minutes", value=30),
-        app_commands.Choice(name="1 heure", value=60),
-        app_commands.Choice(name="2 heures", value=120),
-        app_commands.Choice(name="6 heures", value=360),
-        app_commands.Choice(name="12 heures", value=720),
-        app_commands.Choice(name="24 heures", value=1440),
+        app_commands.Choice(name="30 secondes (test)", value=30),
+        app_commands.Choice(name="1 minute (test)", value=60),
+        app_commands.Choice(name="2 minutes (test)", value=120),
+        app_commands.Choice(name="5 minutes", value=300),
+        app_commands.Choice(name="15 minutes", value=900),
+        app_commands.Choice(name="30 minutes", value=1800),
+        app_commands.Choice(name="1 heure", value=3600),
+        app_commands.Choice(name="2 heures", value=7200),
+        app_commands.Choice(name="6 heures", value=21600),
+        app_commands.Choice(name="12 heures", value=43200),
+        app_commands.Choice(name="24 heures", value=86400),
     ])
-    async def watch(self, interaction: discord.Interaction, message: str, interval: int = 60):
+    async def watch(self, interaction: discord.Interaction, message: str, interval: int = 3600):
         """Add a match message to watch for availability responses."""
         # Check permissions
         if not has_admin_permission(interaction.user):
@@ -95,12 +98,15 @@ class SlashCommands(commands.Cog):
             )
             return
 
+        # Convert interval from seconds to minutes
+        interval_minutes = interval / 60.0
+        
         # Store original interval for comparison
-        original_interval = interval
+        original_interval_minutes = interval_minutes
 
         # Validate interval and check if it was adjusted
-        validated_interval = Settings.validate_interval_minutes(interval)
-        interval_adjusted = validated_interval != original_interval
+        validated_interval = Settings.validate_interval_minutes(interval_minutes)
+        interval_adjusted = validated_interval != original_interval_minutes
 
         # Validate message link with permissions
         try:
@@ -225,22 +231,22 @@ class SlashCommands(commands.Cog):
                 if Settings.is_test_mode():
                     embed.add_field(
                         name="⚠️ Intervalle ajusté (Mode Test)",
-                        value=f"L'intervalle demandé ({original_interval} min) a été ajusté à {validated_interval} min (limite test: 1-10080 min)",
+                        value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite test: 30s-7 jours)",
                         inline=False
                     )
                 else:
                     embed.add_field(
                         name="⚠️ Intervalle ajusté",
-                        value=f"L'intervalle demandé ({original_interval} min) a été ajusté à {validated_interval} min (limite: {Settings.MIN_INTERVAL_MINUTES}-{Settings.MAX_INTERVAL_MINUTES} min)",
+                        value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite: {Settings.MIN_INTERVAL_MINUTES}-{Settings.MAX_INTERVAL_MINUTES} min)",
                         inline=False
                     )
 
             await interaction.followup.send(embed=embed, ephemeral=True)
             
             if is_existing_watch:
-                logger.info(f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {original_interval})")
+                logger.info(f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {Settings.format_interval_display(original_interval_minutes)})")
             else:
-                logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {original_interval})")
+                logger.info(f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {Settings.format_interval_display(original_interval_minutes)})")
 
         except Exception as e:
             await send_error_to_user(interaction, e, "l'ajout du match à la surveillance")
@@ -398,17 +404,20 @@ class SlashCommands(commands.Cog):
     @app_commands.command(name="set_interval", description="Modifier l'intervalle d'un rappel surveillé")
     @app_commands.describe(
         message="Lien du message dont modifier l'intervalle",
-        interval="Nouvel intervalle en minutes (min: 5, max: 1440)"
+        interval="Nouvel intervalle (test: à partir de 30s, prod: à partir de 5min)"
     )
     @app_commands.choices(interval=[
-        app_commands.Choice(name="5 minutes", value=5),
-        app_commands.Choice(name="15 minutes", value=15),
-        app_commands.Choice(name="30 minutes", value=30),
-        app_commands.Choice(name="1 heure", value=60),
-        app_commands.Choice(name="2 heures", value=120),
-        app_commands.Choice(name="6 heures", value=360),
-        app_commands.Choice(name="12 heures", value=720),
-        app_commands.Choice(name="24 heures", value=1440),
+        app_commands.Choice(name="30 secondes (test)", value=30),
+        app_commands.Choice(name="1 minute (test)", value=60),
+        app_commands.Choice(name="2 minutes (test)", value=120),
+        app_commands.Choice(name="5 minutes", value=300),
+        app_commands.Choice(name="15 minutes", value=900),
+        app_commands.Choice(name="30 minutes", value=1800),
+        app_commands.Choice(name="1 heure", value=3600),
+        app_commands.Choice(name="2 heures", value=7200),
+        app_commands.Choice(name="6 heures", value=21600),
+        app_commands.Choice(name="12 heures", value=43200),
+        app_commands.Choice(name="24 heures", value=86400),
     ])
     async def set_interval(self, interaction: discord.Interaction, message: str, interval: int):
         """Set a new reminder interval for a watched match."""
@@ -437,9 +446,10 @@ class SlashCommands(commands.Cog):
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
 
-        # Validate and set new interval
+        # Convert interval from seconds to minutes and validate
+        interval_minutes = interval / 60.0
         old_interval = reminder.interval_minutes
-        reminder.set_interval(interval)
+        reminder.set_interval(interval_minutes)
         save_matches(watched_matches)
 
         embed = discord.Embed(
@@ -457,7 +467,7 @@ class SlashCommands(commands.Cog):
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        logger.info(f"Updated interval for match {message_id} from {old_interval} to {reminder.interval_minutes} minutes")
+        logger.info(f"Updated interval for match {message_id} from {Settings.format_interval_display(old_interval)} to {Settings.format_interval_display(reminder.interval_minutes)}")
 
     @app_commands.command(name="pause", description="Mettre en pause les rappels d'un élément")
     @app_commands.describe(message="Lien du message dont mettre en pause les rappels")
@@ -656,6 +666,142 @@ class SlashCommands(commands.Cog):
         embed = create_health_embed(stats)
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="help", description="Afficher l'aide complète d'utilisation du bot Discord Reminder")
+    async def help(self, interaction: discord.Interaction):
+        """Show comprehensive help for Discord Reminder Bot."""
+        
+        # Créer l'embed principal d'aide
+        embed = discord.Embed(
+            title="🤖 Discord Reminder Bot - Guide d'utilisation",
+            description="**Bot de rappels automatiques pour vos événements**\n\n"
+                       "Ce bot surveille les réactions sur vos messages et envoie des rappels automatiques aux participants qui n'ont pas encore répondu.",
+            color=discord.Color.blue(),
+            timestamp=datetime.now()
+        )
+        
+        # Ajouter l'icône du bot comme thumbnail si disponible
+        if self.bot.user and self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+        
+        # Section commandes principales
+        embed.add_field(
+            name="📋 Commandes principales",
+            value=(
+                "**`/watch`** - Surveiller un message avec rappels automatiques\n"
+                "**`/unwatch`** - Retirer un message de la surveillance\n"
+                "**`/list`** - Afficher tous les rappels surveillés\n"
+                "**`/remind`** - Envoyer un rappel manuel\n"
+                "**`/status`** - Statut détaillé d'un rappel\n"
+            ),
+            inline=False
+        )
+        
+        # Section gestion des rappels
+        embed.add_field(
+            name="⚙️ Gestion des rappels",
+            value=(
+                "**`/set_interval`** - Modifier l'intervalle d'un rappel\n"
+                "**`/pause`** - Mettre en pause un rappel\n"
+                "**`/resume`** - Reprendre un rappel en pause\n"
+            ),
+            inline=False
+        )
+        
+        # Section administration
+        embed.add_field(
+            name="🛠️ Administration",
+            value=(
+                "**`/health`** - Statistiques de santé du bot\n"
+                "**`/sync`** - Synchroniser les commandes slash\n"
+            ),
+            inline=False
+        )
+        
+        # Section intervalles disponibles
+        interval_text = "⏱️ **Intervalles standard:**\n"
+        if Settings.is_test_mode():
+            interval_text += (
+                "• 30 secondes, 1 minute, 2 minutes *(mode test)*\n"
+                "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h\n"
+                f"*(Mode test actif - intervalles flexibles de 30s à 7 jours)*"
+            )
+        else:
+            interval_text += "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h"
+        
+        embed.add_field(
+            name="⏰ Intervalles de rappel",
+            value=interval_text,
+            inline=False
+        )
+        
+        # Section permissions
+        embed.add_field(
+            name="🔐 Permissions",
+            value=(
+                f"**Rôles administrateurs:** {Settings.get_admin_roles_str()}\n"
+                "Les utilisateurs avec ces rôles peuvent gérer tous les rappels."
+            ),
+            inline=False
+        )
+        
+        # Section fonctionnement
+        embed.add_field(
+            name="🎯 Comment ça fonctionne",
+            value=(
+                "1️⃣ Créez un message pour votre événement\n"
+                "2️⃣ Ajoutez les réactions ✅ ❌ ❓ au message\n"
+                "3️⃣ Utilisez `/watch` avec le lien du message\n"
+                "4️⃣ Le bot enverra des rappels aux non-répondants\n"
+                "5️⃣ Les rappels s'arrêtent quand tout le monde a répondu"
+            ),
+            inline=False
+        )
+        
+        # Section exemples
+        embed.add_field(
+            name="💡 Exemples d'utilisation",
+            value=(
+                "**Surveiller un événement:**\n"
+                "`/watch message: [lien du message] interval: 1 heure`\n\n"
+                "**Rappel manuel immédiat:**\n"
+                "`/remind message: [lien du message]`\n\n"
+                "**Lister tous les rappels:**\n"
+                "`/list`"
+            ),
+            inline=False
+        )
+        
+        # Section tips & tricks
+        embed.add_field(
+            name="💭 Conseils d'utilisation",
+            value=(
+                "• Utilisez des titres clairs dans vos messages d'événements\n"
+                "• Les rappels sont envoyés dans le canal d'origine par défaut\n"
+                "• Le bot ignore les réactions des autres bots\n"
+                "• Vous pouvez modifier l'intervalle d'un rappel existant\n"
+                "• Les rappels en pause peuvent être repris à tout moment"
+            ),
+            inline=False
+        )
+        
+        # Footer avec informations supplémentaires
+        if interaction.guild:
+            # En serveur : afficher les statistiques du serveur
+            server_matches = len([k for k, v in watched_matches.items() if v.guild_id == interaction.guild.id])
+            footer_text = f"Bot développé avec discord.py • {server_matches} rappel(s) actifs sur ce serveur"
+        else:
+            # En DM : afficher les statistiques globales
+            total_matches = len(watched_matches)
+            footer_text = f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
+        
+        embed.set_footer(text=footer_text)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        # Log sécurisé avec gestion des DM
+        guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
+        logger.info(f"Help command used by user {interaction.user.id} in {guild_info}")
 
     @app_commands.command(name="sync", description="Synchroniser les commandes slash avec Discord (commande de développement)")
     async def sync(self, interaction: discord.Interaction):
