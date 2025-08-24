@@ -22,6 +22,7 @@ from commands.handlers import register_commands
 from config.settings import Settings, Messages
 from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file
 from utils.validation import validate_environment_config
+from utils.auto_delete import init_auto_delete_manager
 
 
 def create_bot() -> commands.Bot:
@@ -101,6 +102,17 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         else:
             logger.info(f"Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
             print(f"⏰ Système de rappels dynamique activé")
+
+    # Initialize and start auto-delete manager
+    auto_delete_mgr = init_auto_delete_manager(bot)
+    await auto_delete_mgr.start()
+
+    if Settings.AUTO_DELETE_REMINDERS:
+        logger.info(f"Auto-deletion enabled: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
+        print(f"🗑️ Auto-suppression activée: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
+    else:
+        logger.info("Auto-deletion disabled")
+        print("🗑️ Auto-suppression désactivée")
 
     # Display channel mode information
     if Settings.USE_SEPARATE_REMINDER_CHANNEL:

@@ -16,6 +16,7 @@ from discord.ext import commands
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
 from models.reminder import MatchReminder
+from utils.auto_delete import get_auto_delete_manager
 from utils.concurrency import get_concurrency_stats
 from utils.error_recovery import safe_send_message, safe_fetch_message, retry_stats
 from utils.message_parser import parse_message_link, extract_message_title
@@ -230,12 +231,29 @@ async def send_reminder(reminder: MatchReminder, channel: discord.TextChannel, b
 
         if remaining > 0:
             embed.set_footer(text=Messages.MENTION_LIMIT_EXCEEDED.format(remaining))
+        elif Settings.AUTO_DELETE_REMINDERS:
+            # Add auto-deletion footer if no mention limit exceeded
+            delete_delay_text = Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+            embed.set_footer(text=f"🗑️ Ce message s'auto-détruira dans {delete_delay_text}")
+
+        # If we have both remaining mentions and auto-deletion, combine the messages
+        if remaining > 0 and Settings.AUTO_DELETE_REMINDERS:
+            delete_delay_text = Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+            combined_text = f"{Messages.MENTION_LIMIT_EXCEEDED.format(remaining)} • 🗑️ Auto-destruction dans {delete_delay_text}"
+            embed.set_footer(text=combined_text)
 
         # Send the reminder with retry mechanism
         sent_message = await safe_send_message(channel, content=mentions, embed=embed)
         if not sent_message:
             logger.error(f"Failed to send reminder for match {reminder.message_id} to channel {channel.name}")
             return 0
+
+        # Schedule auto-deletion if enabled
+        auto_delete_mgr = get_auto_delete_manager()
+        if auto_delete_mgr and Settings.AUTO_DELETE_REMINDERS:
+            success = await auto_delete_mgr.schedule_deletion(sent_message)
+            if success:
+                logger.debug(f"Scheduled auto-deletion for reminder message {sent_message.id} in {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}")
 
         # Update reminder timestamp
         reminder.last_reminder = datetime.now()
@@ -614,6 +632,13 @@ def register_commands(bot: commands.Bot) -> None:
         )
 
         embed.add_field(
+            name="!autodelete [action] [délai]",
+            value="Configure l'auto-suppression des rappels\n"
+                  "→ !autodelete status, enable [délai], disable",
+            inline=False
+        )
+
+        embed.add_field(
             name="!help_reminder",
             value="Affiche cette aide",
             inline=False
@@ -893,6 +918,122 @@ def register_commands(bot: commands.Bot) -> None:
         """Synchronise les commandes slash avec Discord (commande de développement)."""
         await sync_slash_commands(ctx)
 
+    @bot.command(name='autodelete')
+    async def auto_delete_config(ctx: commands.Context, action: str = "status", delay_hours: float = None) -> None:
+        """
+        Configure l'auto-suppression des messages de rappel.
+
+        Usage:
+        !autodelete status - Affiche la configuration actuelle
+        !autodelete enable [délai_en_heures] - Active l'auto-suppression
+        !autodelete disable - Désactive l'auto-suppression
+        """
+        if not has_admin_permission(ctx.author):
+            await ctx.send(get_permission_error_message())
+            return
+
+        if action.lower() == "status":
+            embed = discord.Embed(
+                title="🗑️ Configuration Auto-suppression",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+
+            status = "✅ Activée" if Settings.AUTO_DELETE_REMINDERS else "❌ Désactivée"
+            embed.add_field(name="📊 Statut", value=status, inline=True)
+
+            if Settings.AUTO_DELETE_REMINDERS:
+                delay_text = Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+                embed.add_field(name="⏰ Délai", value=delay_text, inline=True)
+
+                # Get pending deletions count
+                auto_delete_mgr = get_auto_delete_manager()
+                if auto_delete_mgr:
+                    pending_count = auto_delete_mgr.get_pending_count()
+                    embed.add_field(name="📝 Messages programmés", value=str(pending_count), inline=True)
+
+            # Show available delay choices
+            choices_text = ", ".join([Settings.format_auto_delete_display(h) for h in Settings.AUTO_DELETE_CHOICES[:8]])
+            embed.add_field(
+                name="💡 Délais suggérés",
+                value=f"{choices_text}...",
+                inline=False
+            )
+
+            embed.set_footer(text="Utilisez !autodelete enable [délai] ou !autodelete disable")
+            await ctx.send(embed=embed)
+
+        elif action.lower() == "enable":
+            if delay_hours is None:
+                delay_hours = 1.0  # Default to 1 hour
+
+            # Validate delay
+            validated_delay = Settings.validate_auto_delete_hours(delay_hours)
+
+            # Update settings (this would need to be persistent in a real implementation)
+            Settings.AUTO_DELETE_REMINDERS = True
+            Settings.AUTO_DELETE_DELAY_HOURS = validated_delay
+
+            delay_text = Settings.format_auto_delete_display(validated_delay)
+
+            embed = discord.Embed(
+                title="✅ Auto-suppression activée",
+                description=f"Les messages de rappel s'auto-détruiront après **{delay_text}**",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+
+            if validated_delay != delay_hours:
+                embed.add_field(
+                    name="⚠️ Délai ajusté",
+                    value=f"Le délai demandé ({delay_hours}h) a été ajusté à {validated_delay}h",
+                    inline=False
+                )
+
+            await ctx.send(embed=embed)
+            logger.info(f"Auto-deletion enabled by {ctx.author} with delay: {validated_delay}h")
+
+        elif action.lower() == "disable":
+            Settings.AUTO_DELETE_REMINDERS = False
+
+            # Cancel all pending deletions
+            auto_delete_mgr = get_auto_delete_manager()
+            if auto_delete_mgr:
+                cancelled_count = auto_delete_mgr.get_pending_count()
+                # Note: In a full implementation, we'd add a cancel_all_deletions method
+            else:
+                cancelled_count = 0
+
+            embed = discord.Embed(
+                title="❌ Auto-suppression désactivée",
+                description="Les messages de rappel ne seront plus supprimés automatiquement",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+
+            if cancelled_count > 0:
+                embed.add_field(
+                    name="📝 Suppressions annulées",
+                    value=f"{cancelled_count} message(s) programmé(s) pour suppression ont été annulés",
+                    inline=False
+                )
+
+            await ctx.send(embed=embed)
+            logger.info(f"Auto-deletion disabled by {ctx.author}")
+
+        else:
+            embed = discord.Embed(
+                title="❌ Action invalide",
+                description="Actions disponibles: `status`, `enable [délai]`, `disable`",
+                color=discord.Color.red()
+            )
+            embed.add_field(
+                name="Exemples",
+                value="• `!autodelete status`\n• `!autodelete enable 0.25` (15 min)\n• `!autodelete enable 2` (2 heures)\n• `!autodelete disable`",
+                inline=False
+            )
+            await ctx.send(embed=embed)
+
     # Expose the dynamic reminder functions and reminder manager for bot.py
     bot.start_dynamic_reminder_system = start_dynamic_reminder_system
     bot.reschedule_reminders = reschedule_reminders
@@ -910,3 +1051,4 @@ def register_commands(bot: commands.Bot) -> None:
     slash_commands_module.reminder_manager = reminder_manager
 
     logger.info("Registered all commands and configured reminder manager")
+

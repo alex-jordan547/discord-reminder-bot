@@ -5,8 +5,8 @@ This module centralizes all application settings and provides
 a clean interface for configuration management.
 """
 
-import os
 import logging
+import os
 from typing import List, Optional
 
 # Get logger for this module
@@ -39,6 +39,12 @@ class Settings:
     DEFAULT_REACTIONS: List[str] = ['✅', '❌', '❓']
     MAX_MENTIONS_PER_REMINDER: int = 50
     MAX_TITLE_LENGTH: int = 100
+    # Auto-deletion Configuration
+    AUTO_DELETE_REMINDERS: bool = os.getenv('AUTO_DELETE_REMINDERS', 'true').lower() == 'true'
+    AUTO_DELETE_DELAY_HOURS: float = float(os.getenv('AUTO_DELETE_DELAY_HOURS', '1'))  # Default: 1 hour instead of 24
+    MIN_AUTO_DELETE_HOURS: float = 0.05     # Minimum 3 minutes (0.05 hours)
+    MAX_AUTO_DELETE_HOURS: float = 168.0    # Maximum 7 days
+    AUTO_DELETE_CHOICES: List[float] = [0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168]  # 3min, 5min, 10min, 15min, 30min, 1h, 2h, 6h, 12h, 24h, 48h, 72h, 168h
 
     # Slash Command Configuration
     DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new reminders
@@ -73,6 +79,52 @@ class Settings:
             # Mode production : intervalles standards (entiers seulement)
             interval_minutes = int(interval_minutes)  # Convertir en entier pour la production
             return max(cls.MIN_INTERVAL_MINUTES, min(cls.MAX_INTERVAL_MINUTES, interval_minutes))
+
+    @classmethod
+    def validate_auto_delete_hours(cls, hours: float) -> float:
+        """
+        Validate and clamp an auto-deletion delay to acceptable range.
+
+        Args:
+            hours: The delay in hours to validate
+
+        Returns:
+            float: The clamped delay value in hours
+        """
+        return max(cls.MIN_AUTO_DELETE_HOURS, min(cls.MAX_AUTO_DELETE_HOURS, hours))
+
+    @classmethod
+    def format_auto_delete_display(cls, hours: float) -> str:
+        """
+        Format an auto-deletion delay for user-friendly display.
+
+        Args:
+            hours: Delay in hours
+
+        Returns:
+            str: Formatted delay string
+        """
+        if hours < 1:
+            minutes = int(hours * 60)
+            return f"{minutes} minute(s)"
+        elif hours == 1:
+            return "1 heure"
+        elif hours < 24:
+            if hours == int(hours):
+                return f"{int(hours)} heure(s)"
+            else:
+                return f"{hours} heure(s)"
+        elif hours == 24:
+            return "1 jour"
+        elif hours < 168:
+            days = hours / 24
+            if days == int(days):
+                return f"{int(days)} jour(s)"
+            else:
+                return f"{days:.1f} jour(s)"
+        else:
+            days = hours / 24
+            return f"{int(days)} jour(s)"
 
     @classmethod
     def format_interval_display(cls, minutes: float) -> str:
@@ -279,3 +331,4 @@ class Messages:
     NO_MATCHES_TO_REMIND = NO_REMINDERS_TO_REMIND
     NO_WATCHED_MATCHES = NO_WATCHED_REMINDERS
     MATCHES_LOADED = REMINDERS_LOADED
+
