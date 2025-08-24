@@ -19,6 +19,10 @@ from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission
 from utils.message_parser import parse_message_link, extract_message_title
 from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
+from utils.validation import (
+    validate_message_id, validate_message_link, ValidationError, 
+    get_validation_error_embed, safe_int_conversion
+)
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
 
@@ -98,10 +102,10 @@ class SlashCommands(commands.Cog):
         validated_interval = Settings.validate_interval_minutes(interval)
         interval_adjusted = validated_interval != original_interval
 
-        # Parse the message link
-        link_info = parse_message_link(message)
-        if not link_info:
-            await interaction.response.send_message(Messages.INVALID_LINK_FORMAT, ephemeral=True)
+        # Validate message link with permissions
+        is_valid, error_msg, link_info = await validate_message_link(self.bot, message, interaction.user)
+        if not is_valid:
+            await interaction.response.send_message(error_msg, ephemeral=True)
             return
 
         # Verify the message is on this server

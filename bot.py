@@ -21,6 +21,7 @@ load_dotenv()
 from commands.handlers import register_commands
 from config.settings import Settings, Messages
 from utils.logging_config import setup_logging, get_log_level_from_env, should_log_to_file
+from utils.validation import validate_environment_config
 
 
 def create_bot() -> commands.Bot:
@@ -121,10 +122,19 @@ def main() -> None:
 
     logger = logging.getLogger(__name__)
 
-    # Validate configuration
-    if not Settings.validate_required_settings():
+    # Validate configuration using new comprehensive validation
+    config_errors = validate_environment_config()
+    if config_errors:
         logger.error("Configuration validation failed. Please check your environment variables.")
-        print("❌ Configuration invalide! Vérifiez vos variables d'environnement.")
+        print("❌ Configuration invalide! Vérifiez vos variables d'environnement:")
+        for error in config_errors:
+            print(f"  - {error}")
+        sys.exit(1)
+    
+    # Additional basic validation for critical settings
+    if not Settings.validate_required_settings():
+        logger.error("Critical settings validation failed.")
+        print("❌ Validation des paramètres critiques échouée.")
         sys.exit(1)
 
     # Log configuration

@@ -18,6 +18,10 @@ from persistence.storage import save_matches, load_matches
 from utils.permissions import has_admin_permission, get_permission_error_message
 from utils.message_parser import parse_message_link, get_parsing_error_message, extract_message_title
 from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
+from utils.validation import (
+    validate_message_id, validate_message_link, validate_interval_minutes,
+    ValidationError, get_validation_error_embed, safe_int_conversion
+)
 from utils.reminder_manager import reminder_manager
 from utils.concurrency import get_concurrency_stats
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
@@ -274,14 +278,23 @@ def register_commands(bot: commands.Bot) -> None:
         # Store original interval for comparison
         original_interval = interval_minutes
 
-        # Validate interval and check if it was adjusted
+        # Validate interval using existing Settings validation
         validated_interval = Settings.validate_interval_minutes(interval_minutes)
         interval_adjusted = validated_interval != original_interval
+        
+        # Additional validation for completely invalid inputs
+        try:
+            if not isinstance(interval_minutes, (int, float)) or interval_minutes <= 0:
+                raise ValidationError("❌ L'intervalle doit être un nombre positif")
+        except ValidationError as e:
+            embed = get_validation_error_embed(e, "Erreur d'intervalle")
+            await ctx.send(embed=embed)
+            return
 
-        # Parse the message link
-        link_info = parse_message_link(message_link)
-        if not link_info:
-            await ctx.send(get_parsing_error_message())
+        # Validate message link with permissions
+        is_valid, error_msg, link_info = await validate_message_link(bot, message_link, ctx.author)
+        if not is_valid:
+            await ctx.send(error_msg)
             return
 
         # Verify the message is on this server
@@ -392,13 +405,21 @@ def register_commands(bot: commands.Bot) -> None:
         # Try to parse as URL first, then as ID
         link_info = parse_message_link(message)
         if link_info:
-            message_id = link_info.message_id
-        else:
-            # Try to parse as direct message ID
             try:
-                message_id = int(message)
-            except ValueError as e:
-                await send_error_to_user(ctx, e, "l'analyse de l'ID du message")
+                validate_message_id(link_info.message_id)
+                message_id = link_info.message_id
+            except ValidationError as e:
+                embed = get_validation_error_embed(e, "Erreur d'ID de message")
+                await ctx.send(embed=embed)
+                return
+        else:
+            # Try to parse as direct message ID with validation
+            try:
+                message_id = safe_int_conversion(message, "ID du message")
+                validate_message_id(message_id)
+            except ValidationError as e:
+                embed = get_validation_error_embed(e, "Erreur d'ID de message")
+                await ctx.send(embed=embed)
                 return
 
         # Check if reminder exists using thread-safe manager
@@ -467,13 +488,21 @@ def register_commands(bot: commands.Bot) -> None:
             # Try to parse as URL first, then as ID
             link_info = parse_message_link(message)
             if link_info:
-                message_id = link_info.message_id
-            else:
-                # Try to parse as direct message ID
                 try:
-                    message_id = int(message)
-                except ValueError as e:
-                    await send_error_to_user(ctx, e, "l'analyse de l'ID du message")
+                    validate_message_id(link_info.message_id)
+                    message_id = link_info.message_id
+                except ValidationError as e:
+                    embed = get_validation_error_embed(e, "Erreur d'ID de message")
+                    await ctx.send(embed=embed)
+                    return
+            else:
+                # Try to parse as direct message ID with validation
+                try:
+                    message_id = safe_int_conversion(message, "ID du message")
+                    validate_message_id(message_id)
+                except ValidationError as e:
+                    embed = get_validation_error_embed(e, "Erreur d'ID de message")
+                    await ctx.send(embed=embed)
                     return
 
             # Check if reminder exists using thread-safe manager
