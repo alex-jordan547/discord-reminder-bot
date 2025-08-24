@@ -9,7 +9,7 @@ import asyncio
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Set, Any
+from typing import Any, Dict, Set
 
 from models.reminder import Reminder
 
@@ -100,7 +100,9 @@ class ReactionUpdateQueue:
             self._pending_updates[message_id] = asyncio.create_task(
                 self._delayed_update(message_id, update_function, *args, **kwargs)
             )
-            logger.debug(f"Scheduled reaction update for message {message_id} with {self.delay}s delay")
+            logger.debug(
+                f"Scheduled reaction update for message {message_id} with {self.delay}s delay"
+            )
 
     async def _delayed_update(self, message_id: int, update_function, *args, **kwargs) -> None:
         """
@@ -166,6 +168,7 @@ class ThreadSafePersistence:
             self._pending_saves.add(file_path)
             try:
                 from persistence.storage import save_matches
+
                 result = save_matches(reminders)
                 if result:
                     logger.debug(f"Successfully saved {len(reminders)} reminders to {file_path}")
@@ -188,6 +191,7 @@ class ThreadSafePersistence:
         async with self._write_lock:
             try:
                 from persistence.storage import load_matches
+
                 reminders = load_matches()
                 logger.debug(f"Successfully loaded {len(reminders)} reminders from storage")
                 return reminders
@@ -208,12 +212,12 @@ class ConcurrencyStats:
         """Initialize the statistics tracker."""
         self._stats_lock = threading.Lock()
         self._stats = {
-            'reaction_updates_processed': 0,
-            'reaction_updates_debounced': 0,
-            'lock_acquisitions': 0,
-            'save_operations': 0,
-            'concurrent_conflicts': 0,
-            'last_update': datetime.now()
+            "reaction_updates_processed": 0,
+            "reaction_updates_debounced": 0,
+            "lock_acquisitions": 0,
+            "save_operations": 0,
+            "concurrent_conflicts": 0,
+            "last_update": datetime.now(),
         }
 
     def increment_stat(self, stat_name: str, increment: int = 1) -> None:
@@ -227,7 +231,7 @@ class ConcurrencyStats:
         with self._stats_lock:
             if stat_name in self._stats:
                 self._stats[stat_name] += increment
-                self._stats['last_update'] = datetime.now()
+                self._stats["last_update"] = datetime.now()
             else:
                 logger.warning(f"Unknown statistic: {stat_name}")
 
@@ -245,9 +249,9 @@ class ConcurrencyStats:
         """Reset all statistics to zero."""
         with self._stats_lock:
             for key in self._stats:
-                if key != 'last_update':
+                if key != "last_update":
                     self._stats[key] = 0
-            self._stats['last_update'] = datetime.now()
+            self._stats["last_update"] = datetime.now()
 
 
 # Global instances for the application
@@ -272,7 +276,7 @@ async def with_guild_lock(guild_id: int, operation, *args, **kwargs):
     """
     lock = await lock_manager.get_guild_lock(guild_id)
     async with lock:
-        concurrency_stats.increment_stat('lock_acquisitions')
+        concurrency_stats.increment_stat("lock_acquisitions")
         logger.debug(f"Acquired lock for guild {guild_id}")
         try:
             result = await operation(*args, **kwargs)
@@ -291,7 +295,7 @@ async def schedule_reaction_update(message_id: int, update_func, *args, **kwargs
         *args: Arguments for the update function
         **kwargs: Keyword arguments for the update function
     """
-    concurrency_stats.increment_stat('reaction_updates_processed')
+    concurrency_stats.increment_stat("reaction_updates_processed")
     await reaction_queue.schedule_update(message_id, update_func, *args, **kwargs)
 
 

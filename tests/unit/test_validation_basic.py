@@ -3,15 +3,16 @@
 Basic validation unit tests.
 """
 
-import sys
 import os
+import sys
 
 # Add project root to Python path when running standalone
 if __name__ == "__main__":
-    project_root = os.path.join(os.path.dirname(__file__), '..', '..')
+    project_root = os.path.join(os.path.dirname(__file__), "..", "..")
     sys.path.insert(0, project_root)
 
 from utils.message_parser import parse_message_link
+
 
 def test_message_link_validation():
     """Test basic message link validation."""
@@ -20,7 +21,7 @@ def test_message_link_validation():
     # Valid message links
     valid_links = [
         "https://discord.com/channels/123456789/987654321/111222333",
-        "https://discordapp.com/channels/123456789/987654321/111222333"
+        "https://discordapp.com/channels/123456789/987654321/111222333",
     ]
 
     for link in valid_links:
@@ -36,7 +37,7 @@ def test_message_link_validation():
         "not_a_link",
         "https://example.com",
         "https://discord.com/channels/invalid",
-        "https://discord.com/channels/123/456"  # Missing message ID
+        "https://discord.com/channels/123/456",  # Missing message ID
     ]
 
     for link in invalid_links:
@@ -48,6 +49,7 @@ def test_message_link_validation():
             raise AssertionError(f"Expected invalid parsing for {link}")
 
     return True
+
 
 def main():
     """Main test function."""
@@ -71,6 +73,7 @@ def main():
     print(f"📊 Results: {passed}/{total} tests passed")
 
     return 0 if passed == total else 1
+
 
 if __name__ == "__main__":
     exit(main())

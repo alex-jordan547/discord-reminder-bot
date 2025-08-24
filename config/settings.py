@@ -23,34 +23,54 @@ class Settings:
     """
 
     # Discord Bot Configuration
-    TOKEN: Optional[str] = os.getenv('DISCORD_TOKEN')
-    COMMAND_PREFIX: str = '!'
+    TOKEN: Optional[str] = os.getenv("DISCORD_TOKEN")
+    COMMAND_PREFIX: str = "!"
 
     # Reminder Configuration
-    REMINDER_INTERVAL_HOURS: float = float(os.getenv('REMINDER_INTERVAL_HOURS', '24'))
+    REMINDER_INTERVAL_HOURS: float = float(os.getenv("REMINDER_INTERVAL_HOURS", "24"))
 
     # Channel Configuration
-    USE_SEPARATE_REMINDER_CHANNEL: bool = os.getenv('USE_SEPARATE_REMINDER_CHANNEL', 'false').lower() == 'true'
-    REMINDER_CHANNEL_NAME: str = os.getenv('REMINDER_CHANNEL_NAME', 'rappels')
+    USE_SEPARATE_REMINDER_CHANNEL: bool = (
+        os.getenv("USE_SEPARATE_REMINDER_CHANNEL", "false").lower() == "true"
+    )
+    REMINDER_CHANNEL_NAME: str = os.getenv("REMINDER_CHANNEL_NAME", "rappels")
 
     # Permission Configuration
-    ADMIN_ROLES: List[str] = os.getenv('ADMIN_ROLES', 'Admin,Moderateur,Coach').split(',')
+    ADMIN_ROLES: List[str] = os.getenv("ADMIN_ROLES", "Admin,Moderateur,Coach").split(",")
 
     # Message Configuration
-    DEFAULT_REACTIONS: List[str] = ['✅', '❌', '❓']
+    DEFAULT_REACTIONS: List[str] = ["✅", "❌", "❓"]
     MAX_MENTIONS_PER_REMINDER: int = 50
     MAX_TITLE_LENGTH: int = 100
     # Auto-deletion Configuration
-    AUTO_DELETE_REMINDERS: bool = os.getenv('AUTO_DELETE_REMINDERS', 'true').lower() == 'true'
-    AUTO_DELETE_DELAY_HOURS: float = float(os.getenv('AUTO_DELETE_DELAY_HOURS', '1'))  # Default: 1 hour instead of 24
-    MIN_AUTO_DELETE_HOURS: float = 1/60     # Minimum 1 minute exact (1/60 hours)
-    MAX_AUTO_DELETE_HOURS: float = 168.0    # Maximum 7 days
-    AUTO_DELETE_CHOICES: List[float] = [1/60, 2/60, 0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168]  # 1min, 2min, 3min, 5min, 10min, 15min, 30min, 1h, 2h, 6h, 12h, 24h, 48h, 72h, 168h
+    AUTO_DELETE_REMINDERS: bool = os.getenv("AUTO_DELETE_REMINDERS", "true").lower() == "true"
+    AUTO_DELETE_DELAY_HOURS: float = float(
+        os.getenv("AUTO_DELETE_DELAY_HOURS", "1")
+    )  # Default: 1 hour instead of 24
+    MIN_AUTO_DELETE_HOURS: float = 1 / 60  # Minimum 1 minute exact (1/60 hours)
+    MAX_AUTO_DELETE_HOURS: float = 168.0  # Maximum 7 days
+    AUTO_DELETE_CHOICES: List[float] = [
+        1 / 60,
+        2 / 60,
+        0.05,
+        0.08,
+        0.17,
+        0.25,
+        0.5,
+        1,
+        2,
+        6,
+        12,
+        24,
+        48,
+        72,
+        168,
+    ]  # 1min, 2min, 3min, 5min, 10min, 15min, 30min, 1h, 2h, 6h, 12h, 24h, 48h, 72h, 168h
 
     # Slash Command Configuration
     DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new reminders
-    MIN_INTERVAL_MINUTES: int = 5       # Minimum allowed interval
-    MAX_INTERVAL_MINUTES: int = 1440    # Maximum allowed interval (24 hours)
+    MIN_INTERVAL_MINUTES: int = 5  # Minimum allowed interval
+    MAX_INTERVAL_MINUTES: int = 1440  # Maximum allowed interval (24 hours)
 
     # Suggested interval options for slash command choices
     INTERVAL_CHOICES: List[int] = [5, 15, 30, 60, 120, 360, 720, 1440]
@@ -59,7 +79,7 @@ class Settings:
     REMINDER_DELAY_SECONDS: int = 2  # Delay between multiple reminder messages
 
     # File Configuration
-    REMINDERS_SAVE_FILE: str = 'watched_reminders.json'
+    REMINDERS_SAVE_FILE: str = "watched_reminders.json"
 
     @classmethod
     def validate_interval_minutes(cls, interval_minutes: float) -> float:
@@ -214,11 +234,15 @@ class Settings:
             return False
 
         if cls.REMINDER_INTERVAL_HOURS <= 0:
-            logger.error(f"Invalid reminder interval: {cls.REMINDER_INTERVAL_HOURS}. Must be positive.")
+            logger.error(
+                f"Invalid reminder interval: {cls.REMINDER_INTERVAL_HOURS}. Must be positive."
+            )
             return False
 
         if not cls.ADMIN_ROLES:
-            logger.warning("No admin roles configured. Only Discord administrators will have access.")
+            logger.warning(
+                "No admin roles configured. Only Discord administrators will have access."
+            )
 
         return True
 
@@ -257,8 +281,8 @@ class Settings:
             bool: True if TEST_MODE environment variable is set to true or reminder interval is less than 1 hour
         """
         # Check explicit TEST_MODE environment variable first
-        test_mode_env = os.getenv('TEST_MODE', 'false').lower()
-        if test_mode_env in ['true', '1', 'yes', 'on']:
+        test_mode_env = os.getenv("TEST_MODE", "false").lower()
+        if test_mode_env in ["true", "1", "yes", "on"]:
             return True
 
         # Fallback to checking reminder interval for backward compatibility
@@ -272,7 +296,7 @@ class Settings:
         Returns:
             str: Comma-separated list of admin role names
         """
-        return ', '.join(cls.ADMIN_ROLES)
+        return ", ".join(cls.ADMIN_ROLES)
 
     @classmethod
     def get_embed_timestamp(cls) -> datetime:
@@ -299,6 +323,7 @@ class Settings:
             # Mode production : affichage standard sans secondes
             return now.strftime("%H:%M")
 
+
 # Constants for error messages and user feedback
 class Messages:
     """
@@ -306,10 +331,12 @@ class Messages:
     """
 
     # Error messages
-    INVALID_LINK_FORMAT = ("❌ Format de lien invalide. Pour obtenir le lien d'un message:\n"
-                          "1. Faites clic droit sur le message\n"
-                          "2. Sélectionnez 'Copier le lien du message'\n"
-                          "3. Collez le lien complet dans la commande")
+    INVALID_LINK_FORMAT = (
+        "❌ Format de lien invalide. Pour obtenir le lien d'un message:\n"
+        "1. Faites clic droit sur le message\n"
+        "2. Sélectionnez 'Copier le lien du message'\n"
+        "3. Collez le lien complet dans la commande"
+    )
 
     MESSAGE_NOT_FOUND = "❌ Message introuvable."
     CHANNEL_NOT_FOUND = "❌ Canal introuvable."
@@ -356,4 +383,3 @@ class Messages:
     NO_MATCHES_TO_REMIND = NO_REMINDERS_TO_REMIND
     NO_WATCHED_MATCHES = NO_WATCHED_REMINDERS
     MATCHES_LOADED = REMINDERS_LOADED
-

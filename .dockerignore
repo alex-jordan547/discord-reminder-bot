@@ -60,10 +60,9 @@ README.md
 *.md
 docs/
 
-# Test files
+# Test files (allow tests/ directory for Docker builds)
 test_*.py
 *_test.py
-tests/
 
 # Log files
 *.log
@@ -72,9 +71,8 @@ logs/
 # Data directories (will be mounted as volumes)
 data/
 
-# Development files
+# Development files (allow pyproject.toml for Docker builds)
 requirements-dev.txt
-pyproject.toml
 
 # Backup files
 *_original.py

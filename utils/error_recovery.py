@@ -13,7 +13,7 @@ import threading
 from datetime import datetime
 from enum import Enum
 from functools import wraps
-from typing import Callable, Any, Optional, Dict
+from typing import Any, Callable, Dict, Optional
 
 import discord
 
@@ -23,10 +23,11 @@ logger = logging.getLogger(__name__)
 
 class ErrorSeverity(Enum):
     """Classification des erreurs Discord par sévérité et stratégie de récupération."""
-    TRANSIENT = "transient"         # Retry immédiatement
-    RATE_LIMITED = "rate_limited"   # Attendre et respecter le rate limit
-    PERMANENT = "permanent"         # Ne pas retry (404, 403, etc.)
-    API_UNAVAILABLE = "api_down"    # API Discord indisponible, queue pour plus tard
+
+    TRANSIENT = "transient"  # Retry immédiatement
+    RATE_LIMITED = "rate_limited"  # Attendre et respecter le rate limit
+    PERMANENT = "permanent"  # Ne pas retry (404, 403, etc.)
+    API_UNAVAILABLE = "api_down"  # API Discord indisponible, queue pour plus tard
 
 
 class RetryConfig:
@@ -38,7 +39,7 @@ class RetryConfig:
         base_delay: float = 1.0,
         max_delay: float = 60.0,
         backoff_factor: float = 2.0,
-        jitter_factor: float = 0.1
+        jitter_factor: float = 0.1,
     ):
         self.max_attempts = max_attempts
         self.base_delay = base_delay
@@ -49,10 +50,10 @@ class RetryConfig:
 
 # Configurations prédéfinies pour différents types d'opérations
 RETRY_CONFIGS = {
-    'send_message': RetryConfig(max_attempts=3, base_delay=2.0, max_delay=30.0),
-    'fetch_message': RetryConfig(max_attempts=2, base_delay=1.0, max_delay=10.0),
-    'api_call': RetryConfig(max_attempts=3, base_delay=1.5, max_delay=45.0),
-    'critical': RetryConfig(max_attempts=5, base_delay=3.0, max_delay=120.0)
+    "send_message": RetryConfig(max_attempts=3, base_delay=2.0, max_delay=30.0),
+    "fetch_message": RetryConfig(max_attempts=2, base_delay=1.0, max_delay=10.0),
+    "api_call": RetryConfig(max_attempts=3, base_delay=1.5, max_delay=45.0),
+    "critical": RetryConfig(max_attempts=5, base_delay=3.0, max_delay=120.0),
 }
 
 
@@ -76,7 +77,7 @@ def classify_discord_error(error: Exception) -> ErrorSeverity:
         return ErrorSeverity.PERMANENT
 
     elif isinstance(error, discord.HTTPException):
-        status = getattr(error, 'status', 0)
+        status = getattr(error, "status", 0)
 
         if status == 429:
             # Rate limiting - respecter les limites Discord
@@ -96,13 +97,16 @@ def classify_discord_error(error: Exception) -> ErrorSeverity:
         return ErrorSeverity.API_UNAVAILABLE
 
     # Erreurs de réseau/connexion
-    elif isinstance(error, (
-        asyncio.TimeoutError,
-        OSError,
-        ConnectionError,
-        discord.ConnectionClosed,
-        discord.GatewayNotFound
-    )):
+    elif isinstance(
+        error,
+        (
+            asyncio.TimeoutError,
+            OSError,
+            ConnectionError,
+            discord.ConnectionClosed,
+            discord.GatewayNotFound,
+        ),
+    ):
         return ErrorSeverity.API_UNAVAILABLE
 
     # Par défaut, traiter comme transient
@@ -120,7 +124,11 @@ def is_retryable_error(error: Exception) -> bool:
         bool: True si l'erreur peut être retryée
     """
     severity = classify_discord_error(error)
-    return severity in [ErrorSeverity.TRANSIENT, ErrorSeverity.RATE_LIMITED, ErrorSeverity.API_UNAVAILABLE]
+    return severity in [
+        ErrorSeverity.TRANSIENT,
+        ErrorSeverity.RATE_LIMITED,
+        ErrorSeverity.API_UNAVAILABLE,
+    ]
 
 
 async def calculate_delay(error: Exception, attempt: int, config: RetryConfig) -> float:
@@ -139,16 +147,13 @@ async def calculate_delay(error: Exception, attempt: int, config: RetryConfig) -
 
     if severity == ErrorSeverity.RATE_LIMITED:
         # Pour rate limiting, utiliser le retry_after si disponible
-        retry_after = getattr(error, 'retry_after', None)
+        retry_after = getattr(error, "retry_after", None)
         if retry_after:
             logger.warning(f"Rate limited, waiting {retry_after}s as requested by Discord")
             return float(retry_after)
 
     # Exponential backoff avec jitter
-    delay = min(
-        config.base_delay * (config.backoff_factor ** attempt),
-        config.max_delay
-    )
+    delay = min(config.base_delay * (config.backoff_factor**attempt), config.max_delay)
 
     # Ajouter jitter pour éviter le thundering herd
     jitter = delay * config.jitter_factor * random.random()
@@ -156,7 +161,7 @@ async def calculate_delay(error: Exception, attempt: int, config: RetryConfig) -
     return delay + jitter
 
 
-def with_retry(config_name: str = 'api_call', config: Optional[RetryConfig] = None):
+def with_retry(config_name: str = "api_call", config: Optional[RetryConfig] = None):
     """
     Décorateur pour ajouter retry avec exponential backoff aux fonctions async.
 
@@ -170,7 +175,7 @@ def with_retry(config_name: str = 'api_call', config: Optional[RetryConfig] = No
             await channel.send(content)
     """
     if config is None:
-        config = RETRY_CONFIGS.get(config_name, RETRY_CONFIGS['api_call'])
+        config = RETRY_CONFIGS.get(config_name, RETRY_CONFIGS["api_call"])
 
     def decorator(func: Callable):
         @wraps(func)
@@ -180,7 +185,9 @@ def with_retry(config_name: str = 'api_call', config: Optional[RetryConfig] = No
 
             for attempt in range(config.max_attempts):
                 try:
-                    logger.debug(f"Attempting {func_name} (attempt {attempt + 1}/{config.max_attempts})")
+                    logger.debug(
+                        f"Attempting {func_name} (attempt {attempt + 1}/{config.max_attempts})"
+                    )
                     result = await func(*args, **kwargs)
 
                     # Log successful retry
@@ -221,6 +228,7 @@ def with_retry(config_name: str = 'api_call', config: Optional[RetryConfig] = No
                 raise RuntimeError(f"Function {func_name} failed but no exception was captured")
 
         return wrapper
+
     return decorator
 
 
@@ -262,19 +270,17 @@ class RetryStats:
             recovery_rate = (self.recovered_calls / max(self.retried_calls, 1)) * 100
 
             return {
-                'uptime_hours': uptime.total_seconds() / 3600,
-                'total_calls': self.total_calls,
-                'successful_calls': self.successful_calls,
-                'success_rate_percent': round(success_rate, 2),
-                'failed_calls': self.failed_calls,
-                'retried_calls': self.retried_calls,
-                'recovered_calls': self.recovered_calls,
-                'recovery_rate_percent': round(recovery_rate, 2),
-                'most_common_errors': sorted(
-                    self.error_counts.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:5]
+                "uptime_hours": uptime.total_seconds() / 3600,
+                "total_calls": self.total_calls,
+                "successful_calls": self.successful_calls,
+                "success_rate_percent": round(success_rate, 2),
+                "failed_calls": self.failed_calls,
+                "retried_calls": self.retried_calls,
+                "recovered_calls": self.recovered_calls,
+                "recovery_rate_percent": round(recovery_rate, 2),
+                "most_common_errors": sorted(
+                    self.error_counts.items(), key=lambda x: x[1], reverse=True
+                )[:5],
             }
 
     def reset(self):
@@ -293,14 +299,14 @@ class RetryStats:
 retry_stats = RetryStats()
 
 
-def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig] = None):
+def with_retry_stats(config_name: str = "api_call", config: Optional[RetryConfig] = None):
     """
     Décorateur retry avec collecte automatique de statistiques.
 
     Usage identique à with_retry mais collecte des métriques.
     """
     if config is None:
-        config = RETRY_CONFIGS.get(config_name, RETRY_CONFIGS['api_call'])
+        config = RETRY_CONFIGS.get(config_name, RETRY_CONFIGS["api_call"])
 
     def decorator(func: Callable):
         @wraps(func)
@@ -310,14 +316,13 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
 
             for attempt in range(config.max_attempts):
                 try:
-                    logger.debug(f"Attempting {func_name} (attempt {attempt + 1}/{config.max_attempts})")
+                    logger.debug(
+                        f"Attempting {func_name} (attempt {attempt + 1}/{config.max_attempts})"
+                    )
                     result = await func(*args, **kwargs)
 
                     # Enregistrer les statistiques de succès
-                    retry_stats.record_call(
-                        success=True,
-                        retries=attempt
-                    )
+                    retry_stats.record_call(success=True, retries=attempt)
 
                     # Log successful retry
                     if attempt > 0:
@@ -340,9 +345,7 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                         logger.error(f"🚫 Permanent error in {func_name}, not retrying: {str(e)}")
                         # Enregistrer les statistiques d'échec
                         retry_stats.record_call(
-                            success=False,
-                            error_type=type(e).__name__,
-                            retries=attempt
+                            success=False, error_type=type(e).__name__, retries=attempt
                         )
                         raise e
 
@@ -351,9 +354,7 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                         logger.error(f"💥 {func_name} failed after {config.max_attempts} attempts")
                         # Enregistrer les statistiques d'échec
                         retry_stats.record_call(
-                            success=False,
-                            error_type=type(e).__name__,
-                            retries=attempt
+                            success=False, error_type=type(e).__name__, retries=attempt
                         )
                         break
 
@@ -369,6 +370,7 @@ def with_retry_stats(config_name: str = 'api_call', config: Optional[RetryConfig
                 raise RuntimeError(f"Function {func_name} failed but no exception was captured")
 
         return wrapper
+
     return decorator
 
 
@@ -384,7 +386,8 @@ async def safe_send_message(channel: discord.TextChannel, **kwargs) -> Optional[
     Returns:
         discord.Message: Message envoyé, ou None en cas d'échec
     """
-    @with_retry_stats('send_message')
+
+    @with_retry_stats("send_message")
     async def _send():
         return await channel.send(**kwargs)
 
@@ -395,7 +398,9 @@ async def safe_send_message(channel: discord.TextChannel, **kwargs) -> Optional[
         return None
 
 
-async def safe_fetch_message(channel: discord.TextChannel, message_id: int) -> Optional[discord.Message]:
+async def safe_fetch_message(
+    channel: discord.TextChannel, message_id: int
+) -> Optional[discord.Message]:
     """
     Récupère un message de manière sécurisée avec retry automatique.
 
@@ -406,7 +411,8 @@ async def safe_fetch_message(channel: discord.TextChannel, message_id: int) -> O
     Returns:
         discord.Message: Message récupéré, ou None en cas d'échec
     """
-    @with_retry_stats('fetch_message')
+
+    @with_retry_stats("fetch_message")
     async def _fetch():
         return await channel.fetch_message(message_id)
 

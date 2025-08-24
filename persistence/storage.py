@@ -16,7 +16,7 @@ from typing import Dict, Optional
 from models.reminder import Reminder
 
 # Constants
-SAVE_FILE = 'watched_reminders.json'
+SAVE_FILE = "watched_reminders.json"
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def save_matches(watched_matches: Dict[int, Reminder]) -> bool:
         # Convert Reminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
 
-        with open(SAVE_FILE, 'w', encoding='utf-8') as f:
+        with open(SAVE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         logger.debug(f"Successfully saved {len(watched_matches)} matches to {SAVE_FILE}")
@@ -75,7 +75,7 @@ def load_matches() -> Dict[int, Reminder]:
             if not run_migration():
                 logger.error("Migration failed - proceeding with original data")
 
-        with open(SAVE_FILE, 'r', encoding='utf-8') as f:
+        with open(SAVE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         # Convert dictionaries back to Reminder instances
@@ -98,7 +98,9 @@ def load_matches() -> Dict[int, Reminder]:
         return {}
 
 
-def backup_matches(watched_matches: Dict[int, Reminder], backup_suffix: Optional[str] = None) -> bool:
+def backup_matches(
+    watched_matches: Dict[int, Reminder], backup_suffix: Optional[str] = None
+) -> bool:
     """
     Create a backup of the current matches data.
 
@@ -114,13 +116,14 @@ def backup_matches(watched_matches: Dict[int, Reminder], backup_suffix: Optional
             backup_file = f"watched_matches_{backup_suffix}.json"
         else:
             from datetime import datetime
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_file = f"watched_matches_backup_{timestamp}.json"
 
         # Convert Reminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
 
-        with open(backup_file, 'w', encoding='utf-8') as f:
+        with open(backup_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         logger.info(f"Successfully created backup: {backup_file}")
@@ -156,12 +159,12 @@ async def save_matches_atomic(watched_matches: Dict[int, Reminder]) -> bool:
             try:
                 # Create temporary file
                 with tempfile.NamedTemporaryFile(
-                    mode='w',
-                    encoding='utf-8',
+                    mode="w",
+                    encoding="utf-8",
                     dir=save_path.parent,
                     prefix=f"{save_path.stem}_temp_",
                     suffix=save_path.suffix,
-                    delete=False
+                    delete=False,
                 ) as temp_file:
                     json.dump(data, temp_file, indent=2, ensure_ascii=False)
                     temp_file_path = temp_file.name
@@ -217,7 +220,7 @@ async def load_matches_safe() -> Dict[int, Reminder]:
                     logger.error("Migration failed - proceeding with original data")
 
             async with _file_lock:
-                with open(SAVE_FILE, 'r', encoding='utf-8') as f:
+                with open(SAVE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Validate data structure
@@ -235,7 +238,9 @@ async def load_matches_safe() -> Dict[int, Reminder]:
                         logger.warning(f"Skipping invalid reminder data for key {k}: {e}")
                         continue
 
-                logger.info(f"Successfully loaded {len(watched_matches)} reminders from {SAVE_FILE}")
+                logger.info(
+                    f"Successfully loaded {len(watched_matches)} reminders from {SAVE_FILE}"
+                )
                 return watched_matches
 
         except FileNotFoundError:
@@ -248,7 +253,9 @@ async def load_matches_safe() -> Dict[int, Reminder]:
                 retry_delay *= 2  # Exponential backoff
                 continue
             else:
-                logger.error(f"Failed to decode JSON from {SAVE_FILE} after {max_retries} attempts: {e}")
+                logger.error(
+                    f"Failed to decode JSON from {SAVE_FILE} after {max_retries} attempts: {e}"
+                )
                 return {}
         except Exception as e:
             if attempt < max_retries - 1:
@@ -285,7 +292,7 @@ async def verify_data_integrity(watched_matches: Dict[int, Reminder]) -> bool:
                 return False
 
             # Check required attributes
-            required_attrs = ['message_id', 'channel_id', 'guild_id', 'title']
+            required_attrs = ["message_id", "channel_id", "guild_id", "title"]
             for attr in required_attrs:
                 if not hasattr(reminder, attr):
                     logger.error(f"Reminder missing required attribute: {attr}")
@@ -293,7 +300,9 @@ async def verify_data_integrity(watched_matches: Dict[int, Reminder]) -> bool:
 
             # Validate data consistency
             if reminder.message_id != message_id:
-                logger.error(f"Message ID mismatch: key={message_id}, reminder={reminder.message_id}")
+                logger.error(
+                    f"Message ID mismatch: key={message_id}, reminder={reminder.message_id}"
+                )
                 return False
 
         logger.debug(f"Data integrity check passed for {len(watched_matches)} reminders")
@@ -311,7 +320,4 @@ def get_file_lock_status() -> Dict[str, bool]:
     Returns:
         Dict[str, bool]: Lock status information
     """
-    return {
-        'file_lock_locked': _file_lock.locked(),
-        'save_file_exists': os.path.exists(SAVE_FILE)
-    }
+    return {"file_lock_locked": _file_lock.locked(), "save_file_exists": os.path.exists(SAVE_FILE)}

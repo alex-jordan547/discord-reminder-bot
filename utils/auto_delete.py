@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PendingDeletion:
     """Represents a message scheduled for deletion."""
+
     message_id: int
     channel_id: int
     guild_id: int
@@ -50,7 +51,9 @@ class AutoDeleteManager:
             logger.info("Auto-deletion disabled, manager will not start")
             return
 
-        logger.info(f"Starting auto-delete manager (delay: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)})")
+        logger.info(
+            f"Starting auto-delete manager (delay: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)})"
+        )
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self):
@@ -70,7 +73,9 @@ class AutoDeleteManager:
         self._pending_deletions.clear()
         logger.info("Auto-delete manager stopped")
 
-    async def schedule_deletion(self, message: discord.Message, delay_hours: Optional[float] = None) -> bool:
+    async def schedule_deletion(
+        self, message: discord.Message, delay_hours: Optional[float] = None
+    ) -> bool:
         """
         Schedule a message for automatic deletion.
 
@@ -95,9 +100,7 @@ class AutoDeleteManager:
         await self.cancel_deletion(message.id)
 
         # Create the deletion task
-        deletion_task = asyncio.create_task(
-            self._delete_message_after_delay(message, delay_hours)
-        )
+        deletion_task = asyncio.create_task(self._delete_message_after_delay(message, delay_hours))
 
         # Store the pending deletion
         pending = PendingDeletion(
@@ -105,7 +108,7 @@ class AutoDeleteManager:
             channel_id=message.channel.id,
             guild_id=message.guild.id if message.guild else 0,
             deletion_time=deletion_time,
-            task=deletion_task
+            task=deletion_task,
         )
 
         self._pending_deletions[message.id] = pending
@@ -184,8 +187,7 @@ class AutoDeleteManager:
     def get_pending_deletions(self) -> Dict[int, datetime]:
         """Get a dictionary of message IDs and their scheduled deletion times."""
         return {
-            msg_id: pending.deletion_time
-            for msg_id, pending in self._pending_deletions.items()
+            msg_id: pending.deletion_time for msg_id, pending in self._pending_deletions.items()
         }
 
     async def _delete_message_after_delay(self, message: discord.Message, delay_hours: float):

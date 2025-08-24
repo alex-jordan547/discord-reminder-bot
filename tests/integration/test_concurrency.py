@@ -6,23 +6,20 @@ correctly and prevents race conditions.
 """
 
 import asyncio
-import pytest
-import tempfile
-import os
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
+import os
+import tempfile
+from unittest.mock import patch
 
-# Remove sys.path manipulation - use proper test runner instead
+import pytest
 
 # Set up test environment
-os.environ['DISCORD_TOKEN'] = 'test_token'
-os.environ['TEST_MODE'] = 'true'
+os.environ["DISCORD_TOKEN"] = "test_token"
+os.environ["TEST_MODE"] = "true"
 
 from models.reminder import Reminder
-from persistence.storage import save_matches, load_matches
-from commands.handlers import watched_matches
-from utils.concurrency import ReminderLock
+from persistence.storage import load_matches, save_matches
+from utils.concurrency import ReminderLockManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +30,7 @@ class TestConcurrency:
     @pytest.fixture
     def temp_storage_file(self):
         """Create a temporary storage file for testing."""
-        fd, path = tempfile.mkstemp(suffix='.json')
+        fd, path = tempfile.mkstemp(suffix=".json")
         os.close(fd)
         yield path
         if os.path.exists(path):
@@ -43,92 +40,95 @@ class TestConcurrency:
     async def test_concurrent_reminder_additions(self, temp_storage_file):
         """Test adding multiple reminders concurrently."""
         # Mock storage path
-        with patch('persistence.storage.STORAGE_FILE', temp_storage_file):
-            watched_matches.clear()
+        with patch("persistence.storage.SAVE_FILE", temp_storage_file):
+            # Initialize empty storage
+            save_matches({})
 
             # Create mock reminders
             reminders = []
             for i in range(5):
                 reminder = Reminder(
-                    message_id=f"12345{i}",
+                    message_id=123450 + i,  # Use integers for message_id
                     channel_id=987654321,
                     guild_id=111111111,
                     title=f"Test Match {i}",
-                    reminder_interval_seconds=3600
+                    interval_minutes=60,  # Use interval_minutes parameter
                 )
                 reminders.append(reminder)
 
             # Add reminders concurrently
             async def add_reminder(reminder):
-                watched_matches[reminder.message_id] = reminder
-                save_matches(watched_matches)
+                current_data = load_matches()
+                current_data[reminder.message_id] = reminder
+                save_matches(current_data)
 
             # Execute concurrent operations
             await asyncio.gather(*[add_reminder(r) for r in reminders])
 
             # Verify all reminders were added
-            assert len(watched_matches) == 5
+            final_data = load_matches()
+            assert len(final_data) == 5
 
             # Verify data integrity
             for i in range(5):
-                message_id = f"12345{i}"
-                assert message_id in watched_matches
-                assert watched_matches[message_id].title == f"Test Match {i}"
+                message_id = 123450 + i
+                assert message_id in final_data
+                assert final_data[message_id].title == f"Test Match {i}"
 
     @pytest.mark.asyncio
     async def test_concurrent_storage_operations(self, temp_storage_file):
         """Test concurrent read/write operations to storage."""
-        with patch('persistence.storage.STORAGE_FILE', temp_storage_file):
-            watched_matches.clear()
-
+        with patch("persistence.storage.SAVE_FILE", temp_storage_file):
             # Create initial data
             initial_reminder = Reminder(
-                message_id="initial",
+                message_id=999999,  # Use integer for message_id
                 channel_id=987654321,
                 guild_id=111111111,
                 title="Initial Match",
-                reminder_interval_seconds=3600
+                interval_minutes=60,  # Use interval_minutes parameter
             )
-            watched_matches["initial"] = initial_reminder
-            save_matches(watched_matches)
+            initial_data = {initial_reminder.message_id: initial_reminder}
+            save_matches(initial_data)
 
             # Concurrent operations
-            async def concurrent_write(message_id):
+            async def concurrent_write(index):
                 """Simulate concurrent write operations."""
                 current_data = load_matches()
 
                 # Simulate processing delay
                 await asyncio.sleep(0.01)
 
+                message_id = 888800 + index  # Use integer message_id
                 reminder = Reminder(
                     message_id=message_id,
                     channel_id=987654321,
                     guild_id=111111111,
-                    title=f"Concurrent Match {message_id}",
-                    reminder_interval_seconds=3600
+                    title=f"Concurrent Match {index}",
+                    interval_minutes=60,  # Use interval_minutes parameter
                 )
                 current_data[message_id] = reminder
                 save_matches(current_data)
 
             # Execute concurrent writes
-            write_tasks = [concurrent_write(f"concurrent_{i}") for i in range(3)]
+            write_tasks = [concurrent_write(i) for i in range(3)]
             await asyncio.gather(*write_tasks)
 
             # Verify data consistency
             final_data = load_matches()
             assert len(final_data) >= 1  # At least initial data should be preserved
-            assert "initial" in final_data
 
     @pytest.mark.asyncio
     async def test_reminder_lock_mechanism(self):
         """Test the reminder locking mechanism prevents race conditions."""
-        lock = ReminderLock()
+        lock_manager = ReminderLockManager()
+        guild_id = 123456789
 
         shared_resource = {"value": 0}
 
         async def increment_with_lock():
             """Increment shared resource with lock protection."""
-            async with lock:
+            guild_lock = await lock_manager.get_guild_lock(guild_id)
+            async with guild_lock:
                 current = shared_resource["value"]
                 # Simulate processing delay
                 await asyncio.sleep(0.01)

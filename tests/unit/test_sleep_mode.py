@@ -3,6 +3,7 @@
 Unit tests for sleep mode logic in dynamic scheduling.
 """
 
+
 def test_sleep_mode_logic():
     """Test de la logique du mode veille."""
     print("😴 Test du mode veille intelligent...")
@@ -13,26 +14,26 @@ def test_sleep_mode_logic():
             "name": "Démarrage sans aucun match",
             "watched_matches": {},
             "expected_behavior": "Mode veille (pas de vérifications périodiques)",
-            "cpu_usage": "0%"
+            "cpu_usage": "0%",
         },
         {
             "name": "Ajout d'un premier match",
             "watched_matches": {"123": {"interval": 60, "paused": False}},
             "expected_behavior": "Réactivation immédiate + planification précise",
-            "cpu_usage": "Minimal"
+            "cpu_usage": "Minimal",
         },
         {
             "name": "Suppression du dernier match",
             "watched_matches": {},
             "expected_behavior": "Retour en mode veille",
-            "cpu_usage": "0%"
+            "cpu_usage": "0%",
         },
         {
             "name": "Tous les évènements en pause",
             "watched_matches": {"123": {"interval": 60, "paused": True}},
             "expected_behavior": "Mode veille (pas de rappels actifs)",
-            "cpu_usage": "0%"
-        }
+            "cpu_usage": "0%",
+        },
     ]
 
     for scenario in scenarios:
@@ -41,6 +42,7 @@ def test_sleep_mode_logic():
         print(f"    - Utilisation CPU: {scenario['cpu_usage']}")
 
     return True
+
 
 def test_efficiency_comparison():
     """Comparaison d'efficacité avant/après le mode veille."""
@@ -65,6 +67,7 @@ def test_efficiency_comparison():
 
     return True
 
+
 def test_reactivation_speed():
     """Test de la vitesse de réactivation."""
     print("🚀 Test de réactivation du système...")
@@ -73,7 +76,7 @@ def test_reactivation_speed():
         "Bot démarre sans évènements → Mode veille instantané",
         "Ajout 1er match → Réactivation immédiate (< 1s)",
         "Suppression dernier match → Veille instantanée",
-        "Modification d'un match → Replanification immédiate"
+        "Modification d'un match → Replanification immédiate",
     ]
 
     for i, scenario in enumerate(scenarios, 1):
@@ -84,6 +87,7 @@ def test_reactivation_speed():
 
     return True
 
+
 def test_user_experience():
     """Test de l'expérience utilisateur."""
     print("👤 Test d'expérience utilisateur...")
@@ -92,18 +96,18 @@ def test_user_experience():
         {
             "action": "Démarrage du bot sans évènements",
             "before": "😕 'Vérification dans 5 minutes' répétée à l'infini",
-            "after": "😊 'Mode veille activé' puis silence"
+            "after": "😊 'Mode veille activé' puis silence",
         },
         {
             "action": "Ajout du premier match",
             "before": "😐 Attendre jusqu'à 5 min pour la 1ère vérification",
-            "after": "😊 Planification immédiate avec timestamp précis"
+            "after": "😊 Planification immédiate avec timestamp précis",
         },
         {
             "action": "Messages de statut",
             "before": "😕 Logs répétitifs et peu informatifs",
-            "after": "😊 Messages clairs sur l'état du système"
-        }
+            "after": "😊 Messages clairs sur l'état du système",
+        },
     ]
 
     for improvement in improvements:
@@ -112,6 +116,7 @@ def test_user_experience():
         print(f"    - Après: {improvement['after']}")
 
     return True
+
 
 def main():
     """Fonction principale de test."""
@@ -154,6 +159,7 @@ def main():
     else:
         print("⚠️  Certains tests ont échoué.")
         return 1
+
 
 if __name__ == "__main__":
     exit(main())

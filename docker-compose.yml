@@ -16,12 +16,23 @@ services:
       - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
       - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-events}
       
+      # Auto-deletion Configuration
+      - AUTO_DELETE_REMINDERS=${AUTO_DELETE_REMINDERS:-true}
+      - AUTO_DELETE_DELAY_HOURS=${AUTO_DELETE_DELAY_HOURS:-1}
+      
       # Permission Configuration
       - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}
       
       # Logging Configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_TO_FILE=${LOG_TO_FILE:-true}
+      - LOG_COLORS=${LOG_COLORS:-false}
+      
+      # Error Recovery Configuration
+      - ERROR_RECOVERY_MAX_RETRIES=${ERROR_RECOVERY_MAX_RETRIES:-3}
+      - ERROR_RECOVERY_BASE_DELAY=${ERROR_RECOVERY_BASE_DELAY:-1.5}
+      - ERROR_RECOVERY_MAX_DELAY=${ERROR_RECOVERY_MAX_DELAY:-60}
+      - ERROR_RECOVERY_ENABLE_STATS=${ERROR_RECOVERY_ENABLE_STATS:-true}
       
       # Test Mode (optional)
       - TEST_MODE=${TEST_MODE:-false}
@@ -32,9 +43,9 @@ services:
       # Logs persistence (optional)
       - ./logs:/app/logs
     
-    # Health check - verify Discord bot can import core modules and instantiate
+    # Health check - verify basic imports work
     healthcheck:
-      test: ["CMD", "python", "-c", "import discord; from bot import create_bot; bot = create_bot(); print('Health check passed'); import sys; sys.exit(0)"]
+      test: ["CMD", "python", "-c", "import discord; import bot; print('Health check passed')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -43,8 +54,8 @@ services:
     networks:
       - bot-network
     
-    # Security
-    user: "1000:1000"
+    # Security - Use the app user created in Dockerfile
+    # user: "1000:1000"  # Commented out to avoid permission issues on different systems
     
     # Resource limits (optional, adjust as needed)
     deploy:

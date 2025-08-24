@@ -267,12 +267,48 @@ LOG_LEVEL=DEBUG
 4. **Mode veille** sans évènements
 5. **Permissions** multi-serveur
 
+## 🚀 Déploiement et CI/CD
+
+### Workflows GitHub Actions
+
+Le projet utilise un système CI/CD complet avec GitHub Actions :
+
+#### 🔍 **CI (Intégration Continue)** - `.github/workflows/ci.yml`
+- **Déclenchement** : Push et PR sur `main`/`develop`
+- **Tests multi-Python** : 3.11, 3.12, 3.13
+- **Qualité de code** : black, isort, flake8, mypy
+- **Sécurité** : bandit, safety
+- **Couverture** : pytest avec coverage et upload vers Codecov
+- **Docker** : Test de construction d'image
+
+#### 🚢 **CD (Déploiement Continu)** - `.github/workflows/cd.yml`
+- **Registry** : GitHub Container Registry (GHCR)
+- **Images multi-architecture** : linux/amd64, linux/arm64
+- **Déploiement** : Automatique sur push main, manuel via UI
+- **Environments** : staging, production avec protection
+- **Artefacts** : Package de déploiement pour VPS
+
+### Configuration du déploiement
+
+```bash
+# Image Docker automatiquement construite
+ghcr.io/alex-jordan547/discord-reminder-bot:latest
+
+# Déploiement sur VPS
+cd /opt/discord-bot
+./deploy.sh  # Script automatique fourni
+```
+
+Voir `DEPLOYMENT.md` pour la configuration complète.
+
 ## 📚 Références importantes
 
 ### Fichiers de configuration
 - `.env.example` : Template de configuration
 - `requirements.txt` : Dépendances Python
 - `docker-compose.yml` : Configuration Docker
+- `pyproject.toml` : Configuration dev tools (pytest, black, mypy)
+- `DEPLOYMENT.md` : Guide complet de déploiement CI/CD
 
 ### Scripts utilitaires
 - `run_dev.sh` : Lancement développement
