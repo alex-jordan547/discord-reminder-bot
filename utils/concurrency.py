@@ -8,8 +8,8 @@ to prevent race conditions in the generalized reminder system.
 import asyncio
 import logging
 import threading
-from typing import Dict, Set, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Dict, Set, Any
 
 from models.reminder import Reminder
 
@@ -174,6 +174,26 @@ class ThreadSafePersistence:
                 return result
             finally:
                 self._pending_saves.discard(file_path)
+
+    async def load_reminders_safe(self, file_path: str = None) -> Dict[int, Reminder]:
+        """
+        Load reminders from file in a thread-safe manner.
+
+        Args:
+            file_path: Path to the file to load from (optional, defaults to watched_reminders.json)
+
+        Returns:
+            Dict[int, Reminder]: Dictionary of loaded reminders
+        """
+        async with self._write_lock:
+            try:
+                from persistence.storage import load_matches
+                reminders = load_matches()
+                logger.debug(f"Successfully loaded {len(reminders)} reminders from storage")
+                return reminders
+            except Exception as e:
+                logger.error(f"Failed to load reminders from storage: {e}")
+                return {}
 
 
 class ConcurrencyStats:

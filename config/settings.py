@@ -7,6 +7,7 @@ a clean interface for configuration management.
 
 import logging
 import os
+from datetime import datetime
 from typing import List, Optional
 
 # Get logger for this module
@@ -42,9 +43,9 @@ class Settings:
     # Auto-deletion Configuration
     AUTO_DELETE_REMINDERS: bool = os.getenv('AUTO_DELETE_REMINDERS', 'true').lower() == 'true'
     AUTO_DELETE_DELAY_HOURS: float = float(os.getenv('AUTO_DELETE_DELAY_HOURS', '1'))  # Default: 1 hour instead of 24
-    MIN_AUTO_DELETE_HOURS: float = 0.05     # Minimum 3 minutes (0.05 hours)
+    MIN_AUTO_DELETE_HOURS: float = 1/60     # Minimum 1 minute exact (1/60 hours)
     MAX_AUTO_DELETE_HOURS: float = 168.0    # Maximum 7 days
-    AUTO_DELETE_CHOICES: List[float] = [0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168]  # 3min, 5min, 10min, 15min, 30min, 1h, 2h, 6h, 12h, 24h, 48h, 72h, 168h
+    AUTO_DELETE_CHOICES: List[float] = [1/60, 2/60, 0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168]  # 1min, 2min, 3min, 5min, 10min, 15min, 30min, 1h, 2h, 6h, 12h, 24h, 48h, 72h, 168h
 
     # Slash Command Configuration
     DEFAULT_INTERVAL_MINUTES: int = 60  # Default interval for new reminders
@@ -273,6 +274,30 @@ class Settings:
         """
         return ', '.join(cls.ADMIN_ROLES)
 
+    @classmethod
+    def get_embed_timestamp(cls) -> datetime:
+        """
+        Get timestamp for embed display.
+        Returns datetime.now() for Discord's automatic formatting.
+        """
+        return datetime.now()
+
+    @classmethod
+    def get_custom_footer_timestamp(cls) -> str:
+        """
+        Get custom formatted timestamp for footer display.
+        In test mode, includes seconds for more precise timing.
+
+        Returns:
+            str: Formatted timestamp string
+        """
+        now = datetime.now()
+        if cls.is_test_mode():
+            # Mode test : affichage avec secondes pour plus de précision
+            return now.strftime("%H:%M:%S")
+        else:
+            # Mode production : affichage standard sans secondes
+            return now.strftime("%H:%M")
 
 # Constants for error messages and user feedback
 class Messages:

@@ -10,10 +10,10 @@ import asyncio
 import logging
 import random
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from functools import wraps
-from typing import Callable, Any, Optional, Union, Dict
+from typing import Callable, Any, Optional, Dict
 
 import discord
 
@@ -89,6 +89,11 @@ def classify_discord_error(error: Exception) -> ErrorSeverity:
         elif 500 <= status < 600:
             # Erreurs serveur Discord (5xx)
             return ErrorSeverity.TRANSIENT
+
+    # Erreurs de session fermée
+    elif isinstance(error, RuntimeError) and "session is closed" in str(error).lower():
+        # Session Discord fermée - traiter comme une erreur d'API indisponible
+        return ErrorSeverity.API_UNAVAILABLE
 
     # Erreurs de réseau/connexion
     elif isinstance(error, (

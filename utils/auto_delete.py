@@ -1,5 +1,5 @@
 """
-Auto-deletion management for Discord Reminder Bot.
+Auto-delete manager for Discord Reminder Bot.
 
 This module handles the automatic deletion of reminder messages
 after a configurable delay to prevent channel pollution.
@@ -7,9 +7,9 @@ after a configurable delay to prevent channel pollution.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Set, Optional
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
 import discord
 

@@ -5,18 +5,18 @@ This module handles saving and loading match reminder data to/from JSON files.
 It provides functions to persist the application state across restarts.
 """
 
+import asyncio
 import json
 import logging
-import asyncio
-import tempfile
 import os
-from typing import Dict, Optional
+import tempfile
 from pathlib import Path
+from typing import Dict, Optional
 
-from models.reminder import MatchReminder
+from models.reminder import Reminder
 
 # Constants
-SAVE_FILE = 'watched_matches.json'
+SAVE_FILE = 'watched_reminders.json'
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -25,18 +25,18 @@ logger = logging.getLogger(__name__)
 _file_lock = asyncio.Lock()
 
 
-def save_matches(watched_matches: Dict[int, MatchReminder]) -> bool:
+def save_matches(watched_matches: Dict[int, Reminder]) -> bool:
     """
     Save the watched matches dictionary to a JSON file.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to MatchReminder instances
+        watched_matches: Dictionary mapping message IDs to Reminder instances
 
     Returns:
         bool: True if save was successful, False otherwise
     """
     try:
-        # Convert MatchReminder instances to dictionaries for JSON serialization
+        # Convert Reminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
 
         with open(SAVE_FILE, 'w', encoding='utf-8') as f:
@@ -56,14 +56,14 @@ def save_matches(watched_matches: Dict[int, MatchReminder]) -> bool:
         return False
 
 
-def load_matches() -> Dict[int, MatchReminder]:
+def load_matches() -> Dict[int, Reminder]:
     """
     Load watched matches from the JSON save file.
 
     This function now includes automatic migration for older data formats.
 
     Returns:
-        Dict[int, MatchReminder]: Dictionary mapping message IDs to MatchReminder instances
+        Dict[int, Reminder]: Dictionary mapping message IDs to Reminder instances
         Returns empty dict if file doesn't exist or loading fails
     """
     try:
@@ -78,8 +78,8 @@ def load_matches() -> Dict[int, MatchReminder]:
         with open(SAVE_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        # Convert dictionaries back to MatchReminder instances
-        watched_matches = {int(k): MatchReminder.from_dict(v) for k, v in data.items()}
+        # Convert dictionaries back to Reminder instances
+        watched_matches = {int(k): Reminder.from_dict(v) for k, v in data.items()}
 
         logger.info(f"Successfully loaded {len(watched_matches)} matches from {SAVE_FILE}")
         return watched_matches
@@ -98,12 +98,12 @@ def load_matches() -> Dict[int, MatchReminder]:
         return {}
 
 
-def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Optional[str] = None) -> bool:
+def backup_matches(watched_matches: Dict[int, Reminder], backup_suffix: Optional[str] = None) -> bool:
     """
     Create a backup of the current matches data.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to MatchReminder instances
+        watched_matches: Dictionary mapping message IDs to Reminder instances
         backup_suffix: Optional suffix for the backup file name
 
     Returns:
@@ -117,7 +117,7 @@ def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Opt
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_file = f"watched_matches_backup_{timestamp}.json"
 
-        # Convert MatchReminder instances to dictionaries for JSON serialization
+        # Convert Reminder instances to dictionaries for JSON serialization
         data = {str(k): v.to_dict() for k, v in watched_matches.items()}
 
         with open(backup_file, 'w', encoding='utf-8') as f:
@@ -131,7 +131,7 @@ def backup_matches(watched_matches: Dict[int, MatchReminder], backup_suffix: Opt
         return False
 
 
-async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool:
+async def save_matches_atomic(watched_matches: Dict[int, Reminder]) -> bool:
     """
     Save the watched matches dictionary atomically to prevent corruption.
 
@@ -139,14 +139,14 @@ async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool
     and prevents data corruption during concurrent operations.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to MatchReminder instances
+        watched_matches: Dictionary mapping message IDs to Reminder instances
 
     Returns:
         bool: True if save was successful, False otherwise
     """
     async with _file_lock:
         try:
-            # Convert MatchReminder instances to dictionaries for JSON serialization
+            # Convert Reminder instances to dictionaries for JSON serialization
             data = {str(k): v.to_dict() for k, v in watched_matches.items()}
 
             # Create temporary file in same directory to ensure atomic operation
@@ -192,7 +192,7 @@ async def save_matches_atomic(watched_matches: Dict[int, MatchReminder]) -> bool
             return False
 
 
-async def load_matches_safe() -> Dict[int, MatchReminder]:
+async def load_matches_safe() -> Dict[int, Reminder]:
     """
     Load watched matches from the JSON save file with safety checks.
 
@@ -200,7 +200,7 @@ async def load_matches_safe() -> Dict[int, MatchReminder]:
     concurrent access and potential file corruption.
 
     Returns:
-        Dict[int, MatchReminder]: Dictionary mapping message IDs to MatchReminder instances
+        Dict[int, Reminder]: Dictionary mapping message IDs to Reminder instances
         Returns empty dict if file doesn't exist or loading fails
     """
     max_retries = 3
@@ -224,12 +224,12 @@ async def load_matches_safe() -> Dict[int, MatchReminder]:
                 if not isinstance(data, dict):
                     raise ValueError("Invalid data structure: expected dictionary")
 
-                # Convert dictionaries back to MatchReminder instances with validation
+                # Convert dictionaries back to Reminder instances with validation
                 watched_matches = {}
                 for k, v in data.items():
                     try:
                         message_id = int(k)
-                        reminder = MatchReminder.from_dict(v)
+                        reminder = Reminder.from_dict(v)
                         watched_matches[message_id] = reminder
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(f"Skipping invalid reminder data for key {k}: {e}")
@@ -263,7 +263,7 @@ async def load_matches_safe() -> Dict[int, MatchReminder]:
     return {}  # Fallback
 
 
-async def verify_data_integrity(watched_matches: Dict[int, MatchReminder]) -> bool:
+async def verify_data_integrity(watched_matches: Dict[int, Reminder]) -> bool:
     """
     Verify the integrity of reminder data.
 
@@ -280,7 +280,7 @@ async def verify_data_integrity(watched_matches: Dict[int, MatchReminder]) -> bo
                 logger.error(f"Invalid message_id type: {type(message_id)}")
                 return False
 
-            if not isinstance(reminder, MatchReminder):
+            if not isinstance(reminder, Reminder):
                 logger.error(f"Invalid reminder type: {type(reminder)}")
                 return False
 

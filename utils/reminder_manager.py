@@ -322,20 +322,26 @@ class ReminderManager:
             bool: True if loaded successfully, False otherwise
         """
         try:
-            from persistence.storage import load_matches_safe
-            loaded_reminders = await load_matches_safe()
+            # Use the thread-safe persistence manager instead of the old system
+            result = await persistence_manager.load_reminders_safe()
+            if result:
+                loaded_reminders = result
 
-            self._reminders = loaded_reminders
-            self._guild_reminders.clear()
+                self._reminders = loaded_reminders
+                self._guild_reminders.clear()
 
-            # Rebuild guild index
-            for message_id, reminder in loaded_reminders.items():
-                if reminder.guild_id not in self._guild_reminders:
-                    self._guild_reminders[reminder.guild_id] = set()
-                self._guild_reminders[reminder.guild_id].add(message_id)
+                # Rebuild guild index
+                for message_id, reminder in loaded_reminders.items():
+                    if reminder.guild_id not in self._guild_reminders:
+                        self._guild_reminders[reminder.guild_id] = set()
+                    self._guild_reminders[reminder.guild_id].add(message_id)
 
-            logger.info(f"Loaded {len(loaded_reminders)} reminders from storage")
-            return True
+                logger.info(f"Loaded {len(loaded_reminders)} reminders from storage")
+                return True
+            else:
+                # No reminders found or empty file - this is normal for a fresh start
+                logger.info("No existing reminders found - starting with empty reminder list")
+                return True
         except Exception as e:
             logger.error(f"Failed to load reminders from storage: {e}")
             return False

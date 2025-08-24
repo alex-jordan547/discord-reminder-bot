@@ -16,11 +16,11 @@ from discord.ext import commands
 
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
 from config.settings import Settings, Messages
-from models.reminder import MatchReminder
-from persistence.storage import save_matches, load_matches
+from models.reminder import Reminder
 from utils.error_recovery import safe_fetch_message, retry_stats
 from utils.message_parser import parse_message_link, extract_message_title
 from utils.permissions import has_admin_permission
+from utils.reminder_manager import reminder_manager
 from utils.validation import (
     validate_message_link, ValidationError,
     get_validation_error_embed
@@ -28,9 +28,6 @@ from utils.validation import (
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
-
-# Global storage for watched matches (shared with legacy commands)
-watched_matches: Dict[int, MatchReminder] = {}
 
 
 async def send_error_to_user(interaction: discord.Interaction, error: Exception, context: str = "") -> None:
@@ -137,10 +134,11 @@ class SlashCommands(commands.Cog):
                 return
 
             # Check if this is an existing watch being modified
-            is_existing_watch = link_info.message_id in watched_matches
+            existing_reminder = await reminder_manager.get_reminder(link_info.message_id)
+            is_existing_watch = existing_reminder is not None
             old_interval = None
             if is_existing_watch:
-                old_interval = watched_matches[link_info.message_id].interval_minutes
+                old_interval = existing_reminder.interval_minutes
 
             # Extract title from message content
             title = extract_message_title(discord_message.content, Settings.MAX_TITLE_LENGTH)
@@ -150,11 +148,15 @@ class SlashCommands(commands.Cog):
             # Create the reminder (or update existing)
             if is_existing_watch:
                 # Update existing reminder
-                reminder = watched_matches[link_info.message_id]
-                reminder.set_interval(validated_interval)
+                existing_reminder.set_interval(validated_interval)
+                success = await reminder_manager.update_reminder(existing_reminder)
+                if not success:
+                    await interaction.followup.send("❌ Erreur lors de la mise à jour du rappel.", ephemeral=True)
+                    return
+                reminder = existing_reminder
             else:
                 # Create new reminder
-                reminder = MatchReminder(
+                reminder = Reminder(
                     link_info.message_id,
                     link_info.channel_id,
                     link_info.guild_id,
@@ -163,8 +165,6 @@ class SlashCommands(commands.Cog):
                     Settings.DEFAULT_REACTIONS
                 )
 
-            # Only scan for users and reactions if this is a new watch
-            if not is_existing_watch:
                 # Get all server members who can access this specific channel (excluding bots)
                 guild = interaction.guild
                 accessible_users = set()
@@ -184,11 +184,13 @@ class SlashCommands(commands.Cog):
                             if not user.bot:
                                 reminder.users_who_reacted.add(user.id)
 
-            # Save the reminder
-            watched_matches[link_info.message_id] = reminder
-            save_matches(watched_matches)
+                # Add to reminder manager
+                success = await reminder_manager.add_reminder(reminder)
+                if not success:
+                    await interaction.followup.send("❌ Erreur lors de l'ajout du rappel.", ephemeral=True)
+                    return
 
-            # Replanifier les rappels après ajout
+            # Replanifier les rappels après ajout/modification
             from commands.handlers import reschedule_reminders
             reschedule_reminders()
 
@@ -271,10 +273,15 @@ class SlashCommands(commands.Cog):
 
         message_id = link_info.message_id
 
-        if message_id in watched_matches:
-            title = watched_matches[message_id].title
-            del watched_matches[message_id]
-            save_matches(watched_matches)
+        # Use thread-safe reminder manager
+        existing_reminder = await reminder_manager.get_reminder(message_id)
+        if existing_reminder:
+            title = existing_reminder.title
+            success = await reminder_manager.remove_reminder(message_id)
+
+            if not success:
+                await interaction.response.send_message("❌ Erreur lors de la suppression du rappel.", ephemeral=True)
+                return
 
             # Replanifier les rappels après suppression
             from commands.handlers import reschedule_reminders
@@ -295,8 +302,11 @@ class SlashCommands(commands.Cog):
     @app_commands.command(name="list", description="Lister tous les rappels surveillés sur ce serveur")
     async def list_matches(self, interaction: discord.Interaction):
         """List all watched matches on this server."""
-        # Filter matches for this server only
-        server_matches = {k: v for k, v in watched_matches.items() if v.guild_id == interaction.guild.id}
+        # Utiliser le système thread-safe au lieu de l'ancien système
+        from commands.handlers import reminder_manager
+
+        # Filter matches for this server only using thread-safe manager
+        server_matches = await reminder_manager.get_guild_reminders(interaction.guild.id)
 
         if not server_matches:
             await interaction.response.send_message(Messages.NO_WATCHED_MATCHES, ephemeral=True)
@@ -313,14 +323,23 @@ class SlashCommands(commands.Cog):
             channel_mention = f"<#{reminder.channel_id}>" if channel else "Canal inconnu"
 
             status_emoji = "⏸️" if reminder.is_paused else "▶️"
-            time_until_next = reminder.get_time_until_next_reminder()
 
             if reminder.is_paused:
                 next_reminder_text = "En pause"
-            elif time_until_next.total_seconds() < 0:
-                next_reminder_text = "En retard!"
             else:
-                next_reminder_text = f"<t:{int(reminder.get_next_reminder_time().timestamp())}:R>"
+                # Calculer le temps jusqu'au prochain rappel de manière plus précise
+                next_reminder_time = reminder.get_next_reminder_time()
+                current_time = datetime.now()
+                time_until_next = (next_reminder_time - current_time).total_seconds()
+
+                # Considérer qu'un rappel est "en retard" seulement s'il dépasse de plus de 30 secondes
+                # En mode test, être plus tolérant pour les intervalles courts
+                tolerance = 60 if not Settings.is_test_mode() else 30
+
+                if time_until_next < -tolerance:
+                    next_reminder_text = "En retard!"
+                else:
+                    next_reminder_text = f"<t:{int(next_reminder_time.timestamp())}:R>"
 
             embed.add_field(
                 name=f"{status_emoji} {reminder.title[:50]}",
@@ -351,7 +370,7 @@ class SlashCommands(commands.Cog):
         # Defer response for processing
         await interaction.response.defer(ephemeral=True)
 
-        # Determine which matches to remind
+        # Determine which matches to remind using thread-safe manager
         if message:
             link_info = parse_message_link(message)
             if not link_info:
@@ -359,16 +378,17 @@ class SlashCommands(commands.Cog):
                 return
 
             message_id = link_info.message_id
-            if message_id not in watched_matches:
+            reminder = await reminder_manager.get_reminder(message_id)
+            if not reminder:
                 await interaction.followup.send(Messages.MATCH_NOT_WATCHED, ephemeral=True)
                 return
-            if watched_matches[message_id].guild_id != interaction.guild.id:
+            if reminder.guild_id != interaction.guild.id:
                 await interaction.followup.send(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
                 return
-            matches_to_remind = {message_id: watched_matches[message_id]}
+            matches_to_remind = {message_id: reminder}
         else:
-            # Filter matches for this server only
-            matches_to_remind = {k: v for k, v in watched_matches.items() if v.guild_id == interaction.guild.id}
+            # Get all matches for this server using thread-safe manager
+            matches_to_remind = await reminder_manager.get_guild_reminders(interaction.guild.id)
 
         if not matches_to_remind:
             await interaction.followup.send(Messages.NO_MATCHES_TO_REMIND, ephemeral=True)
@@ -437,11 +457,12 @@ class SlashCommands(commands.Cog):
 
         message_id = link_info.message_id
 
-        if message_id not in watched_matches:
+        # Use thread-safe reminder manager
+        reminder = await reminder_manager.get_reminder(message_id)
+        if not reminder:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
             return
 
-        reminder = watched_matches[message_id]
         if reminder.guild_id != interaction.guild.id:
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
@@ -450,7 +471,16 @@ class SlashCommands(commands.Cog):
         interval_minutes = interval / 60.0
         old_interval = reminder.interval_minutes
         reminder.set_interval(interval_minutes)
-        save_matches(watched_matches)
+
+        # Update using thread-safe manager
+        success = await reminder_manager.update_reminder(reminder)
+        if not success:
+            await interaction.response.send_message("❌ Erreur lors de la mise à jour de l'intervalle.", ephemeral=True)
+            return
+
+        # Replanifier les rappels après modification
+        from commands.handlers import reschedule_reminders
+        reschedule_reminders()
 
         embed = discord.Embed(
             title="✅ Intervalle mis à jour",
@@ -489,11 +519,12 @@ class SlashCommands(commands.Cog):
 
         message_id = link_info.message_id
 
-        if message_id not in watched_matches:
+        # Use thread-safe reminder manager
+        reminder = await reminder_manager.get_reminder(message_id)
+        if not reminder:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
             return
 
-        reminder = watched_matches[message_id]
         if reminder.guild_id != interaction.guild.id:
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
@@ -503,7 +534,16 @@ class SlashCommands(commands.Cog):
             return
 
         reminder.pause_reminders()
-        save_matches(watched_matches)
+
+        # Update using thread-safe manager
+        success = await reminder_manager.update_reminder(reminder)
+        if not success:
+            await interaction.response.send_message("❌ Erreur lors de la mise en pause du rappel.", ephemeral=True)
+            return
+
+        # Replanifier les rappels après modification
+        from commands.handlers import reschedule_reminders
+        reschedule_reminders()
 
         embed = discord.Embed(
             title="⏸️ Rappels mis en pause",
@@ -535,11 +575,12 @@ class SlashCommands(commands.Cog):
 
         message_id = link_info.message_id
 
-        if message_id not in watched_matches:
+        # Use thread-safe reminder manager
+        reminder = await reminder_manager.get_reminder(message_id)
+        if not reminder:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
             return
 
-        reminder = watched_matches[message_id]
         if reminder.guild_id != interaction.guild.id:
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
@@ -549,7 +590,16 @@ class SlashCommands(commands.Cog):
             return
 
         reminder.resume_reminders()
-        save_matches(watched_matches)
+
+        # Update using thread-safe manager
+        success = await reminder_manager.update_reminder(reminder)
+        if not success:
+            await interaction.response.send_message("❌ Erreur lors de la reprise du rappel.", ephemeral=True)
+            return
+
+        # Replanifier les rappels après modification
+        from commands.handlers import reschedule_reminders
+        reschedule_reminders()
 
         embed = discord.Embed(
             title="▶️ Rappels repris",
@@ -578,11 +628,12 @@ class SlashCommands(commands.Cog):
 
         message_id = link_info.message_id
 
-        if message_id not in watched_matches:
+        # Use thread-safe reminder manager
+        reminder = await reminder_manager.get_reminder(message_id)
+        if not reminder:
             await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
             return
 
-        reminder = watched_matches[message_id]
         if reminder.guild_id != interaction.guild.id:
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
@@ -712,6 +763,7 @@ class SlashCommands(commands.Cog):
         embed.add_field(
             name="🛠️ Administration",
             value=(
+                "**`/autodelete`** - Configurer l'auto-suppression des rappels\n"
                 "**`/health`** - Statistiques de santé du bot\n"
                 "**`/sync`** - Synchroniser les commandes slash\n"
             ),
@@ -787,12 +839,14 @@ class SlashCommands(commands.Cog):
 
         # Footer avec informations supplémentaires
         if interaction.guild:
-            # En serveur : afficher les statistiques du serveur
-            server_matches = len([k for k, v in watched_matches.items() if v.guild_id == interaction.guild.id])
-            footer_text = f"Bot développé avec discord.py • {server_matches} rappel(s) actifs sur ce serveur"
+            # En serveur : afficher les statistiques du serveur using thread-safe manager
+            server_matches = await reminder_manager.get_guild_reminders(interaction.guild.id)
+            server_count = len(server_matches)
+            footer_text = f"Bot développé avec discord.py • {server_count} rappel(s) actifs sur ce serveur"
         else:
-            # En DM : afficher les statistiques globales
-            total_matches = len(watched_matches)
+            # En DM : afficher les statistiques globales using thread-safe manager
+            all_reminders = reminder_manager.reminders
+            total_matches = len(all_reminders)
             footer_text = f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
 
         embed.set_footer(text=footer_text)
@@ -814,6 +868,8 @@ class SlashCommands(commands.Cog):
         app_commands.Choice(name="disable - Désactiver l'auto-suppression", value="disable")
     ])
     @app_commands.choices(delay_hours=[
+        app_commands.Choice(name="1 minute", value=1/60),
+        app_commands.Choice(name="2 minutes", value=2/60),
         app_commands.Choice(name="3 minutes", value=0.05),
         app_commands.Choice(name="5 minutes", value=0.08),
         app_commands.Choice(name="10 minutes", value=0.17),
@@ -824,9 +880,7 @@ class SlashCommands(commands.Cog):
         app_commands.Choice(name="6 heures", value=6.0),
         app_commands.Choice(name="12 heures", value=12.0),
         app_commands.Choice(name="24 heures", value=24.0),
-        app_commands.Choice(name="48 heures", value=48.0),
-        app_commands.Choice(name="72 heures", value=72.0),
-        app_commands.Choice(name="7 jours", value=168.0)
+        app_commands.Choice(name="48 heures", value=48.0)
     ])
     async def autodelete(
         self,
@@ -990,13 +1044,9 @@ def register_slash_commands(bot: commands.Bot) -> None:
     Args:
         bot: Discord bot instance to register commands with
     """
-    global watched_matches
-
-    # Load matches on startup (shared with legacy commands)
-    watched_matches = load_matches()
-
     # The actual cog registration happens in bot.py on_ready event
-    # when the event loop is running
+    # when the event loop is running using the setup() function above
+    # No need to load from old storage system anymore - using thread-safe reminder_manager
 
-    logger.info(f"Slash commands setup prepared and loaded {len(watched_matches)} matches from storage")
+    logger.info("Slash commands setup prepared - using thread-safe reminder_manager")
 
