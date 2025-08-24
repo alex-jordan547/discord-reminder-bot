@@ -674,7 +674,7 @@ class SlashCommands(commands.Cog):
         # Créer l'embed principal d'aide
         embed = discord.Embed(
             title="🤖 Discord Reminder Bot - Guide d'utilisation",
-            description="**Bot de rappels automatiques pour les matchs et événements**\n\n"
+            description="**Bot de rappels automatiques pour vos événements**\n\n"
                        "Ce bot surveille les réactions sur vos messages et envoie des rappels automatiques aux participants qui n'ont pas encore répondu.",
             color=discord.Color.blue(),
             timestamp=datetime.now()
@@ -749,7 +749,7 @@ class SlashCommands(commands.Cog):
         embed.add_field(
             name="🎯 Comment ça fonctionne",
             value=(
-                "1️⃣ Créez un message pour votre match/événement\n"
+                "1️⃣ Créez un message pour votre événement\n"
                 "2️⃣ Ajoutez les réactions ✅ ❌ ❓ au message\n"
                 "3️⃣ Utilisez `/watch` avec le lien du message\n"
                 "4️⃣ Le bot enverra des rappels aux non-répondants\n"
@@ -762,7 +762,7 @@ class SlashCommands(commands.Cog):
         embed.add_field(
             name="💡 Exemples d'utilisation",
             value=(
-                "**Surveiller un match:**\n"
+                "**Surveiller un événement:**\n"
                 "`/watch message: [lien du message] interval: 1 heure`\n\n"
                 "**Rappel manuel immédiat:**\n"
                 "`/remind message: [lien du message]`\n\n"
@@ -786,12 +786,22 @@ class SlashCommands(commands.Cog):
         )
         
         # Footer avec informations supplémentaires
-        embed.set_footer(
-            text=f"Bot développé avec discord.py • Version actuelle • {len([k for k, v in watched_matches.items() if v.guild_id == interaction.guild.id])} rappel(s) actifs sur ce serveur"
-        )
+        if interaction.guild:
+            # En serveur : afficher les statistiques du serveur
+            server_matches = len([k for k, v in watched_matches.items() if v.guild_id == interaction.guild.id])
+            footer_text = f"Bot développé avec discord.py • {server_matches} rappel(s) actifs sur ce serveur"
+        else:
+            # En DM : afficher les statistiques globales
+            total_matches = len(watched_matches)
+            footer_text = f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
+        
+        embed.set_footer(text=footer_text)
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        logger.info(f"Help command used by user {interaction.user.id} in guild {interaction.guild.id}")
+        
+        # Log sécurisé avec gestion des DM
+        guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
+        logger.info(f"Help command used by user {interaction.user.id} in {guild_info}")
 
     @app_commands.command(name="sync", description="Synchroniser les commandes slash avec Discord (commande de développement)")
     async def sync(self, interaction: discord.Interaction):
