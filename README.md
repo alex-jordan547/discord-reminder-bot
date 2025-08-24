@@ -252,8 +252,8 @@ LOG_LEVEL=DEBUG  # Detailed logs including scheduling timestamps
 ## 📚 Documentation
 
 - **[CLAUDE.md](CLAUDE.md)**: Development guidelines and architecture details
-- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contributor guide *(coming soon)*
-- **[CHANGELOG.md](CHANGELOG.md)**: Version history *(coming soon)*
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contributor guide
+- **[CHANGELOG.md](CHANGELOG.md)**: Version history
 
 ## 🤝 Contributing
 

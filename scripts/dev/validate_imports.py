@@ -3,7 +3,6 @@
 Development script to validate that all imports work correctly.
 """
 
-import sys
 import os
 import importlib.util
 
@@ -13,7 +12,7 @@ def validate_module(module_path, module_name):
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         if spec is None:
             return False, "Could not create module spec"
-        
+
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return True, "Import successful"
@@ -23,7 +22,7 @@ def validate_module(module_path, module_name):
 def main():
     """Main function."""
     print("🔍 Validating Python imports...")
-    
+
     # Key modules to test
     test_modules = [
         ("bot.py", "bot"),
@@ -35,24 +34,24 @@ def main():
         ("utils/logging_config.py", "logging_config"),
         ("utils/validation.py", "validation"),
     ]
-    
+
     passed = 0
     total = len(test_modules)
-    
+
     for module_path, module_name in test_modules:
         if not os.path.exists(module_path):
             print(f"❌ {module_path}: File not found")
             continue
-            
+
         success, message = validate_module(module_path, module_name)
         if success:
             print(f"✅ {module_path}: {message}")
             passed += 1
         else:
             print(f"❌ {module_path}: {message}")
-    
+
     print(f"\n📊 Results: {passed}/{total} modules imported successfully")
-    
+
     if passed == total:
         print("🎉 All imports validated successfully!")
         return 0

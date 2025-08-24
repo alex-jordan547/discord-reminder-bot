@@ -20,7 +20,7 @@ from utils.permissions import has_admin_permission
 from utils.message_parser import parse_message_link, extract_message_title
 from utils.error_recovery import with_retry_stats, safe_send_message, safe_fetch_message, retry_stats
 from utils.validation import (
-    validate_message_id, validate_message_link, ValidationError, 
+    validate_message_id, validate_message_link, ValidationError,
     get_validation_error_embed, safe_int_conversion
 )
 from commands.command_utils import sync_slash_commands_logic, create_health_embed
@@ -100,7 +100,7 @@ class SlashCommands(commands.Cog):
 
         # Convert interval from seconds to minutes
         interval_minutes = interval / 60.0
-        
+
         # Store original interval for comparison
         original_interval_minutes = interval_minutes
 
@@ -187,7 +187,7 @@ class SlashCommands(commands.Cog):
             # Save the reminder
             watched_matches[link_info.message_id] = reminder
             save_matches(watched_matches)
-            
+
             # Replanifier les rappels après ajout
             from commands.handlers import reschedule_reminders
             reschedule_reminders()
@@ -206,7 +206,7 @@ class SlashCommands(commands.Cog):
                     timestamp=datetime.now()
                 )
             embed.add_field(name="📌 Match", value=title, inline=False)
-            
+
             if is_existing_watch and old_interval != validated_interval:
                 # Show interval change for edits
                 embed.add_field(name="⏰ Ancien intervalle", value=Settings.format_interval_display(old_interval), inline=True)
@@ -214,7 +214,7 @@ class SlashCommands(commands.Cog):
             else:
                 # Show single interval for new watches or when interval unchanged
                 embed.add_field(name="⏰ Intervalle", value=Settings.format_interval_display(validated_interval), inline=True)
-            
+
             embed.add_field(name="✅ Ont répondu", value=str(reminder.get_response_count()), inline=True)
             embed.add_field(name="❌ Manquants", value=str(reminder.get_missing_count()), inline=True)
             embed.add_field(name="👥 Total", value=str(reminder.get_total_users_count()), inline=True)
@@ -242,7 +242,7 @@ class SlashCommands(commands.Cog):
                     )
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            
+
             if is_existing_watch:
                 logger.info(f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {Settings.format_interval_display(original_interval_minutes)})")
             else:
@@ -275,7 +275,7 @@ class SlashCommands(commands.Cog):
             title = watched_matches[message_id].title
             del watched_matches[message_id]
             save_matches(watched_matches)
-            
+
             # Replanifier les rappels après suppression
             from commands.handlers import reschedule_reminders
             reschedule_reminders()
@@ -664,13 +664,13 @@ class SlashCommands(commands.Cog):
 
         stats = retry_stats.get_summary()
         embed = create_health_embed(stats)
-        
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="help", description="Afficher l'aide complète d'utilisation du bot Discord Reminder")
     async def help(self, interaction: discord.Interaction):
         """Show comprehensive help for Discord Reminder Bot."""
-        
+
         # Créer l'embed principal d'aide
         embed = discord.Embed(
             title="🤖 Discord Reminder Bot - Guide d'utilisation",
@@ -679,11 +679,11 @@ class SlashCommands(commands.Cog):
             color=discord.Color.blue(),
             timestamp=datetime.now()
         )
-        
+
         # Ajouter l'icône du bot comme thumbnail si disponible
         if self.bot.user and self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
-        
+
         # Section commandes principales
         embed.add_field(
             name="📋 Commandes principales",
@@ -696,7 +696,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section gestion des rappels
         embed.add_field(
             name="⚙️ Gestion des rappels",
@@ -707,7 +707,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section administration
         embed.add_field(
             name="🛠️ Administration",
@@ -717,7 +717,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section intervalles disponibles
         interval_text = "⏱️ **Intervalles standard:**\n"
         if Settings.is_test_mode():
@@ -728,13 +728,13 @@ class SlashCommands(commands.Cog):
             )
         else:
             interval_text += "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h"
-        
+
         embed.add_field(
             name="⏰ Intervalles de rappel",
             value=interval_text,
             inline=False
         )
-        
+
         # Section permissions
         embed.add_field(
             name="🔐 Permissions",
@@ -744,7 +744,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section fonctionnement
         embed.add_field(
             name="🎯 Comment ça fonctionne",
@@ -757,7 +757,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section exemples
         embed.add_field(
             name="💡 Exemples d'utilisation",
@@ -771,7 +771,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Section tips & tricks
         embed.add_field(
             name="💭 Conseils d'utilisation",
@@ -784,7 +784,7 @@ class SlashCommands(commands.Cog):
             ),
             inline=False
         )
-        
+
         # Footer avec informations supplémentaires
         if interaction.guild:
             # En serveur : afficher les statistiques du serveur
@@ -794,11 +794,11 @@ class SlashCommands(commands.Cog):
             # En DM : afficher les statistiques globales
             total_matches = len(watched_matches)
             footer_text = f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
-        
+
         embed.set_footer(text=footer_text)
-        
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        
+
         # Log sécurisé avec gestion des DM
         guild_info = f"guild {interaction.guild.id}" if interaction.guild else "DM"
         logger.info(f"Help command used by user {interaction.user.id} in {guild_info}")
@@ -815,11 +815,11 @@ class SlashCommands(commands.Cog):
             return
 
         await interaction.response.defer(ephemeral=True)
-        
+
         try:
             # Sync commands
             synced = await sync_slash_commands_logic(self.bot)
-            
+
             embed = discord.Embed(
                 title="✅ Synchronisation réussie",
                 description=f"**{len(synced)}** commande(s) slash synchronisée(s) avec Discord.",

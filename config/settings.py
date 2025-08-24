@@ -207,7 +207,7 @@ class Settings:
         test_mode_env = os.getenv('TEST_MODE', 'false').lower()
         if test_mode_env in ['true', '1', 'yes', 'on']:
             return True
-        
+
         # Fallback to checking reminder interval for backward compatibility
         return cls.REMINDER_INTERVAL_HOURS < 1
 
