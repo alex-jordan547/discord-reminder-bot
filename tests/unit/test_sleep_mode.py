@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Script de test pour valider le mode veille intelligent du système de planification dynamique.
+Unit tests for sleep mode logic in dynamic scheduling.
 """
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from datetime import datetime, timedelta
 
