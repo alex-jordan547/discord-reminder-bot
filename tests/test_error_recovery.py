@@ -1,7 +1,7 @@
 """
-Tests unitaires pour le système de récupération d'erreurs.
+Unit tests for the error recovery system.
 
-Tests des mécanismes de retry, classification d'erreurs, et récupération.
+Tests retry mechanisms, error classification, and recovery.
 """
 
 import asyncio
@@ -26,51 +26,51 @@ from utils.error_recovery import (
 
 
 class TestErrorClassification:
-    """Tests de classification des erreurs Discord."""
+    """Tests for Discord error classification."""
     
     def test_classify_not_found_error(self):
-        """Test classification des erreurs 404."""
+        """Test classification of 404 errors."""
         error = discord.NotFound(response=MagicMock(), message="Not Found")
         assert classify_discord_error(error) == ErrorSeverity.PERMANENT
     
     def test_classify_forbidden_error(self):
-        """Test classification des erreurs 403."""
+        """Test classification of 403 errors."""
         error = discord.Forbidden(response=MagicMock(), message="Forbidden")
         assert classify_discord_error(error) == ErrorSeverity.PERMANENT
     
     def test_classify_rate_limit_error(self):
-        """Test classification des erreurs de rate limiting."""
+        """Test classification of rate limiting errors."""
         error = discord.HTTPException(response=MagicMock(), message="Rate Limited")
         error.status = 429
         assert classify_discord_error(error) == ErrorSeverity.RATE_LIMITED
     
     def test_classify_server_error(self):
-        """Test classification des erreurs serveur (5xx)."""
+        """Test classification of server errors (5xx)."""
         error = discord.HTTPException(response=MagicMock(), message="Server Error")
         error.status = 503
         assert classify_discord_error(error) == ErrorSeverity.API_UNAVAILABLE
     
     def test_classify_timeout_error(self):
-        """Test classification des timeout."""
+        """Test classification of timeout errors."""
         error = asyncio.TimeoutError()
         assert classify_discord_error(error) == ErrorSeverity.API_UNAVAILABLE
     
     def test_classify_unknown_error(self):
-        """Test classification des erreurs inconnues."""
+        """Test classification of unknown errors."""
         error = ValueError("Unknown error")
         assert classify_discord_error(error) == ErrorSeverity.TRANSIENT
 
 
 class TestRetryLogic:
-    """Tests de logique de retry."""
+    """Tests for retry logic."""
     
     def test_is_retryable_error(self):
-        """Test de détermination des erreurs retryables."""
-        # Erreurs permanentes - non retryables
+        """Test determination of retryable errors."""
+        # Permanent errors - not retryable
         assert not is_retryable_error(discord.NotFound(response=MagicMock(), message="Not Found"))
         assert not is_retryable_error(discord.Forbidden(response=MagicMock(), message="Forbidden"))
         
-        # Erreurs retryables
+        # Retryable errors
         assert is_retryable_error(asyncio.TimeoutError())
         
         rate_limit_error = discord.HTTPException(response=MagicMock(), message="Rate Limited")
@@ -79,25 +79,25 @@ class TestRetryLogic:
     
     @pytest.mark.asyncio
     async def test_calculate_delay_exponential_backoff(self):
-        """Test du calcul de délai avec exponential backoff."""
+        """Test delay calculation with exponential backoff."""
         config = RetryConfig(base_delay=1.0, backoff_factor=2.0, max_delay=10.0)
         error = ValueError("Test error")
         
-        # Premier retry
+        # First retry
         delay1 = await calculate_delay(error, 0, config)
         assert 1.0 <= delay1 <= 1.5  # Base + jitter
         
-        # Deuxième retry
+        # Second retry
         delay2 = await calculate_delay(error, 1, config)
         assert 2.0 <= delay2 <= 2.5  # Base * 2 + jitter
         
-        # Troisième retry (should be capped)
+        # Third retry (should be capped)
         delay3 = await calculate_delay(error, 5, config)
-        assert delay3 <= 11.0  # Max delay + jitter (plus de tolérance)
+        assert delay3 <= 11.0  # Max delay + jitter (with tolerance)
     
     @pytest.mark.asyncio
     async def test_calculate_delay_rate_limit(self):
-        """Test du calcul de délai pour rate limiting."""
+        """Test delay calculation for rate limiting."""
         config = RetryConfig()
         error = discord.HTTPException(response=MagicMock(), message="Rate Limited")
         error.status = 429
@@ -108,11 +108,11 @@ class TestRetryLogic:
 
 
 class TestRetryDecorator:
-    """Tests du décorateur de retry."""
+    """Tests for retry decorator."""
     
     @pytest.mark.asyncio
     async def test_retry_success_on_first_attempt(self):
-        """Test succès dès la première tentative."""
+        """Test success on first attempt."""
         @with_retry('api_call', RetryConfig(max_attempts=3))
         async def mock_function():
             return "success"
@@ -122,7 +122,7 @@ class TestRetryDecorator:
     
     @pytest.mark.asyncio
     async def test_retry_success_after_retries(self):
-        """Test succès après plusieurs retries."""
+        """Test success after multiple retries."""
         call_count = 0
         
         @with_retry('api_call', RetryConfig(max_attempts=3, base_delay=0.01))
@@ -139,7 +139,7 @@ class TestRetryDecorator:
     
     @pytest.mark.asyncio
     async def test_retry_permanent_error_no_retry(self):
-        """Test qu'une erreur permanente n'est pas retryée."""
+        """Test that permanent errors are not retried."""
         call_count = 0
         
         @with_retry('api_call', RetryConfig(max_attempts=3))
@@ -151,11 +151,11 @@ class TestRetryDecorator:
         with pytest.raises(discord.NotFound):
             await mock_function()
         
-        assert call_count == 1  # Pas de retry pour erreur permanente
+        assert call_count == 1  # No retry for permanent error
     
     @pytest.mark.asyncio
     async def test_retry_max_attempts_exceeded(self):
-        """Test dépassement du nombre max de tentatives."""
+        """Test exceeding maximum number of attempts."""
         call_count = 0
         
         @with_retry('api_call', RetryConfig(max_attempts=2, base_delay=0.01))
@@ -171,11 +171,11 @@ class TestRetryDecorator:
 
 
 class TestSafeHelpers:
-    """Tests des fonctions helper sécurisées."""
+    """Tests for safe helper functions."""
     
     @pytest.mark.asyncio
     async def test_safe_send_message_success(self):
-        """Test d'envoi de message réussi."""
+        """Test successful message sending."""
         mock_channel = AsyncMock()
         mock_message = MagicMock()
         mock_channel.send.return_value = mock_message
@@ -187,7 +187,7 @@ class TestSafeHelpers:
     
     @pytest.mark.asyncio
     async def test_safe_send_message_failure(self):
-        """Test d'envoi de message échoué."""
+        """Test failed message sending."""
         mock_channel = AsyncMock()
         mock_channel.send.side_effect = discord.Forbidden(response=MagicMock(), message="Forbidden")
         
@@ -197,7 +197,7 @@ class TestSafeHelpers:
     
     @pytest.mark.asyncio
     async def test_safe_fetch_message_success(self):
-        """Test de récupération de message réussie."""
+        """Test successful message fetching."""
         mock_channel = AsyncMock()
         mock_message = MagicMock()
         mock_channel.fetch_message.return_value = mock_message
@@ -209,7 +209,7 @@ class TestSafeHelpers:
     
     @pytest.mark.asyncio
     async def test_safe_fetch_message_not_found(self):
-        """Test de récupération de message non trouvé."""
+        """Test fetching message not found."""
         mock_channel = AsyncMock()
         mock_channel.fetch_message.side_effect = discord.NotFound(response=MagicMock(), message="Not Found")
         
@@ -219,14 +219,14 @@ class TestSafeHelpers:
 
 
 class TestRetryStats:
-    """Tests des statistiques de retry."""
+    """Tests for retry statistics."""
     
     def setup_method(self):
-        """Reset stats avant chaque test."""
+        """Reset stats before each test."""
         retry_stats.reset()
     
     def test_stats_initialization(self):
-        """Test de l'initialisation des statistiques."""
+        """Test statistics initialization."""
         stats = retry_stats.get_summary()
         
         assert stats['total_calls'] == 0
@@ -236,7 +236,7 @@ class TestRetryStats:
         assert len(stats['most_common_errors']) == 0
     
     def test_record_successful_call(self):
-        """Test d'enregistrement d'appel réussi."""
+        """Test recording successful call."""
         retry_stats.record_call(success=True, retries=2)
         
         stats = retry_stats.get_summary()
@@ -246,7 +246,7 @@ class TestRetryStats:
         assert stats['retried_calls'] == 1  # Had retries
     
     def test_record_failed_call(self):
-        """Test d'enregistrement d'appel échoué."""
+        """Test recording failed call."""
         retry_stats.record_call(success=False, error_type="HTTPException")
         
         stats = retry_stats.get_summary()
@@ -256,8 +256,8 @@ class TestRetryStats:
         assert ('HTTPException', 1) in stats['most_common_errors']
     
     def test_mixed_calls_statistics(self):
-        """Test de statistiques avec appels mixtes."""
-        # 3 succès, 1 échec
+        """Test statistics with mixed calls."""
+        # 3 successes, 1 failure
         retry_stats.record_call(success=True)
         retry_stats.record_call(success=True, retries=1)
         retry_stats.record_call(success=True)
@@ -272,7 +272,7 @@ class TestRetryStats:
 
 @pytest.mark.asyncio
 async def test_with_retry_stats_decorator():
-    """Test du décorateur avec statistiques."""
+    """Test decorator with statistics."""
     retry_stats.reset()
     
     @with_retry_stats('test', RetryConfig(max_attempts=2, base_delay=0.01))
@@ -289,10 +289,10 @@ async def test_with_retry_stats_decorator():
 
 @pytest.mark.asyncio
 async def test_integration_scenario():
-    """Test d'intégration d'un scénario réaliste."""
+    """Integration test of a realistic scenario."""
     retry_stats.reset()
     
-    # Simuler 3 appels : 1 succès immédiat, 1 succès après retry, 1 échec
+    # Simulate 3 calls: 1 immediate success, 1 success after retry, 1 failure
     @with_retry_stats('integration', RetryConfig(max_attempts=2, base_delay=0.01))
     async def api_call(should_fail=False, retry_once=False):
         if should_fail:
@@ -303,19 +303,19 @@ async def test_integration_scenario():
                 raise ConnectionError("Temporary error")
         return "success"
     
-    # Appel 1: Succès immédiat
+    # Call 1: Immediate success
     result1 = await api_call()
     assert result1 == "success"
     
-    # Appel 2: Succès après retry
+    # Call 2: Success after retry
     result2 = await api_call(retry_once=True)
     assert result2 == "success"
     
-    # Appel 3: Échec permanent
+    # Call 3: Permanent failure
     with pytest.raises(discord.Forbidden):
         await api_call(should_fail=True)
     
-    # Vérifier les statistiques finales
+    # Check final statistics
     stats = retry_stats.get_summary()
     assert stats['total_calls'] == 3
     assert stats['success_rate_percent'] == pytest.approx(66.67, abs=0.1)
