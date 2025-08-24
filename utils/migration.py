@@ -5,8 +5,8 @@ This module handles migration of data from older versions to support
 the new minute-based interval system and enhanced features.
 """
 
-import logging
 import json
+import logging
 import os
 from datetime import datetime
 from typing import Dict, Any
@@ -131,7 +131,7 @@ def run_migration() -> bool:
     Returns:
         bool: True if migration was successful, False otherwise
     """
-    data_file = Settings.MATCHES_SAVE_FILE
+    data_file = Settings.REMINDERS_SAVE_FILE
 
     try:
         # Check if file exists
@@ -182,7 +182,7 @@ def check_migration_needed() -> bool:
     Returns:
         bool: True if migration is needed, False otherwise
     """
-    data_file = Settings.MATCHES_SAVE_FILE
+    data_file = Settings.REMINDERS_SAVE_FILE
 
     try:
         if not os.path.exists(data_file):
@@ -212,7 +212,7 @@ def get_migration_status() -> Dict[str, Any]:
     Returns:
         Dict containing migration status details
     """
-    data_file = Settings.MATCHES_SAVE_FILE
+    data_file = Settings.REMINDERS_SAVE_FILE
     status = {
         'file_exists': os.path.exists(data_file),
         'migration_needed': False,
