@@ -1,0 +1,216 @@
+name: CI - Tests and Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  lint-and-format:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install audioop-lts  # Python 3.13 compatibility
+    
+    - name: Code formatting check (Black)
+      run: |
+        black --check --diff .
+    
+    - name: Import sorting check (isort)
+      run: |
+        isort --check-only --diff .
+    
+    - name: Linting (flake8)
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+    
+    - name: Type checking (mypy)
+      run: |
+        mypy . --ignore-missing-imports
+      continue-on-error: true  # Allow mypy to fail without breaking CI
+    
+    - name: Security linting (bandit)
+      run: |
+        bandit -r . -f json -o bandit-report.json || true
+        bandit -r . --severity-level medium
+      continue-on-error: true
+    
+    - name: Dependency vulnerability scan (safety)
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check
+      continue-on-error: true
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        if [ "${{ matrix.python-version }}" = "3.13" ]; then
+          pip install audioop-lts
+        fi
+    
+    - name: Create test environment file
+      run: |
+        cat > .env << EOF
+        DISCORD_TOKEN=test_token_for_ci
+        TEST_MODE=true
+        LOG_LEVEL=DEBUG
+        LOG_TO_FILE=false
+        REMINDER_INTERVAL_HOURS=0.0167
+        EOF
+    
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-report=html
+      env:
+        PYTHONPATH: .
+    
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.13'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          coverage.xml
+          pytest.xml
+        retention-days: 7
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image (test)
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: discord-reminder-bot:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+    
+    - name: Test Docker image
+      run: |
+        # Test that the image can be created and basic imports work
+        docker run --rm --env DISCORD_TOKEN=test_token discord-reminder-bot:test python -c "
+        import sys
+        print(f'Python version: {sys.version}')
+        
+        # Test core imports
+        import discord
+        print('✓ discord.py imported successfully')
+        
+        from bot import create_bot
+        print('✓ Bot creation import successful')
+        
+        from utils.logging_config import setup_logging
+        setup_logging(log_to_file=False)
+        print('✓ Logging system works')
+        
+        print('✓ All basic functionality tests passed')
+        "
+    
+    - name: Test Docker compose configuration
+      run: |
+        # Create minimal test environment
+        echo "DISCORD_TOKEN=test_token" > .env
+        
+        # Test docker-compose configuration
+        docker-compose config
+        
+        echo "✓ Docker Compose configuration is valid"
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install audioop-lts
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --tb=short
+      env:
+        DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN_TEST }}
+        TEST_MODE: true
+        LOG_LEVEL: DEBUG
