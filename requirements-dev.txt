@@ -2,20 +2,20 @@
 # These tools are used for code quality, linting, and development workflow
 
 # Code formatting and style
-black==24.3.0                # Code formatter (updated)
-isort==5.13.2                 # Import sorting
+black==25.1.0                # Code formatter (latest)
+isort==6.0.1                 # Import sorting (latest)
 
 # Linting and code quality
-flake8==7.0.0                 # Python linting (updated)
+flake8==7.3.0                 # Python linting (latest)
 flake8-docstrings==1.7.0      # Docstring conventions
 flake8-import-order==0.18.2   # Import order checking
 flake8-bugbear==24.2.6        # Additional bug and design problem detection (updated)
 flake8-comprehensions==3.14.0 # List/dict/set comprehension improvements
-mypy==1.9.0                   # Static type checking (updated)
+mypy==1.17.1                   # Static type checking (latest)
 
 # Security scanning
-bandit==1.7.7                 # Security linter (updated)
-safety==3.1.0                 # Dependency vulnerability scanner (updated for compatibility)
+bandit==1.8.6                 # Security linter (latest)
+safety==3.6.0                 # Dependency vulnerability scanner (latest)
 
 # Testing framework and plugins
 pytest==8.1.1                # Testing framework (updated)
