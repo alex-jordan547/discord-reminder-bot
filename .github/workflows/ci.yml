@@ -239,8 +239,8 @@ jobs:
         # Create minimal test environment
         echo "DISCORD_TOKEN=test_token" > .env
         
-        # Test docker-compose configuration
-        docker-compose config
+        # Test docker compose configuration (new syntax)
+        docker compose config
         
         echo "✓ Docker Compose configuration is valid"
 
