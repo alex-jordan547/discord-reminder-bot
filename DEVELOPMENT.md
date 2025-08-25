@@ -43,13 +43,18 @@ make validate-ci
 
 ### Avant chaque commit
 ```bash
-# Formatage automatique
+# 1. OBLIGATOIRE: Activez le venv
+source venv/bin/activate
+# ou
+./run_dev.sh
+
+# 2. Formatage automatique (détecte automatiquement le venv)
 make format
 
-# Validation complète (ce que les CI vont vérifier)
+# 3. Validation complète (ce que les CI vont vérifier)
 make validate-ci
 
-# Si tout est OK, commit
+# 4. Si tout est OK, commit
 git add .
 git commit -m "feat: description du changement"
 ```
@@ -114,6 +119,25 @@ make format
 
 # Ou manuellement
 python -m isort healthcheck.py --profile=black --line-length=100
+```
+
+### ❌ Erreur: "Environnement virtuel non détecté!"
+
+**Cause**: Commandes make lancées sans avoir activé le venv
+
+**Solution**:
+```bash
+# Option 1: Activer le venv manuellement
+source venv/bin/activate
+make format
+
+# Option 2: Utiliser le script run_dev.sh 
+./run_dev.sh
+
+# Option 3: Si pas de venv, le créer
+python3 -m venv venv
+source venv/bin/activate
+make dev-setup
 ```
 
 ### ❌ Pre-commit hooks qui échouent

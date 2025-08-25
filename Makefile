@@ -90,40 +90,59 @@ docker-stop: ## Arrête le conteneur direct
 
 # Commandes de développement
 dev-install: ## Installe les dépendances pour le développement local
-	pip install -r requirements.txt
-	pip install -r requirements-dev.txt
-	pip install pre-commit
+	$(PIP) install -r requirements.txt
+	$(PIP) install -r requirements-dev.txt
+	$(PIP) install pre-commit
 
 dev-setup: dev-install ## Configuration complète de développement
 	@echo "🔧 Configuration des pre-commit hooks..."
 	pre-commit install
 	@echo "✅ Pre-commit hooks installés!"
 
-dev-test: ## Lance les tests localement
-	python3 -m pytest tests/ -v
+dev-test: check-venv ## Lance les tests localement
+	$(PYTHON) -m pytest tests/ -v
+
+# Variables Python avec détection automatique du venv
+PYTHON := $(shell if [ -f venv/bin/python ]; then echo venv/bin/python; elif [ "$$VIRTUAL_ENV" != "" ]; then echo python3; else echo "python3"; fi)
+PIP := $(shell if [ -f venv/bin/pip ]; then echo venv/bin/pip; elif [ "$$VIRTUAL_ENV" != "" ]; then echo pip; else echo "pip3"; fi)
 
 # Formatage et qualité de code
-format: ## Formate automatiquement tout le code
+format: check-venv ## Formate automatiquement tout le code
 	@echo "🎨 Formatage du code avec Black..."
-	python3 -m black . --line-length=100
+	$(PYTHON) -m black . --line-length=100
 	@echo "📦 Tri des imports avec isort..."
-	python3 -m isort . --profile=black --line-length=100
+	$(PYTHON) -m isort . --profile=black --line-length=100
 	@echo "✅ Formatage terminé!"
 
-format-check: ## Vérifie le formatage sans modifier
+format-check: check-venv ## Vérifie le formatage sans modifier
 	@echo "🔍 Vérification du formatage..."
-	python3 -m black . --check --line-length=100
-	python3 -m isort . --check-only --profile=black --line-length=100
+	$(PYTHON) -m black . --check --line-length=100
+	$(PYTHON) -m isort . --check-only --profile=black --line-length=100
 	@echo "✅ Formatage vérifié!"
 
-lint: ## Lance tous les outils de vérification
+lint: check-venv ## Lance tous les outils de vérification
 	@echo "🔍 Analyse avec flake8..."
-	python3 -m flake8 --max-line-length=100 --ignore=E203,W503
+	$(PYTHON) -m flake8 --max-line-length=100 --ignore=E203,W503
 	@echo "🔒 Scan de sécurité avec bandit..."
-	python3 -m bandit -r . --skip B101 -f json -o bandit-report.json || true
+	$(PYTHON) -m bandit -r . --skip B101 -f json -o bandit-report.json || true
 	@echo "🎯 Vérification des types avec mypy..."
-	python3 -m mypy --ignore-missing-imports . || true
+	$(PYTHON) -m mypy --ignore-missing-imports . || true
 	@echo "✅ Analyse terminée!"
+
+check-venv: ## Vérifie que l'environnement virtuel est activé
+	@if [ ! -f venv/bin/python ] && [ "$$VIRTUAL_ENV" = "" ]; then \
+		echo "❌ Environnement virtuel non détecté!"; \
+		echo "💡 Lancez d'abord:"; \
+		echo "   source venv/bin/activate"; \
+		echo "   ou"; \
+		echo "   ./run_dev.sh"; \
+		exit 1; \
+	fi
+	@if [ -f venv/bin/python ]; then \
+		echo "✅ Utilisation du venv local: venv/bin/python"; \
+	elif [ "$$VIRTUAL_ENV" != "" ]; then \
+		echo "✅ Environnement virtuel actif: $$VIRTUAL_ENV"; \
+	fi
 
 pre-commit-all: ## Lance tous les pre-commit hooks sur tous les fichiers
 	@echo "🚀 Lancement de tous les pre-commit hooks..."
