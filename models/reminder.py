@@ -190,6 +190,7 @@ class Reminder:
         except Exception as e:
             # Log error but don't fail - keep existing data as fallback
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to update accessible users for reminder {self.message_id}: {e}")
 

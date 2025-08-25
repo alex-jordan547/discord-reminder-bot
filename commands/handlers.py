@@ -673,7 +673,7 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
         for match_id, reminder in server_matches.items():
             # Update user counts to reflect current server state
             await reminder.update_accessible_users(bot)
-            
+
             channel = bot.get_channel(reminder.channel_id)
             channel_mention = f"<#{reminder.channel_id}>" if channel else "Canal inconnu"
 

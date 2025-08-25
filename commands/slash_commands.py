@@ -156,7 +156,9 @@ class SlashCommands(commands.Cog):
             # Create the reminder (or update existing)
             if is_existing_watch:
                 # Update existing reminder using thread-safe manager
-                success = await reminder_manager.update_reminder_interval(link_info.message_id, validated_interval)
+                success = await reminder_manager.update_reminder_interval(
+                    link_info.message_id, validated_interval
+                )
                 if not success:
                     await interaction.followup.send(
                         "❌ Erreur lors de la mise à jour du rappel.", ephemeral=True
@@ -373,7 +375,7 @@ class SlashCommands(commands.Cog):
         for match_id, reminder in server_matches.items():
             # Update user counts to reflect current server state
             await reminder.update_accessible_users(self.bot)
-            
+
             channel = self.bot.get_channel(reminder.channel_id)
             channel_mention = f"<#{reminder.channel_id}>" if channel else "Canal inconnu"
 
@@ -717,7 +719,7 @@ class SlashCommands(commands.Cog):
 
         # Update user counts to reflect current server state
         await reminder.update_accessible_users(self.bot)
-        
+
         status = reminder.get_status_summary()
 
         # Determine status color and emoji
