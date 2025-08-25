@@ -23,16 +23,17 @@ from peewee import (
 )
 
 from persistence.database import get_database
+from models.validation import ValidationMixin, SerializationMixin, FieldValidator
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
 
-class BaseModel(Model):
+class BaseModel(Model, ValidationMixin, SerializationMixin):
     """
     Base model class that provides common functionality for all models.
     
-    Includes automatic timestamps and common utility methods.
+    Includes automatic timestamps, validation, and serialization capabilities.
     """
     
     created_at = DateTimeField(default=datetime.now)
@@ -49,50 +50,28 @@ class BaseModel(Model):
         self.updated_at = datetime.now()
         return super().save(*args, **kwargs)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def clean(self) -> None:
         """
-        Convert model instance to dictionary for JSON serialization.
-        
-        Returns:
-            Dict[str, Any]: Dictionary representation of the model
+        Perform model cleaning and validation before save.
+        Override this method in subclasses for custom cleaning logic.
         """
-        data = {}
-        for field_name in self._meta.fields:
-            field_value = getattr(self, field_name)
-            
-            # Handle datetime fields
-            if isinstance(field_value, datetime):
-                data[field_name] = field_value.isoformat()
-            # Handle foreign key fields
-            elif hasattr(field_value, 'id'):
-                data[field_name] = field_value.id
-            else:
-                data[field_name] = field_value
-        
-        return data
+        pass
     
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'BaseModel':
+    def full_clean(self, validate_unique: bool = True) -> None:
         """
-        Create model instance from dictionary data.
+        Perform full model validation including field validation and custom cleaning.
         
         Args:
-            data: Dictionary containing model data
+            validate_unique: Whether to validate unique constraints
             
-        Returns:
-            BaseModel: New model instance
+        Raises:
+            ValidationError: If validation fails
         """
-        # Convert datetime strings back to datetime objects
-        for field_name, field in cls._meta.fields.items():
-            if field_name in data and isinstance(field, DateTimeField):
-                if isinstance(data[field_name], str):
-                    try:
-                        data[field_name] = datetime.fromisoformat(data[field_name])
-                    except ValueError:
-                        logger.warning(f"Invalid datetime format for {field_name}: {data[field_name]}")
-                        data[field_name] = datetime.now()
+        # Run custom cleaning logic
+        self.clean()
         
-        return cls(**data)
+        # Run validation
+        self.validate(raise_exception=True)
 
 
 class Guild(BaseModel):
@@ -134,6 +113,52 @@ class Guild(BaseModel):
             logger.error(f"Failed to serialize guild settings: {e}")
             self.settings = '{}'
     
+    def get_active_events_count(self) -> int:
+        """
+        Get the number of active (non-paused) events in this guild.
+        
+        Returns:
+            int: Number of active events
+        """
+        return Event.select().where(
+            (Event.guild == self) & 
+            (Event.is_paused == False)
+        ).count()
+    
+    def get_total_events_count(self) -> int:
+        """
+        Get the total number of events in this guild.
+        
+        Returns:
+            int: Total number of events
+        """
+        return Event.select().where(Event.guild == self).count()
+    
+    def validate_data(self) -> List[str]:
+        """
+        Validate the guild data and return any validation errors.
+        
+        Returns:
+            List[str]: List of validation error messages
+        """
+        errors = []
+        
+        # Validate guild ID
+        errors.extend(FieldValidator.validate_discord_id(self.guild_id, "guild_id"))
+        
+        # Validate name
+        if not self.name or len(self.name.strip()) == 0:
+            errors.append("Guild name cannot be empty")
+        
+        if len(self.name) > 100:
+            errors.append("Guild name cannot exceed 100 characters")
+        
+        # Validate settings JSON
+        if self.settings:
+            errors.extend(FieldValidator.validate_json_field(self.settings, "settings"))
+        
+        return errors
+    
     def __str__(self) -> str:
         return f"Guild({self.guild_id}, {self.name})"
 
@@ -150,6 +175,41 @@ class User(BaseModel):
     username = CharField(max_length=100)
     is_bot = BooleanField(default=False)
     last_seen = DateTimeField(default=datetime.now)
+    
+    class Meta:
+        indexes = (
+            (('user_id', 'guild'), True),  # Unique constraint per guild
+        )
+    
+    def get_reaction_count(self) -> int:
+        """
+        Get the number of reactions this user has made.
+        
+        Returns:
+            int: Number of reactions by this user
+        """
+        return Reaction.select().where(Reaction.user_id == self.user_id).count()
+    
+    def validate_data(self) -> List[str]:
+        """
+        Validate the user data and return any validation errors.
+        
+        Returns:
+            List[str]: List of validation error messages
+        """
+        errors = []
+        
+        # Validate user ID
+        errors.extend(FieldValidator.validate_discord_id(self.user_id, "user_id"))
+        
+        # Validate username
+        if not self.username or len(self.username.strip()) == 0:
+            errors.append("Username cannot be empty")
+        
+        if len(self.username) > 100:
+            errors.append("Username cannot exceed 100 characters")
+        
+        return errors
     
     def __str__(self) -> str:
         return f"User({self.user_id}, {self.username}, Guild:{self.guild.guild_id})"
@@ -171,6 +231,16 @@ class Event(BaseModel):
     is_paused = BooleanField(default=False)
     last_reminder = DateTimeField(default=datetime.now)
     required_reactions = TextField(default='["✅", "❌", "❓"]')  # JSON array
+    
+    # Define computed properties for serialization
+    _computed_properties = [
+        'is_due_for_reminder',
+        'next_reminder_time',
+        'reaction_count',
+        'total_users_count',
+        'missing_users_count',
+        'response_percentage'
+    ]
     
     @property
     def required_reactions_list(self) -> List[str]:
@@ -223,8 +293,128 @@ class Event(BaseModel):
         self.last_reminder = datetime.now()
         self.save()
     
+    def get_missing_users(self) -> List[int]:
+        """
+        Get list of user IDs who haven't reacted to this event.
+        
+        Returns:
+            List[int]: User IDs who haven't reacted
+        """
+        # Get all users in the guild who aren't bots
+        all_users = User.select().where(
+            (User.guild == self.guild) & 
+            (User.is_bot == False)
+        )
+        all_user_ids = {user.user_id for user in all_users}
+        
+        # Get users who have reacted
+        reacted_users = Reaction.select().where(Reaction.event == self)
+        reacted_user_ids = {reaction.user_id for reaction in reacted_users}
+        
+        # Return the difference
+        return list(all_user_ids - reacted_user_ids)
+    
+    def get_reaction_count(self) -> int:
+        """
+        Get the number of users who have reacted to this event.
+        
+        Returns:
+            int: Number of unique users who have reacted
+        """
+        return Reaction.select().where(Reaction.event == self).count()
+    
+    def get_total_users_count(self) -> int:
+        """
+        Get the total number of non-bot users in the guild.
+        
+        Returns:
+            int: Total number of users who could react
+        """
+        return User.select().where(
+            (User.guild == self.guild) & 
+            (User.is_bot == False)
+        ).count()
+    
+    def get_next_reminder_time(self) -> datetime:
+        """
+        Calculate when the next reminder should be sent.
+        
+        Returns:
+            datetime: The time when the next reminder should be sent
+        """
+        from datetime import timedelta
+        return self.last_reminder + timedelta(minutes=self.interval_minutes)
+    
+    @property
+    def next_reminder_time(self) -> datetime:
+        """
+        Property version of get_next_reminder_time for computed properties.
+        """
+        return self.get_next_reminder_time()
+    
+    @property
+    def missing_users_count(self) -> int:
+        """
+        Get the number of users who haven't reacted.
+        """
+        return len(self.get_missing_users())
+    
+    @property
+    def response_percentage(self) -> float:
+        """
+        Get the percentage of users who have responded.
+        """
+        total = self.get_total_users_count()
+        if total == 0:
+            return 0.0
+        return round((self.get_reaction_count() / total) * 100, 1)
+    
+    def validate_data(self) -> List[str]:
+        """
+        Validate the event data and return any validation errors.
+        
+        Returns:
+            List[str]: List of validation error messages
+        """
+        errors = []
+        
+        # Validate message and channel IDs
+        errors.extend(FieldValidator.validate_discord_id(self.message_id, "message_id"))
+        errors.extend(FieldValidator.validate_discord_id(self.channel_id, "channel_id"))
+        
+        # Validate title
+        if not self.title or len(self.title.strip()) == 0:
+            errors.append("Event title cannot be empty")
+        
+        if len(self.title) > 200:
+            errors.append("Event title cannot exceed 200 characters")
+        
+        # Validate interval
+        errors.extend(FieldValidator.validate_interval_minutes(self.interval_minutes))
+        
+        # Validate required reactions JSON
+        if self.required_reactions:
+            errors.extend(FieldValidator.validate_json_field(self.required_reactions, "required_reactions"))
+            
+            # Validate individual emojis in the list
+            try:
+                reactions = self.required_reactions_list
+                if not reactions:
+                    errors.append("At least one required reaction must be specified")
+                else:
+                    for emoji in reactions:
+                        errors.extend(FieldValidator.validate_emoji(emoji, f"required_reaction '{emoji}'"))
+            except Exception as e:
+                errors.append(f"Invalid required_reactions format: {e}")
+        
+        return errors
+    
     class Meta:
-        pass
+        indexes = (
+            (('guild', 'is_paused'), False),  # For finding active events per guild
+            (('last_reminder', 'interval_minutes'), False),  # For scheduler queries
+            (('guild', 'created_at'), False),  # For chronological queries per guild
+        )
     
     def __str__(self) -> str:
         return f"Event({self.message_id}, {self.title}, Guild:{self.guild.guild_id})"
@@ -243,7 +433,27 @@ class Reaction(BaseModel):
     reacted_at = DateTimeField(default=datetime.now)
     
     class Meta:
-        pass
+        indexes = (
+            (('event', 'user_id'), True),  # One reaction per user per event
+            (('event', 'emoji'), False),  # For filtering by emoji type
+        )
+    
+    def validate_data(self) -> List[str]:
+        """
+        Validate the reaction data and return any validation errors.
+        
+        Returns:
+            List[str]: List of validation error messages
+        """
+        errors = []
+        
+        # Validate user ID
+        errors.extend(FieldValidator.validate_discord_id(self.user_id, "user_id"))
+        
+        # Validate emoji
+        errors.extend(FieldValidator.validate_emoji(self.emoji))
+        
+        return errors
     
     def __str__(self) -> str:
         return f"Reaction({self.user_id}, {self.emoji}, Event:{self.event.message_id})"
@@ -264,7 +474,58 @@ class ReminderLog(BaseModel):
     error_message = TextField(null=True)
     
     class Meta:
-        pass
+        indexes = (
+            (('event', 'scheduled_at'), False),  # For chronological queries per event
+            (('status', 'scheduled_at'), False),  # For finding pending/failed reminders
+        )
+    
+    def mark_as_sent(self, users_notified: int = 0) -> None:
+        """
+        Mark this reminder log as successfully sent.
+        
+        Args:
+            users_notified: Number of users who were notified
+        """
+        self.status = 'sent'
+        self.sent_at = datetime.now()
+        self.users_notified = users_notified
+        self.error_message = None
+        self.save()
+    
+    def mark_as_failed(self, error_message: str) -> None:
+        """
+        Mark this reminder log as failed.
+        
+        Args:
+            error_message: Description of the error that occurred
+        """
+        self.status = 'failed'
+        self.error_message = error_message
+        self.save()
+    
+    def validate_data(self) -> List[str]:
+        """
+        Validate the reminder log data and return any validation errors.
+        
+        Returns:
+            List[str]: List of validation error messages
+        """
+        errors = []
+        
+        valid_statuses = ['pending', 'sent', 'failed']
+        if self.status not in valid_statuses:
+            errors.append(f"Status must be one of: {', '.join(valid_statuses)}")
+        
+        if self.users_notified < 0:
+            errors.append("Users notified count cannot be negative")
+        
+        if self.status == 'sent' and self.sent_at is None:
+            errors.append("Sent reminders must have a sent_at timestamp")
+        
+        if self.status == 'failed' and not self.error_message:
+            errors.append("Failed reminders must have an error message")
+        
+        return errors
     
     def __str__(self) -> str:
         return f"ReminderLog({self.event.message_id}, {self.status}, {self.users_notified} users)"
