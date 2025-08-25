@@ -13,15 +13,15 @@ import discord
 from peewee import DoesNotExist, IntegrityError
 
 from config.settings import Settings
-from models.database_models import Event, Guild, User, Reaction, ReminderLog, initialize_models
+from models.database_models import Event, Guild, Reaction, ReminderLog, User, initialize_models
 from persistence.database import get_database
 from utils.concurrency_sqlite import (
+    ensure_database_connection,
+    execute_with_retry,
+    schedule_sqlite_reaction_update,
     sqlite_concurrency_stats,
     with_sqlite_guild_lock,
     with_sqlite_transaction,
-    schedule_sqlite_reaction_update,
-    ensure_database_connection,
-    execute_with_retry,
 )
 from utils.error_recovery import safe_fetch_message
 
@@ -45,7 +45,7 @@ class SQLiteEventManager:
     def _ensure_database_connection(self) -> bool:
         """
         Ensure database connection is available and tables are created.
-        
+
         Returns:
             bool: True if database is ready, False otherwise
         """
@@ -54,6 +54,7 @@ class SQLiteEventManager:
             initialize_models()
             # Then create tables
             from models.database_models import create_tables
+
             return create_tables()
         except Exception as e:
             logger.error(f"Failed to ensure database connection: {e}")
@@ -71,32 +72,33 @@ class SQLiteEventManager:
         Returns:
             Optional[Event]: The created event or None if failed
         """
+
         async def _create_operation():
             try:
                 # Ensure guild exists
                 guild, created = Guild.get_or_create(
                     guild_id=guild_id,
-                    defaults={'name': kwargs.get('guild_name', f'Guild {guild_id}')}
+                    defaults={"name": kwargs.get("guild_name", f"Guild {guild_id}")},
                 )
-                
+
                 # Create the event
                 event = Event.create(
                     message_id=message_id,
-                    channel_id=kwargs.get('channel_id'),
+                    channel_id=kwargs.get("channel_id"),
                     guild=guild,
-                    title=kwargs.get('title', 'Untitled Event'),
-                    description=kwargs.get('description'),
+                    title=kwargs.get("title", "Untitled Event"),
+                    description=kwargs.get("description"),
                     interval_minutes=Settings.validate_interval_minutes(
-                        kwargs.get('interval_minutes', 60.0)
+                        kwargs.get("interval_minutes", 60.0)
                     ),
-                    is_paused=kwargs.get('is_paused', False),
-                    last_reminder=kwargs.get('last_reminder', datetime.now()),
-                    required_reactions=kwargs.get('required_reactions', '["✅", "❌", "❓"]')
+                    is_paused=kwargs.get("is_paused", False),
+                    last_reminder=kwargs.get("last_reminder", datetime.now()),
+                    required_reactions=kwargs.get("required_reactions", '["✅", "❌", "❓"]'),
                 )
-                
+
                 logger.info(f"Created event {message_id} in guild {guild_id}")
                 return event
-                    
+
             except IntegrityError as e:
                 logger.error(f"Event {message_id} already exists: {e}")
                 return None
@@ -147,43 +149,43 @@ class SQLiteEventManager:
             try:
                 # Update allowed fields
                 updated = False
-                
-                if 'title' in kwargs:
-                    event.title = kwargs['title']
+
+                if "title" in kwargs:
+                    event.title = kwargs["title"]
                     updated = True
-                
-                if 'description' in kwargs:
-                    event.description = kwargs['description']
+
+                if "description" in kwargs:
+                    event.description = kwargs["description"]
                     updated = True
-                
-                if 'interval_minutes' in kwargs:
+
+                if "interval_minutes" in kwargs:
                     event.interval_minutes = Settings.validate_interval_minutes(
-                        kwargs['interval_minutes']
+                        kwargs["interval_minutes"]
                     )
                     updated = True
-                
-                if 'is_paused' in kwargs:
-                    event.is_paused = kwargs['is_paused']
+
+                if "is_paused" in kwargs:
+                    event.is_paused = kwargs["is_paused"]
                     updated = True
-                
-                if 'last_reminder' in kwargs:
-                    event.last_reminder = kwargs['last_reminder']
+
+                if "last_reminder" in kwargs:
+                    event.last_reminder = kwargs["last_reminder"]
                     updated = True
-                
-                if 'required_reactions' in kwargs:
-                    if isinstance(kwargs['required_reactions'], list):
-                        event.required_reactions_list = kwargs['required_reactions']
+
+                if "required_reactions" in kwargs:
+                    if isinstance(kwargs["required_reactions"], list):
+                        event.required_reactions_list = kwargs["required_reactions"]
                     else:
-                        event.required_reactions = kwargs['required_reactions']
+                        event.required_reactions = kwargs["required_reactions"]
                     updated = True
-                    
+
                 if updated:
                     event.save()
                     logger.info(f"Updated event {message_id}")
                     return True
-                
+
                 return False
-                    
+
             except Exception as e:
                 logger.error(f"Failed to update event {message_id}: {e}")
                 return False
@@ -213,13 +215,13 @@ class SQLiteEventManager:
                 # Delete related records first (cascading delete)
                 Reaction.delete().where(Reaction.event == event).execute()
                 ReminderLog.delete().where(ReminderLog.event == event).execute()
-                
+
                 # Delete the event
                 event.delete_instance()
-                
+
                 logger.info(f"Deleted event {message_id} from guild {event.guild.guild_id}")
                 return True
-                    
+
             except Exception as e:
                 logger.error(f"Failed to delete event {message_id}: {e}")
                 return False
@@ -255,20 +257,20 @@ class SQLiteEventManager:
         """
         try:
             current_time = datetime.now()
-            
+
             # Optimized query to find due events
             due_events = []
-            
+
             # Get all non-paused events and check if they're due
             events = Event.select().where(Event.is_paused == False)
-            
+
             for event in events:
                 if event.is_due_for_reminder:
                     due_events.append(event)
-            
+
             logger.debug(f"Found {len(due_events)} due events")
             return due_events
-            
+
         except Exception as e:
             logger.error(f"Failed to get due events: {e}")
             return []
@@ -339,37 +341,37 @@ class SQLiteEventManager:
                     return False
 
                 database = get_database()
-                
+
                 with database.atomic():
                     # Clear existing reactions for this event
                     Reaction.delete().where(Reaction.event == event).execute()
-                    
+
                     # Process current reactions
                     users_who_reacted = set()
-                    
+
                     for reaction in message.reactions:
                         if reaction.emoji in event.required_reactions_list:
                             async for user in reaction.users():
                                 if not user.bot:
                                     users_who_reacted.add(user.id)
-                                    
+
                                     # Ensure user exists in database
                                     user_obj, created = User.get_or_create(
                                         user_id=user.id,
                                         guild=event.guild,
                                         defaults={
-                                            'username': user.display_name,
-                                            'is_bot': user.bot,
-                                            'last_seen': datetime.now()
-                                        }
+                                            "username": user.display_name,
+                                            "is_bot": user.bot,
+                                            "last_seen": datetime.now(),
+                                        },
                                     )
-                                    
+
                                     # Create reaction record
                                     Reaction.create(
                                         event=event,
                                         user_id=user.id,
                                         emoji=str(reaction.emoji),
-                                        reacted_at=datetime.now()
+                                        reacted_at=datetime.now(),
                                     )
 
                     logger.debug(
@@ -424,24 +426,24 @@ class SQLiteEventManager:
         async def _mark_sent_operation():
             try:
                 database = get_database()
-                
+
                 with database.atomic():
                     # Update event's last reminder time
                     event.last_reminder = datetime.now()
                     event.save()
-                    
+
                     # Create reminder log entry
                     ReminderLog.create(
                         event=event,
                         scheduled_at=datetime.now(),
                         sent_at=datetime.now(),
                         users_notified=users_notified,
-                        status='sent'
+                        status="sent",
                     )
-                    
+
                     logger.info(f"Marked reminder sent for event {message_id}")
                     return True
-                    
+
             except Exception as e:
                 logger.error(f"Failed to mark reminder sent for event {message_id}: {e}")
                 return False
@@ -464,7 +466,7 @@ class SQLiteEventManager:
             active_events = Event.select().where(Event.is_paused == False).count()
             paused_events = Event.select().where(Event.is_paused == True).count()
             total_guilds = Guild.select().count()
-            
+
             # Calculate average events per guild
             avg_events_per_guild = total_events / total_guilds if total_guilds > 0 else 0
 
@@ -494,24 +496,27 @@ class SQLiteEventManager:
                 "paused_reminders": 0,
                 "guilds_with_reminders": 0,
                 "average_reminders_per_guild": 0,
-                "error": str(e)
+                "error": str(e),
             }
 
     # Legacy compatibility methods
     async def add_event(self, event_data) -> bool:
         """Add a new event (legacy compatibility)."""
-        if hasattr(event_data, 'message_id'):
+        if hasattr(event_data, "message_id"):
             # Convert from old Event object
-            return await self.create_event(
-                guild_id=event_data.guild_id,
-                message_id=event_data.message_id,
-                channel_id=event_data.channel_id,
-                title=event_data.title,
-                interval_minutes=event_data.interval_minutes,
-                is_paused=event_data.is_paused,
-                last_reminder=event_data.last_reminder,
-                required_reactions=event_data.required_reactions
-            ) is not None
+            return (
+                await self.create_event(
+                    guild_id=event_data.guild_id,
+                    message_id=event_data.message_id,
+                    channel_id=event_data.channel_id,
+                    title=event_data.title,
+                    interval_minutes=event_data.interval_minutes,
+                    is_paused=event_data.is_paused,
+                    last_reminder=event_data.last_reminder,
+                    required_reactions=event_data.required_reactions,
+                )
+                is not None
+            )
         return False
 
     async def remove_event(self, message_id: int) -> bool:
@@ -559,7 +564,7 @@ class SQLiteEventManager:
         """
         Load events from storage (legacy compatibility).
         For SQLite, this is a no-op since data is already in the database.
-        
+
         Returns:
             bool: Always True for SQLite implementation
         """
@@ -570,7 +575,7 @@ class SQLiteEventManager:
         """
         Save events to storage (legacy compatibility).
         For SQLite, this is a no-op since data is automatically persisted.
-        
+
         Returns:
             bool: Always True for SQLite implementation
         """

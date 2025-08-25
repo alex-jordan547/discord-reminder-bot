@@ -24,7 +24,7 @@ def test_core_imports():
         assert False, f"Failed to import Settings: {e}"
 
     try:
-        from models.reminder import Reminder
+        from models.database_models import Event as Reminder
 
         assert hasattr(Reminder, "to_dict"), "Reminder should have to_dict method"
         print("✅ Reminder model import successful")

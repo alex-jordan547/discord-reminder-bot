@@ -8,21 +8,21 @@ database operations with proper transaction handling and guild isolation.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 import discord
 from discord.ext import commands
 
 from config.settings import Messages, Settings
 from models.database_models import Event, Guild
-from utils.event_manager_sqlite import sqlite_event_manager
+from utils.auto_delete import get_auto_delete_manager
 from utils.concurrency_sqlite import (
-    sqlite_concurrency_stats,
     ensure_database_connection,
     execute_with_retry,
+    sqlite_concurrency_stats,
 )
 from utils.error_recovery import safe_fetch_message, safe_send_message
-from utils.auto_delete import get_auto_delete_manager
+from utils.event_manager_sqlite import sqlite_event_manager
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ bot: Optional[commands.Bot] = None
 async def schedule_next_reminder_check() -> None:
     """
     Schedule the next reminder check dynamically using SQLite queries.
-    
+
     Calculates the exact time until the next due reminder and enters
     sleep mode if no reminders are being watched.
     """
@@ -56,7 +56,7 @@ async def schedule_next_reminder_check() -> None:
         # Get all active events from database
         active_events = await sqlite_event_manager.get_due_events()
         all_events = []
-        
+
         # Get all non-paused events for scheduling
         try:
             all_events = list(Event.select().where(Event.is_paused == False))
@@ -117,7 +117,7 @@ async def schedule_next_reminder_check() -> None:
             except asyncio.CancelledError:
                 logger.debug("Overdue reminder check cancelled (likely due to rescheduling)")
                 pass
-            
+
             # After processing overdue reminders, schedule normally
             await schedule_next_reminder_check()
             return
@@ -167,7 +167,7 @@ async def schedule_next_reminder_check() -> None:
 async def check_reminders_dynamic(reschedule_after: bool = True) -> None:
     """
     Dynamic reminder checking with automatic scheduling of next check.
-    
+
     Uses SQLite database queries to find due reminders with proper
     transaction handling and guild isolation.
 
@@ -256,7 +256,7 @@ async def start_dynamic_reminder_system_sqlite() -> None:
     try:
         # Check for existing events in database
         total_events = Event.select().count()
-        
+
         if total_events > 0:
             print(
                 f"🔍 Détection de {total_events} événement(s) surveillé(s) - "
@@ -266,7 +266,7 @@ async def start_dynamic_reminder_system_sqlite() -> None:
         else:
             print("😴 Aucun événement surveillé - système en mode veille")
             print("💡 Le système se réactivera automatiquement lors de l'ajout d'un événement")
-            
+
     except Exception as e:
         logger.error(f"Failed to start SQLite reminder system: {e}")
         print("⚠️ Erreur lors du démarrage du système de rappels SQLite")
@@ -348,7 +348,9 @@ async def send_reminder_sqlite(
                 logger.info(
                     f"Successfully removed deleted message {event.message_id} from surveillance"
                 )
-                print(f"🗑️ Événement supprimé automatiquement - message {event.message_id} introuvable")
+                print(
+                    f"🗑️ Événement supprimé automatiquement - message {event.message_id} introuvable"
+                )
             else:
                 logger.error(
                     f"Failed to remove deleted message {event.message_id} from surveillance"
@@ -366,7 +368,7 @@ async def send_reminder_sqlite(
             return 0
 
         # Limit mentions to avoid spam
-        users_to_mention = missing_users[:Settings.MAX_MENTIONS_PER_REMINDER]
+        users_to_mention = missing_users[: Settings.MAX_MENTIONS_PER_REMINDER]
         remaining = len(missing_users) - len(users_to_mention)
 
         # Build the reminder message
@@ -447,9 +449,7 @@ async def send_reminder_sqlite(
         # Mark reminder as sent in database
         await sqlite_event_manager.mark_reminder_sent(event.message_id, len(users_to_mention))
 
-        logger.info(
-            f"Sent reminder for event {event.message_id} to {len(users_to_mention)} users"
-        )
+        logger.info(f"Sent reminder for event {event.message_id} to {len(users_to_mention)} users")
 
         return len(users_to_mention)
 
@@ -476,7 +476,7 @@ def get_scheduler_stats() -> dict:
         "task_active": _dynamic_reminder_task is not None and not _dynamic_reminder_task.done(),
         "database_available": False,
     }
-    
+
     try:
         # Check database availability
         stats["database_available"] = True
@@ -484,5 +484,5 @@ def get_scheduler_stats() -> dict:
         stats["active_events"] = Event.select().where(Event.is_paused == False).count()
     except Exception as e:
         stats["database_error"] = str(e)
-    
+
     return stats

@@ -10,7 +10,6 @@ This is the refactored version using the new modular architecture.
 
 import logging
 import sys
-import asyncio
 
 import discord
 from discord.ext import commands
@@ -192,38 +191,44 @@ def main() -> None:
     @bot.event
     async def on_ready():
         await setup_bot_ready(bot)
+        # Setup the unified event manager after bot is ready
+        await setup_unified_event_manager()
 
     # Set up unified event manager with feature flags
-    from utils.unified_event_manager import unified_event_manager
     from config.feature_flags import feature_flags
-    
+    from utils.unified_event_manager import unified_event_manager
+
     # Initialize unified event manager
     async def setup_unified_event_manager():
         success = await unified_event_manager.initialize()
         if success:
             bot.event_manager = unified_event_manager
-            logger.info(f"Unified event manager initialized successfully")
-            
+            logger.info("Unified event manager initialized successfully")
+
             # Log current backend and feature flag status
             status = unified_event_manager.get_status()
-            logger.info(f"Using {status['backend_type']} backend with {status['event_count']} events")
-            
+            logger.info(
+                f"Using {status['backend_type']} backend with {status['event_count']} events"
+            )
+
             if feature_flags.is_sqlite_fully_enabled():
                 logger.info("SQLite features fully enabled")
             elif feature_flags.is_degraded_mode():
                 logger.warning("Running in degraded mode")
-            
+
         else:
-            logger.error("Failed to initialize unified event manager, falling back to legacy adapter")
+            logger.error(
+                "Failed to initialize unified event manager, falling back to legacy adapter"
+            )
             # Fallback to legacy adapter
             from utils.event_manager_adapter import setup_event_manager_for_bot
+
             setup_event_manager_for_bot(bot)
-    
-    # Setup the event manager
-    asyncio.create_task(setup_unified_event_manager())
 
     # Register all commands and event handlers
     setup_bot_handlers(bot)
+
+    # Setup the event manager will be done in the on_ready event
 
     # Start the bot
     try:

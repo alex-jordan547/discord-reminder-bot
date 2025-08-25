@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from models.reminder import Reminder
+from models.database_models import Event as Reminder
 from persistence.storage import load_matches, save_matches
 from utils.concurrency import ReminderLockManager
 

@@ -9,7 +9,7 @@ import asyncio
 import logging
 import threading
 from datetime import datetime
-from typing import Any, Dict, Set, Optional, Callable
+from typing import Any, Callable, Dict, Optional, Set
 
 from peewee import Database
 
@@ -53,7 +53,7 @@ class SQLiteLockManager:
     async def get_transaction_lock(self, guild_id: int) -> asyncio.Lock:
         """
         Get or create a transaction lock for a specific guild.
-        
+
         This is used for operations that require database transactions
         to be isolated per guild.
 
@@ -140,21 +140,21 @@ class SQLiteReactionUpdateQueue:
         """
         try:
             await asyncio.sleep(self.delay)
-            
+
             # Execute update with database connection management
             database = get_database()
             try:
                 if database.is_closed():
                     database.connect()
-                
+
                 result = await update_function(*args, **kwargs)
                 logger.debug(f"Completed SQLite reaction update for message {message_id}")
                 return result
-                
+
             finally:
                 if not database.is_closed():
                     database.close()
-                    
+
         except asyncio.CancelledError:
             logger.debug(f"SQLite reaction update cancelled for message {message_id}")
             raise
@@ -169,7 +169,9 @@ class SQLiteReactionUpdateQueue:
         """Wait for all pending updates to complete."""
         pending_tasks = list(self._pending_updates.values())
         if pending_tasks:
-            logger.info(f"Waiting for {len(pending_tasks)} pending SQLite reaction updates to complete")
+            logger.info(
+                f"Waiting for {len(pending_tasks)} pending SQLite reaction updates to complete"
+            )
             await asyncio.gather(*pending_tasks, return_exceptions=True)
 
 
@@ -187,11 +189,7 @@ class SQLiteTransactionManager:
         self._transaction_lock = asyncio.Lock()
 
     async def execute_with_transaction(
-        self, 
-        guild_id: int, 
-        operation: Callable, 
-        *args, 
-        **kwargs
+        self, guild_id: int, operation: Callable, *args, **kwargs
     ) -> Any:
         """
         Execute an operation within a SQLite transaction with guild isolation.
@@ -209,12 +207,12 @@ class SQLiteTransactionManager:
             Exception: If the transaction fails and cannot be rolled back
         """
         database = get_database()
-        
+
         async with self._transaction_lock:
             try:
                 if database.is_closed():
                     database.connect()
-                
+
                 with database.atomic() as transaction:
                     self._active_transactions[guild_id] = database
                     try:
@@ -227,7 +225,7 @@ class SQLiteTransactionManager:
                         raise
                     finally:
                         self._active_transactions.pop(guild_id, None)
-                        
+
             except Exception as e:
                 logger.error(f"Failed to execute transaction for guild {guild_id}: {e}")
                 raise
@@ -414,7 +412,7 @@ def get_sqlite_concurrency_stats() -> Dict[str, Any]:
 async def ensure_database_connection() -> bool:
     """
     Ensure database connection is available and working.
-    
+
     Returns:
         bool: True if database is available, False otherwise
     """
@@ -422,11 +420,11 @@ async def ensure_database_connection() -> bool:
         database = get_database()
         if database.is_closed():
             database.connect()
-        
+
         # Test the connection
-        database.execute_sql('SELECT 1')
+        database.execute_sql("SELECT 1")
         sqlite_concurrency_stats.increment_stat("database_connections")
-        
+
         return True
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
@@ -436,11 +434,7 @@ async def ensure_database_connection() -> bool:
             database.close()
 
 
-async def execute_with_retry(
-    operation: Callable, 
-    max_retries: int = 3, 
-    delay: float = 0.1
-) -> Any:
+async def execute_with_retry(operation: Callable, max_retries: int = 3, delay: float = 0.1) -> Any:
     """
     Execute a database operation with retry logic for handling locks.
 
@@ -456,7 +450,7 @@ async def execute_with_retry(
         Exception: If all retries are exhausted
     """
     last_exception = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             result = await operation()
@@ -466,10 +460,12 @@ async def execute_with_retry(
         except Exception as e:
             last_exception = e
             if attempt < max_retries:
-                logger.warning(f"Operation failed on attempt {attempt + 1}, retrying in {delay}s: {e}")
+                logger.warning(
+                    f"Operation failed on attempt {attempt + 1}, retrying in {delay}s: {e}"
+                )
                 await asyncio.sleep(delay)
                 delay *= 2  # Exponential backoff
             else:
                 logger.error(f"Operation failed after {max_retries + 1} attempts: {e}")
-    
+
     raise last_exception

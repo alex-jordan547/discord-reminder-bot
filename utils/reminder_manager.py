@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Set
 import discord
 
 from config.settings import Settings
-from models.reminder import Event
+from models.database_models import Event
 from utils.concurrency import (
     concurrency_stats,
     persistence_manager,
@@ -42,7 +42,7 @@ class EventManager:
     def events(self) -> Dict[int, Event]:
         """Get a copy of all events."""
         return self._events.copy()
-    
+
     @property
     def reminders(self) -> Dict[int, Event]:
         """Get a copy of all events (legacy compatibility)."""
@@ -67,9 +67,7 @@ class EventManager:
                 self._guild_events[event.guild_id] = set()
             self._guild_events[event.guild_id].add(event.message_id)
 
-            logger.info(
-                f"Added event for message {event.message_id} in guild {event.guild_id}"
-            )
+            logger.info(f"Added event for message {event.message_id} in guild {event.guild_id}")
             return True
 
         try:
@@ -80,7 +78,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to add event for message {event.message_id}: {e}")
             return False
-    
+
     async def add_reminder(self, reminder: Event) -> bool:
         """Add a new event (legacy compatibility)."""
         return await self.add_event(reminder)
@@ -121,7 +119,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to remove event for message {message_id}: {e}")
             return False
-    
+
     async def remove_reminder(self, message_id: int) -> bool:
         """Remove an event (legacy compatibility)."""
         return await self.remove_event(message_id)
@@ -137,7 +135,7 @@ class EventManager:
             Optional[Event]: The event if found, None otherwise
         """
         return self._events.get(message_id)
-    
+
     async def get_reminder(self, message_id: int) -> Optional[Event]:
         """Get an event by message ID (legacy compatibility)."""
         return self._events.get(message_id)
@@ -160,7 +158,7 @@ class EventManager:
             for msg_id in self._guild_events[guild_id]
             if msg_id in self._events
         }
-    
+
     async def get_guild_reminders(self, guild_id: int) -> Dict[int, Event]:
         """Get all events for a specific guild (legacy compatibility)."""
         return await self.get_guild_events(guild_id)
@@ -216,7 +214,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to update reactions for message {message_id}: {e}")
             return False
-    
+
     async def update_reminder_reactions_safe(self, message_id: int, bot: discord.Client) -> bool:
         """Update event reactions (legacy compatibility)."""
         return await self.update_event_reactions_safe(message_id, bot)
@@ -264,7 +262,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to pause event for message {message_id}: {e}")
             return False
-    
+
     async def pause_reminder(self, message_id: int) -> bool:
         """Pause an event (legacy compatibility)."""
         return await self.pause_event(message_id)
@@ -297,7 +295,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to resume event for message {message_id}: {e}")
             return False
-    
+
     async def resume_reminder(self, message_id: int) -> bool:
         """Resume an event (legacy compatibility)."""
         return await self.resume_event(message_id)
@@ -321,9 +319,7 @@ class EventManager:
 
         async def _update_interval_operation():
             event.interval_minutes = validated_interval
-            logger.info(
-                f"Updated interval for event {message_id} to {validated_interval} minutes"
-            )
+            logger.info(f"Updated interval for event {message_id} to {validated_interval} minutes")
             return True
 
         try:
@@ -334,7 +330,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to update interval for event {message_id}: {e}")
             return False
-    
+
     async def update_reminder_interval(self, message_id: int, new_interval_minutes: int) -> bool:
         """Update an event's interval (legacy compatibility)."""
         return await self.update_event_interval(message_id, new_interval_minutes)
@@ -356,7 +352,7 @@ class EventManager:
                     due_events.append(event)
 
         return due_events
-    
+
     async def get_due_reminders(self) -> List[Event]:
         """Get all events that are due for notification (legacy compatibility)."""
         return await self.get_due_events()
@@ -410,7 +406,7 @@ class EventManager:
         except Exception as e:
             logger.error(f"Failed to save events: {e}")
             return False
-    
+
     async def _save_reminders_safe(self) -> bool:
         """Save events to storage (legacy compatibility)."""
         return await self._save_events_safe()

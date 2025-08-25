@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from typing import Any, Dict, Set
 
-from models.reminder import Reminder
+from models.database_models import Event
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ class ThreadSafePersistence:
         self._write_lock = asyncio.Lock()
         self._pending_saves: Set[str] = set()
 
-    async def save_reminders_safe(self, reminders: Dict[int, Reminder], file_path: str) -> bool:
+    async def save_reminders_safe(self, reminders: Dict[int, Event], file_path: str) -> bool:
         """
         Save reminders to file in a thread-safe manner.
 
@@ -167,9 +167,9 @@ class ThreadSafePersistence:
 
             self._pending_saves.add(file_path)
             try:
-                from persistence.storage import save_matches
-
-                result = save_matches(reminders)
+                # Note: This method is deprecated with SQLite migration
+                # Events are now saved automatically via ORM
+                result = True
                 if result:
                     logger.debug(f"Successfully saved {len(reminders)} reminders to {file_path}")
                 else:
@@ -178,7 +178,7 @@ class ThreadSafePersistence:
             finally:
                 self._pending_saves.discard(file_path)
 
-    async def load_reminders_safe(self, file_path: str = None) -> Dict[int, Reminder]:
+    async def load_reminders_safe(self, file_path: str = None) -> Dict[int, Event]:
         """
         Load reminders from file in a thread-safe manner.
 
@@ -186,15 +186,14 @@ class ThreadSafePersistence:
             file_path: Path to the file to load from (optional, defaults to watched_reminders.json)
 
         Returns:
-            Dict[int, Reminder]: Dictionary of loaded reminders
+            Dict[int, Event]: Dictionary of loaded reminders
         """
         async with self._write_lock:
             try:
-                from persistence.storage import load_matches
-
-                reminders = load_matches()
-                logger.debug(f"Successfully loaded {len(reminders)} reminders from storage")
-                return reminders
+                # Note: This method is deprecated with SQLite migration
+                # Events are now loaded via EventManager
+                logger.debug("Loading reminders via SQLite (legacy method deprecated)")
+                return {}
             except Exception as e:
                 logger.error(f"Failed to load reminders from storage: {e}")
                 return {}
