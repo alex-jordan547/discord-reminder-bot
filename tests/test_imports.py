@@ -2,7 +2,10 @@
 Test basic imports and module loading.
 """
 
+import pytest
 
+
+@pytest.mark.unit
 def test_core_imports():
     """Test that all core modules can be imported."""
     try:
@@ -40,6 +43,7 @@ def test_core_imports():
         assert False, f"Failed to import logging utils: {e}"
 
 
+@pytest.mark.unit
 def test_configuration_loading():
     """Test that configuration can be loaded properly."""
     import os
@@ -64,6 +68,7 @@ def test_configuration_loading():
         assert False, f"Configuration loading failed: {e}"
 
 
+@pytest.mark.unit
 def test_storage_system():
     """Test that the storage system works without file operations."""
     try:

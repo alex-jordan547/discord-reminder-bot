@@ -4,7 +4,10 @@ Simple test to verify pytest is working.
 
 import os
 
+import pytest
 
+
+@pytest.mark.unit
 def test_environment_setup():
     """Test that the test environment is properly configured."""
     # These should be set by pytest configuration
@@ -18,12 +21,14 @@ def test_environment_setup():
     assert discord_token is not None, "DISCORD_TOKEN should be set"
 
 
+@pytest.mark.unit
 def test_basic_functionality():
     """Basic test to ensure pytest is working."""
     assert 1 + 1 == 2
     assert "test" in "testing"
 
 
+@pytest.mark.unit
 def test_project_structure():
     """Test that key project files exist."""
     import os

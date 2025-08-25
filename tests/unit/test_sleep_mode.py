@@ -3,7 +3,10 @@
 Unit tests for sleep mode logic in dynamic scheduling.
 """
 
+import pytest
 
+
+@pytest.mark.unit
 def test_sleep_mode_logic():
     """Test de la logique du mode veille."""
     print("😴 Test du mode veille intelligent...")
@@ -44,6 +47,7 @@ def test_sleep_mode_logic():
     return True
 
 
+@pytest.mark.unit
 def test_efficiency_comparison():
     """Comparaison d'efficacité avant/après le mode veille."""
     print("⚡ Comparaison d'efficacité...")
@@ -68,6 +72,7 @@ def test_efficiency_comparison():
     return True
 
 
+@pytest.mark.unit
 def test_reactivation_speed():
     """Test de la vitesse de réactivation."""
     print("🚀 Test de réactivation du système...")
@@ -88,6 +93,7 @@ def test_reactivation_speed():
     return True
 
 
+@pytest.mark.unit
 def test_user_experience():
     """Test de l'expérience utilisateur."""
     print("👤 Test d'expérience utilisateur...")
