@@ -264,16 +264,16 @@ async def send_error_to_user(channel_or_interaction, error: Exception, context: 
     """Send a descriptive error message to the user."""
     # Handle database-specific errors
     if "database" in str(error).lower() or "sqlite" in str(error).lower():
-        error_msg = f"❌ **Erreur de base de données**"
+        error_msg = "❌ **Erreur de base de données**"
         if context:
             error_msg += f" lors de {context}"
-        error_msg += f"\n💬 **Description**: Problème de connexion à la base de données"
-        error_msg += f"\n🔧 **Action**: Veuillez réessayer dans quelques instants"
+        error_msg += "\n💬 **Description**: Problème de connexion à la base de données"
+        error_msg += "\n🔧 **Action**: Veuillez réessayer dans quelques instants"
     elif "IntegrityError" in error.__class__.__name__:
-        error_msg = f"❌ **Erreur de données**"
+        error_msg = "❌ **Erreur de données**"
         if context:
             error_msg += f" lors de {context}"
-        error_msg += f"\n💬 **Description**: Conflit de données (élément déjà existant)"
+        error_msg += "\n💬 **Description**: Conflit de données (élément déjà existant)"
     else:
         error_msg = f"❌ **Erreur** ({error.__class__.__name__})"
         if context:
@@ -1026,7 +1026,7 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             embed = discord.Embed(
                 title="✅ Sauvegarde Créée",
-                description=f"La base de données a été sauvegardée avec succès.",
+                description="La base de données a été sauvegardée avec succès.",
                 color=discord.Color.green(),
                 timestamp=datetime.now(),
             )

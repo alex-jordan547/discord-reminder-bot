@@ -8,7 +8,7 @@ All models inherit from BaseModel which provides common functionality.
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from peewee import (
     BigIntegerField,
@@ -120,7 +120,7 @@ class Guild(BaseModel):
         Returns:
             int: Number of active events
         """
-        return Event.select().where((Event.guild == self) & (Event.is_paused == False)).count()
+        return Event.select().where((Event.guild == self) & (Event.is_paused is False)).count()
 
     def get_total_events_count(self) -> int:
         """
@@ -303,7 +303,7 @@ class Event(BaseModel):
             .left_outer_join(
                 Reaction, on=((Reaction.user_id == User.user_id) & (Reaction.event == self))
             )
-            .where((User.guild == self.guild) & (User.is_bot == False) & (Reaction.id.is_null()))
+            .where((User.guild == self.guild) & (User.is_bot is False) & (Reaction.id.is_null()))
         )
 
         return [user.user_id for user in missing_users]
@@ -324,7 +324,7 @@ class Event(BaseModel):
         Returns:
             int: Total number of users who could react
         """
-        return User.select().where((User.guild == self.guild) & (User.is_bot == False)).count()
+        return User.select().where((User.guild == self.guild) & (User.is_bot is False)).count()
 
     def get_next_reminder_time(self) -> datetime:
         """

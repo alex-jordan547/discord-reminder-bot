@@ -15,9 +15,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-# Load environment variables from .env file FIRST
-load_dotenv()
-
 from commands.handlers import setup_bot_handlers
 from config.settings import Messages, Settings
 from utils.auto_delete import init_auto_delete_manager
@@ -28,6 +25,9 @@ from utils.logging_config import (
     should_use_colors,
 )
 from utils.validation import validate_environment_config
+
+# Load environment variables from .env file FIRST
+load_dotenv()
 
 
 def create_bot() -> commands.Bot:
