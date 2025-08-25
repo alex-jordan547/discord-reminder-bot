@@ -6,8 +6,10 @@ Guide complet pour configurer et déployer le bot Discord avec GitHub Actions CI
 
 Le système CI/CD comprend :
 - **CI (Intégration Continue)** : Tests automatiques sur chaque push/PR
-- **CD (Déploiement Continu)** : Construction d'images Docker et déploiement automatique
-- **Registry** : Utilise GitHub Container Registry (GHCR) par défaut
+- **CD (Déploiement Continu)** : Construction d'images Docker multi-stage et déploiement automatique
+- **Registry** : GitHub Container Registry (GHCR) avec images production-ready
+- **Multi-Architecture** : Support AMD64 et ARM64
+- **Sécurité** : Scan Trivy, SBOM, et attestation de provenance
 
 ## ⚙️ Configuration GitHub
 
@@ -54,13 +56,34 @@ Créez les environnements pour le déploiement protégé :
 
 ### Option 1 : GitHub Container Registry (GHCR) - Recommandé ✅
 
-**Avantages** : Intégré à GitHub, pas de configuration supplémentaire
+**Avantages** :
+- ✅ Intégré à GitHub, pas de configuration supplémentaire
+- ✅ Images multi-stage optimisées pour production
+- ✅ Multi-architecture (AMD64/ARM64)
+- ✅ Scan de sécurité Trivy automatique
+- ✅ SBOM et attestation de provenance
 
-Les images sont automatiquement publiées sur :
-```
+**Images disponibles** :
+```bash
+# Latest production build from main branch
 ghcr.io/alex-jordan547/discord-reminder-bot:latest
+
+# Date-tagged releases
 ghcr.io/alex-jordan547/discord-reminder-bot:main-2025-08-24
+
+# Commit-specific builds  
+ghcr.io/alex-jordan547/discord-reminder-bot:main-a1b2c3d
+
+# Semantic version releases (when tagged)
+ghcr.io/alex-jordan547/discord-reminder-bot:v1.2.3
 ```
+
+**Production Image Features** :
+- 🐳 Multi-stage build (builder + production)
+- 🔒 Non-root user (uid/gid 1000)
+- 📦 Minimal runtime footprint (no dev dependencies)
+- ✅ Built-in health checks
+- 🏷️ OpenContainer labels and metadata
 
 ### Option 2 : Docker Hub (alternative)
 
@@ -158,17 +181,21 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     healthcheck:
-      test: ["CMD", "python", "-c", "import discord; from bot import create_bot; bot = create_bot(); print('Health check passed'); import sys; sys.exit(0)"]
+      test: ["CMD", "python", "-c", "import sys; import discord; import bot; from config.settings import Settings; print('✓ Health check passed - all modules ready'); sys.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s
     deploy:
       resources:
         limits:
           memory: 256M
         reservations:
           memory: 128M
+    user: "1000:1000"  # Run as non-root user
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Bot needs to write to data/logs
 
 networks:
   default:
@@ -181,10 +208,13 @@ EOF
 ### 1. Déploiement automatique (GitHub Actions)
 
 Quand vous push sur `main`, le workflow CD va :
-1. Construire l'image Docker
-2. La pousser sur GHCR
-3. Créer un package de déploiement
-4. (Optionnel) Déployer automatiquement sur le VPS
+1. **Validation pré-déploiement** : Vérification syntaxe et imports
+2. **Construction multi-stage** : Builder stage → Production stage optimisée
+3. **Multi-architecture** : Construction AMD64 et ARM64
+4. **Sécurité** : Scan Trivy + génération SBOM
+5. **Publication GHCR** : Push avec tags multiples (latest, date, SHA)
+6. **Package déploiement** : Scripts et configuration pour VPS
+7. **(Optionnel)** Déploiement automatique sur VPS via SSH
 
 ### 2. Déploiement manuel depuis GitHub
 
