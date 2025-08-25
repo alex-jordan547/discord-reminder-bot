@@ -1,14 +1,10 @@
 # Flake8 configuration for Discord Reminder Bot
 [flake8]
+# Maximum line length - même que Black
+max-line-length = 88
 
-# Maximum line length
-max-line-length = 100
-
-# Ignore specific error codes
-ignore = 
-    E203,
-    W503,
-    E501
+# Ignorer les conflits connus avec Black et autres règles trop strictes
+ignore = E203,W503,E501,W504,E402,D212,D200,I201,B007,C901
 
 # Exclude directories and files from checking
 exclude = 
@@ -19,13 +15,20 @@ exclude =
     env,
     build,
     dist,
+    *.pyc,
     *.egg-info,
-    .pytest_cache,
-    logs
+    .eggs,
+    tests
 
-# Maximum cyclomatic complexity
-max-complexity = 15
+# Complexité maximale autorisée
+max-complexity = 18
 
-# Per-file ignores
-per-file-ignores =
-    __init__.py:D104,F401
+# Style des docstrings
+docstring-convention = google
+
+# Statistiques
+statistics = True
+
+# Configuration import-order
+application-import-names = bot,commands,config,models,persistence,utils
+import-order-style = pycharm

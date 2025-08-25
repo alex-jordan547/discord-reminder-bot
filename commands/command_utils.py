@@ -72,7 +72,10 @@ def create_health_embed(stats: Dict[str, Any]) -> discord.Embed:
     recovery_text = (
         f"**❌ Échecs**: {stats['failed_calls']}\n**🔁 Retries**: {stats['retried_calls']}"
     )
-    recovery_text += f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n**📈 Taux de récupération**: {stats['recovery_rate_percent']:.1f}%"
+    recovery_text += (
+        f"\n**♻️ Récupérés**: {stats['recovered_calls']}\n"
+        f"**📈 Taux de récupération**: {stats['recovery_rate_percent']:.1f}%"
+    )
 
     embed.add_field(name="🔄 Récupération d'erreurs", value=recovery_text, inline=True)
 

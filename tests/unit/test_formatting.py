@@ -83,17 +83,17 @@ def main():
                 elif issue["type"] == "trailing_spaces":
                     print(f"  ❌ {issue['count']} lines with trailing spaces:")
                     for line_num in issue["lines"]:
-                        print(f"    → Line {line_num}")
+                        print("    → Line {}".format(line_num))
         else:
             print("  ✅ No formatting issues detected")
 
         print()
 
     print("=" * 60)
-    print(f"📊 Summary:")
-    print(f"  • Files checked: {len(files_to_check)}")
-    print(f"  • Files with issues: {files_with_issues}")
-    print(f"  • Total issues: {total_issues}")
+    print("📊 Summary:")
+    print("  • Files checked: {}".format(len(files_to_check)))
+    print("  • Files with issues: {}".format(files_with_issues))
+    print("  • Total issues: {}".format(total_issues))
 
     if total_issues == 0:
         print("🎉 All files have correct formatting!")

@@ -59,11 +59,11 @@ def test_efficiency_comparison():
 
     cpu_cycles_saved = old_checks_per_day * 100  # Estimation des cycles CPU
 
-    print(f"  📊 Scénario: Bot en ligne 24h sans aucun match surveillé")
-    print(f"    - Ancien système: {old_checks_per_day:.0f} vérifications/jour")
-    print(f"    - Nouveau système: {new_checks_per_day} vérifications/jour")
-    print(f"    - Économie: {old_checks_per_day:.0f} vérifications évitées")
-    print(f"    - Cycles CPU économisés: ~{cpu_cycles_saved:.0f}")
+    print("  📊 Scénario: Bot en ligne 24h sans aucun match surveillé")
+    print("    - Ancien système: {:.0f} vérifications/jour".format(old_checks_per_day))
+    print("    - Nouveau système: {} vérifications/jour".format(new_checks_per_day))
+    print("    - Économie: {:.0f} vérifications évitées".format(old_checks_per_day))
+    print("    - Cycles CPU économisés: ~{:.0f}".format(cpu_cycles_saved))
 
     return True
 

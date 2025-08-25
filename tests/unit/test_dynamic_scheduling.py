@@ -50,9 +50,9 @@ def test_precision_comparison():
 
     # Nouveau système: vérification dynamique
     print("  📊 Ancien système (vérification fixe):")
-    print(f"    - Intervalle fixe: {old_system_precision}s")
-    print(f"    - Précision: ±{old_system_precision / 2}s")
-    print(f"    - Dérive possible: Oui (si traitement > 0s)")
+    print("    - Intervalle fixe: {}s".format(old_system_precision))
+    print("    - Précision: ±{}s".format(old_system_precision / 2))
+    print("    - Dérive possible: Oui (si traitement > 0s)")
 
     print("  🎯 Nouveau système (planification dynamique):")
     print("    - Intervalle: Variable selon le besoin")

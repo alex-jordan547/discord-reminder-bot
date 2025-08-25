@@ -8,10 +8,17 @@ echo "📂 Dossier de travail: $(pwd)"
 echo "🐍 Version Python: $(python --version 2>&1)"
 echo ""
 
-# Vérifier que l'environnement virtuel est activé
-if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo "⚠️  Activation de l'environnement virtuel..."
+# S'assurer qu'on utilise le bon environnement virtuel
+if [[ -f ".venv/bin/activate" ]]; then
+    echo "⚠️  Activation de l'environnement virtuel (.venv)..."
+    source .venv/bin/activate
+elif [[ -f "venv/bin/activate" ]]; then
+    echo "⚠️  Activation de l'environnement virtuel (venv)..."
     source venv/bin/activate
+else
+    echo "❌ Aucun environnement virtuel trouvé!"
+    echo "📋 Créez un environnement virtuel avec: python3 -m venv .venv"
+    exit 1
 fi
 
 # Vérifier la présence du fichier .env
@@ -36,6 +43,11 @@ echo "💡 Appuyez sur Ctrl+C pour arrêter le bot"
 echo "📝 Les logs détaillés sont disponibles en mode DEBUG"
 echo "🌈 Couleurs des logs : ajoutez FORCE_COLOR=1 avant la commande pour forcer l'activation"
 echo "   Example: FORCE_COLOR=1 ./run_dev.sh"
+echo ""
+
+# Vérifier la version Python après activation
+echo "🐍 Version Python après activation: $(python --version 2>&1)"
+echo "🔍 Chemin Python: $(which python)"
 echo ""
 
 # Lancer le bot avec gestion des erreurs

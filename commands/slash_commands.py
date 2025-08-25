@@ -60,6 +60,11 @@ class SlashCommands(commands.Cog):
     """
 
     def __init__(self, bot: commands.Bot):
+        """Initialise les commandes slash.
+
+        Args:
+            bot: L'instance du bot Discord
+        """
         self.bot = bot
 
     async def cog_load(self):
@@ -257,13 +262,24 @@ class SlashCommands(commands.Cog):
                 if Settings.is_test_mode():
                     embed.add_field(
                         name="⚠️ Intervalle ajusté (Mode Test)",
-                        value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite test: 30s-7 jours)",
+                        value=(
+                            f"L'intervalle demandé "
+                            f"({Settings.format_interval_display(original_interval_minutes)}) "
+                            f"a été ajusté à {Settings.format_interval_display(validated_interval)} "
+                            "(limite test: 30s-7 jours)"
+                        ),
                         inline=False,
                     )
                 else:
                     embed.add_field(
                         name="⚠️ Intervalle ajusté",
-                        value=f"L'intervalle demandé ({Settings.format_interval_display(original_interval_minutes)}) a été ajusté à {Settings.format_interval_display(validated_interval)} (limite: {Settings.MIN_INTERVAL_MINUTES}-{Settings.MAX_INTERVAL_MINUTES} min)",
+                        value=(
+                            f"L'intervalle demandé "
+                            f"({Settings.format_interval_display(original_interval_minutes)}) "
+                            f"a été ajusté à {Settings.format_interval_display(validated_interval)} "
+                            f"(limite: {Settings.MIN_INTERVAL_MINUTES}-"
+                            f"{Settings.MAX_INTERVAL_MINUTES} min)"
+                        ),
                         inline=False,
                     )
 
@@ -271,11 +287,15 @@ class SlashCommands(commands.Cog):
 
             if is_existing_watch:
                 logger.info(
-                    f"Modified match {link_info.message_id} on guild {interaction.guild.id}: interval changed from {old_interval}min to {validated_interval}min (requested: {Settings.format_interval_display(original_interval_minutes)})"
+                    f"Modified match {link_info.message_id} on guild {interaction.guild.id}: "
+                    f"interval changed from {old_interval}min to {validated_interval}min "
+                    f"(requested: {Settings.format_interval_display(original_interval_minutes)})"
                 )
             else:
                 logger.info(
-                    f"Added match {link_info.message_id} to watch list on guild {interaction.guild.id} with {validated_interval}min interval (original: {Settings.format_interval_display(original_interval_minutes)})"
+                    f"Added match {link_info.message_id} to watch list on guild "
+                    f"{interaction.guild.id} with {validated_interval}min interval "
+                    f"(original: {Settings.format_interval_display(original_interval_minutes)})"
                 )
 
         except Exception as e:
@@ -839,7 +859,7 @@ class SlashCommands(commands.Cog):
             interval_text += (
                 "• 30 secondes, 1 minute, 2 minutes *(mode test)*\n"
                 "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h\n"
-                f"*(Mode test actif - intervalles flexibles de 30s à 7 jours)*"
+                "*(Mode test actif - intervalles flexibles de 30s à 7 jours)*"
             )
         else:
             interval_text += "• 5 min, 15 min, 30 min, 1h, 2h, 6h, 12h, 24h"

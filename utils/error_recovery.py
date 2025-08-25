@@ -1,5 +1,5 @@
 """
-Discord Error Recovery and Resilience System
+Discord Error Recovery and Resilience System.
 
 Ce module fournit des mécanismes de récupération d'erreur robustes pour les appels
 Discord API, incluant retry avec exponential backoff, classification d'erreurs,
@@ -41,6 +41,15 @@ class RetryConfig:
         backoff_factor: float = 2.0,
         jitter_factor: float = 0.1,
     ):
+        """Initialise la configuration de retry.
+
+        Args:
+            max_attempts: Nombre maximum de tentatives.
+            base_delay: Délai initial entre les tentatives (en secondes).
+            max_delay: Délai maximum entre les tentatives (en secondes).
+            backoff_factor: Facteur multiplicatif pour le délai entre chaque tentative.
+            jitter_factor: Facteur de variation aléatoire du délai.
+        """
         self.max_attempts = max_attempts
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -236,12 +245,21 @@ class RetryStats:
     """Collecte des statistiques sur les retries pour monitoring."""
 
     def __init__(self):
+        """Initialise un nouveau collecteur de statistiques de retry.
+
+        Les statistiques incluent :
+        - Nombre total d'appels
+        - Appels réussis/échoués
+        - Appels avec retry
+        - Taux de récupération
+        - Types d'erreurs rencontrées
+        """
         self._lock = threading.Lock()
         self.total_calls = 0
         self.successful_calls = 0
         self.failed_calls = 0
         self.retried_calls = 0
-        self.recovered_calls = 0  # Pour un calcul précis du taux de récupération
+        self.recovered_calls = 0
         self.error_counts: Dict[str, int] = {}
         self.last_reset = datetime.now()
 

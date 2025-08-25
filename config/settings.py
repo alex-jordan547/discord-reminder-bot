@@ -278,7 +278,8 @@ class Settings:
         Check if the bot is running in test mode (rapid reminders).
 
         Returns:
-            bool: True if TEST_MODE environment variable is set to true or reminder interval is less than 1 hour
+            bool: True if TEST_MODE environment variable is set to true
+                 or reminder interval is less than 1 hour
         """
         # Check explicit TEST_MODE environment variable first
         test_mode_env = os.getenv("TEST_MODE", "false").lower()

@@ -197,12 +197,18 @@ class Reminder:
         if is_due:
             time_diff = current_time - next_reminder_time
             logger.debug(
-                f"Reminder {self.message_id}: Reminder DUE! Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Overdue by: {time_diff}"
+                f"Reminder {self.message_id}: Reminder DUE! "
+                f"Current: {current_time.strftime('%H:%M:%S')}, "
+                f"Next: {next_reminder_time.strftime('%H:%M:%S')}, "
+                f"Overdue by: {time_diff}"
             )
         else:
             time_until = next_reminder_time - current_time
             logger.debug(
-                f"Reminder {self.message_id}: Reminder not due. Current: {current_time.strftime('%H:%M:%S')}, Next: {next_reminder_time.strftime('%H:%M:%S')}, Time until: {time_until}"
+                f"Reminder {self.message_id}: Reminder not due. "
+                f"Current: {current_time.strftime('%H:%M:%S')}, "
+                f"Next: {next_reminder_time.strftime('%H:%M:%S')}, "
+                f"Time until: {time_until}"
             )
 
         return is_due
@@ -220,8 +226,8 @@ class Reminder:
         self.is_paused = False
 
     def set_interval(self, interval_minutes: float) -> None:
-        """
-        Set a new reminder interval for this item.
+        """Set a new reminder interval for this item.
+
         Uses centralized validation that accounts for test mode.
 
         Args:

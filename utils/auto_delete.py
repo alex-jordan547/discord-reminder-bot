@@ -52,7 +52,8 @@ class AutoDeleteManager:
             return
 
         logger.info(
-            f"Starting auto-delete manager (delay: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)})"
+            f"Starting auto-delete manager "
+            f"(delay: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)})"
         )
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
@@ -227,8 +228,8 @@ class AutoDeleteManager:
             self._pending_deletions.pop(message.id, None)
 
     async def _cleanup_loop(self):
-        """
-        Background task to clean up expired deletion entries.
+        """Background task to clean up expired deletion entries.
+
         Runs every hour to remove stale entries.
         """
         try:

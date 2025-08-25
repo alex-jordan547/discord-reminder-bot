@@ -15,7 +15,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file FIRST
 load_dotenv()
 
 from commands.handlers import setup_bot_handlers
@@ -60,15 +60,15 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
     logger = logging.getLogger(__name__)
 
     logger.info(Messages.BOT_CONNECTED.format(bot.user))
-    logger.info(f"Bot is present on {len(bot.guilds)} server(s)")
+    logger.info("Bot is present on {} server(s)".format(len(bot.guilds)))
 
     print(Messages.BOT_CONNECTED.format(bot.user))
-    print(f"📊 Présent sur {len(bot.guilds)} serveur(s)")
+    print("📊 Présent sur {} serveur(s)".format(len(bot.guilds)))
 
     # Log server information
     for guild in bot.guilds:
-        logger.info(f"  - {guild.name} (ID: {guild.id})")
-        print(f"  - {guild.name} (ID: {guild.id})")
+        logger.info("  - {} (ID: {})".format(guild.name, guild.id))
+        print("  - {} (ID: {})".format(guild.name, guild.id))
 
     # Setup slash commands when bot is ready
     try:
@@ -80,19 +80,19 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         # Synchronize slash commands with Discord
         logger.info("Synchronizing slash commands with Discord...")
         synced = await bot.tree.sync()
-        logger.info(f"Synchronized {len(synced)} slash command(s) with Discord")
-        print(f"⚡ {len(synced)} commande(s) slash synchronisée(s) avec Discord")
+        logger.info("Synchronized {} slash command(s) with Discord".format(len(synced)))
+        print("⚡ {} commande(s) slash synchronisée(s) avec Discord".format(len(synced)))
     except Exception as e:
-        logger.error(f"Failed to register or sync slash commands: {e}")
-        print(f"❌ Erreur lors de la synchronisation des commandes slash: {e}")
+        logger.error("Failed to register or sync slash commands: {}".format(e))
+        print("❌ Erreur lors de la synchronisation des commandes slash: {}".format(e))
 
     # Load reminders from storage using thread-safe manager
     if hasattr(bot, "reminder_manager"):
         success = await bot.reminder_manager.load_from_storage()
         if success:
             total_loaded = len(bot.reminder_manager.reminders)
-            logger.info(f"Loaded {total_loaded} reminders from storage")
-            print(f"📥 Chargé {total_loaded} rappel(s) depuis le stockage")
+            logger.info("Loaded {} reminders from storage".format(total_loaded))
+            print("📥 Chargé {} rappel(s) depuis le stockage".format(total_loaded))
         else:
             logger.warning("Failed to load reminders from storage")
             print("⚠️ Échec du chargement des rappels depuis le stockage")
@@ -107,18 +107,22 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
 
         # Display reminder interval information
         if Settings.is_test_mode():
-            logger.info(f"Dynamic reminder system enabled (TEST MODE) - Intervals: 1-10080 min")
-            print(f"⏰ Système de rappels dynamique activé (MODE TEST)")
+            logger.info("Dynamic reminder system enabled (TEST MODE) - Intervals: 1-10080 min")
+            print("⏰ Système de rappels dynamique activé (MODE TEST)")
         else:
-            logger.info(f"Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
-            print(f"⏰ Système de rappels dynamique activé")
+            logger.info("Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
+            print("⏰ Système de rappels dynamique activé")
 
     if Settings.AUTO_DELETE_REMINDERS:
         logger.info(
-            f"Auto-deletion enabled: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
+            "Auto-deletion enabled: {}".format(
+                Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+            )
         )
         print(
-            f"🗑️ Auto-suppression activée: {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
+            "🗑️ Auto-suppression activée: {}".format(
+                Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)
+            )
         )
     else:
         logger.info("Auto-deletion disabled")
@@ -126,8 +130,8 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
 
     # Display channel mode information
     if Settings.USE_SEPARATE_REMINDER_CHANNEL:
-        logger.info(f"Reminder mode: Separate channel (#{Settings.REMINDER_CHANNEL_NAME})")
-        print(f"📢 Mode: Rappels dans un canal séparé (#{Settings.REMINDER_CHANNEL_NAME})")
+        logger.info("Reminder mode: Separate channel (#{})".format(Settings.REMINDER_CHANNEL_NAME))
+        print("📢 Mode: Rappels dans un canal séparé (#{})".format(Settings.REMINDER_CHANNEL_NAME))
     else:
         logger.info("Reminder mode: Same channel as event")
         print("📢 Mode: Rappels dans le même canal que l'évènement")

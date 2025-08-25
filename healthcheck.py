@@ -6,7 +6,6 @@ This script validates that all required modules can be imported
 and basic functionality is available.
 """
 
-import logging
 import sys
 
 
@@ -14,27 +13,27 @@ def main():
     """Main health check logic."""
     try:
         # Test core dependencies
-        import discord
+        import discord  # noqa: F401
 
         print("✓ discord.py import successful")
 
         # Test bot module
-        import bot
+        import bot  # noqa: F401
 
         print("✓ Bot module import successful")
 
         # Test settings configuration
-        from config.settings import Settings
+        from config.settings import Settings  # noqa: F401
 
         print("✓ Settings configuration accessible")
 
         # Test basic model imports
-        from models.reminder import MatchReminder
+        from models.reminder import MatchReminder  # noqa: F401
 
         print("✓ MatchReminder model accessible")
 
         # Test persistence layer
-        from persistence.storage import load_matches, save_matches
+        from persistence.storage import load_matches, save_matches  # noqa: F401
 
         print("✓ Persistence layer accessible")
 
@@ -50,6 +49,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # Disable logging during health check to avoid noise
-    logging.disable(logging.CRITICAL)
     main()

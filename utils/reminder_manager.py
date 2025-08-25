@@ -5,7 +5,6 @@ This module provides a centralized, thread-safe manager for handling
 reminder operations with proper concurrency controls.
 """
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
@@ -182,7 +181,8 @@ class ReminderManager:
                             reminder.users_who_reacted.add(user.id)
 
             logger.debug(
-                f"Updated reactions for reminder {message_id}: {len(reminder.users_who_reacted)} users"
+                f"Updated reactions for reminder {message_id}: "
+                f"{len(reminder.users_who_reacted)} users"
             )
             return True
 

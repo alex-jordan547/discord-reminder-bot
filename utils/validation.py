@@ -7,7 +7,7 @@ configuration settings, and Discord-specific data types.
 
 import logging
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 import discord
 from discord.ext import commands
@@ -22,6 +22,12 @@ class ValidationError(Exception):
     """Custom exception for validation errors with user-friendly messages."""
 
     def __init__(self, message: str, technical_reason: Optional[str] = None):
+        """Initialise une erreur de validation.
+
+        Args:
+            message: Message d'erreur destiné à l'utilisateur
+            technical_reason: Raison technique optionnelle pour le logging
+        """
         self.message = message
         self.technical_reason = technical_reason
         super().__init__(message)

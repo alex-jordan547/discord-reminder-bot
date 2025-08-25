@@ -13,13 +13,13 @@ from unittest.mock import patch
 
 import pytest
 
-# Set up test environment
-os.environ["DISCORD_TOKEN"] = "test_token"
-os.environ["TEST_MODE"] = "true"
-
 from models.reminder import Reminder
 from persistence.storage import load_matches, save_matches
 from utils.concurrency import ReminderLockManager
+
+# Set up test environment
+os.environ["DISCORD_TOKEN"] = "test_token"
+os.environ["TEST_MODE"] = "true"
 
 logger = logging.getLogger(__name__)
 

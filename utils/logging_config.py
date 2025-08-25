@@ -34,6 +34,13 @@ class ColoredFormatter(logging.Formatter):
     SEPARATOR_COLOR = "\033[90m"  # Dark gray
 
     def __init__(self, fmt=None, datefmt=None, use_colors=True):
+        """Initialise le formateur de logs avec support des couleurs.
+
+        Args:
+            fmt: Format du message de log
+            datefmt: Format de la date/heure
+            use_colors: Active ou désactive les couleurs ANSI
+        """
         super().__init__(fmt, datefmt)
         self.use_colors = use_colors and self._supports_color()
 
@@ -75,6 +82,14 @@ class ColoredFormatter(logging.Formatter):
         return sys.platform != "win32"
 
     def format(self, record):
+        """Formate un enregistrement de log avec des couleurs ANSI si supporté.
+
+        Args:
+            record: L'enregistrement de log à formater
+
+        Returns:
+            str: Le message de log formaté avec des couleurs si supporté
+        """
         if self.use_colors:
             # Get the color for this log level
             level_color = self.COLORS.get(record.levelname, "")
@@ -101,7 +116,10 @@ class ColoredFormatter(logging.Formatter):
                     colored_separator = f"{self.SEPARATOR_COLOR} | {self.RESET}"
 
                     # Reconstruct the formatted message with colored components
-                    formatted = f"{colored_timestamp}{colored_separator}{colored_level}{colored_separator}{colored_logger}{colored_separator}{colored_message}"
+                    formatted = (
+                        f"{colored_timestamp}{colored_separator}{colored_level}"
+                        f"{colored_separator}{colored_logger}{colored_separator}{colored_message}"
+                    )
                 else:
                     # Fallback: color the entire message if splitting fails
                     formatted = f"{level_color}{formatted}{self.RESET}"
@@ -195,13 +213,13 @@ def setup_logging(
     logger = logging.getLogger(__name__)
     logger.info("=" * 50)
     logger.info("Discord Reminder Bot - Logging Initialized")
-    logger.info(f"Log Level: {log_level.upper()}")
-    logger.info(f"Console Logging: Enabled")
-    logger.info(f"File Logging: {'Enabled' if log_to_file else 'Disabled'}")
+    logger.info("Log Level: {}".format(log_level.upper()))
+    logger.info("Console Logging: Enabled")
+    logger.info("File Logging: {}".format("Enabled" if log_to_file else "Disabled"))
     if log_to_file and log_file_path:
-        logger.info(f"Log File: {log_file_path}")
-        logger.info(f"Max File Size: {max_file_size_mb}MB")
-        logger.info(f"Backup Count: {backup_count}")
+        logger.info("Log File: {}".format(log_file_path))
+        logger.info("Max File Size: {}MB".format(max_file_size_mb))
+        logger.info("Backup Count: {}".format(backup_count))
     logger.info("=" * 50)
 
 

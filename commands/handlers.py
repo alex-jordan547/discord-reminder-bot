@@ -73,28 +73,33 @@ async def schedule_next_reminder_check() -> None:
             time_diff = (current_time - next_time).total_seconds()
 
             logger.debug(
-                f"Reminder {reminder.message_id}: next_time={next_time.strftime('%H:%M:%S')}, current={current_time.strftime('%H:%M:%S')}, diff={time_diff:.1f}s"
+                f"Reminder {reminder.message_id}: next_time={next_time.strftime('%H:%M:%S')}, "
+                f"current={current_time.strftime('%H:%M:%S')}, diff={time_diff:.1f}s"
             )
 
             if next_time <= current_time:
                 # Rappel en retard - doit être traité immédiatement
                 overdue_reminders.append(reminder)
                 logger.debug(
-                    f"Added reminder {reminder.message_id} to overdue list (overdue by {time_diff:.1f}s)"
+                    f"Added reminder {reminder.message_id} to overdue list "
+                    f"(overdue by {time_diff:.1f}s)"
                 )
             else:
                 # Rappel futur - ajouter à la planification
                 next_reminder_times.append(next_time)
                 logger.debug(
-                    f"Added reminder {reminder.message_id} to future list (due in {-time_diff:.1f}s)"
+                    f"Added reminder {reminder.message_id} to future list "
+                    f"(due in {-time_diff:.1f}s)"
                 )
 
     # Si il y a des rappels en retard, les traiter immédiatement
     if overdue_reminders:
         logger.info(
-            f"Found {len(overdue_reminders)} overdue reminder(s), processing immediately..."
+            f"Found {len(overdue_reminders)} overdue reminder(s), " "processing immediately..."
         )
-        print(f"🚨 {len(overdue_reminders)} rappel(s) en retard détecté(s), traitement immédiat...")
+        print(
+            f"🚨 {len(overdue_reminders)} rappel(s) en retard détecté(s), " "traitement immédiat..."
+        )
 
         # Traiter immédiatement les rappels en retard sans replanification automatique
         _dynamic_reminder_task = asyncio.create_task(
@@ -127,10 +132,12 @@ async def schedule_next_reminder_check() -> None:
     time_until_next = min(time_until_next, max_wait)
 
     logger.debug(
-        f"Next reminder due at {next_reminder.strftime('%H:%M:%S')}, waiting {time_until_next:.1f} seconds"
+        f"Next reminder due at {next_reminder.strftime('%H:%M:%S')}, "
+        f"waiting {time_until_next:.1f} seconds"
     )
     print(
-        f"🕰️ Prochain rappel programmé à {next_reminder.strftime('%H:%M:%S')} (dans {time_until_next:.0f}s)"
+        f"🕰️ Prochain rappel programmé à {next_reminder.strftime('%H:%M:%S')} "
+        f"(dans {time_until_next:.0f}s)"
     )
 
     _dynamic_reminder_task = asyncio.create_task(asyncio.sleep(time_until_next))
@@ -171,7 +178,8 @@ async def check_reminders_dynamic(reschedule_after: bool = True) -> None:
 
     for reminder in due_reminders:
         logger.info(
-            f"Reminder due for message {reminder.message_id} (interval: {reminder.interval_minutes}min)"
+            f"Reminder due for message {reminder.message_id} "
+            f"(interval: {reminder.interval_minutes}min)"
         )
 
         guild = bot.get_guild(reminder.guild_id)
@@ -214,7 +222,8 @@ async def start_dynamic_reminder_system() -> None:
         reminders = reminder_manager.reminders
         if reminders:
             print(
-                f"🔍 Détection de {len(reminders)} rappel(s) surveillé(s) - planification en cours..."
+                f"🔍 Détection de {len(reminders)} rappel(s) surveillé(s) - "
+                "planification en cours..."
             )
             await schedule_next_reminder_check()
         else:
@@ -323,23 +332,33 @@ async def send_reminder(
         message = await safe_fetch_message(match_channel, reminder.message_id)
         if not message:
             logger.error(
-                f"Could not fetch message {reminder.message_id} from channel {reminder.channel_id}"
+                "Could not fetch message {} from channel {}".format(
+                    reminder.message_id, reminder.channel_id
+                )
             )
             # Message supprimé - supprimer automatiquement ce rappel de la surveillance
             logger.warning(
-                f"Message {reminder.message_id} appears to have been deleted, removing reminder from watch list"
+                "Message {} appears to have been deleted, removing reminder from watch list".format(
+                    reminder.message_id
+                )
             )
             success = await reminder_manager.remove_reminder(reminder.message_id)
             if success:
                 logger.info(
-                    f"Successfully removed deleted message {reminder.message_id} from reminder surveillance"
+                    "Successfully removed deleted message {} from reminder surveillance".format(
+                        reminder.message_id
+                    )
                 )
                 print(
-                    f"🗑️ Rappel supprimé automatiquement - message {reminder.message_id} introuvable"
+                    "🗑️ Rappel supprimé automatiquement - message {} introuvable".format(
+                        reminder.message_id
+                    )
                 )
             else:
                 logger.error(
-                    f"Failed to remove deleted message {reminder.message_id} from reminder surveillance"
+                    "Failed to remove deleted message {} from reminder surveillance".format(
+                        reminder.message_id
+                    )
                 )
             return 0
 
@@ -401,7 +420,11 @@ async def send_reminder(
 
         embed.add_field(
             name="🔗 Lien vers l'évènement",
-            value=f"[**Cliquez ici pour voir le message**](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{reminder.message_id})",
+            value=(
+                f"[**Cliquez ici pour voir le message**]"
+                f"(https://discord.com/channels/{reminder.guild_id}/"
+                f"{reminder.channel_id}/{reminder.message_id})"
+            ),
             inline=False,
         )
 
@@ -434,20 +457,23 @@ async def send_reminder(
         sent_message = await safe_send_message(channel, content=mentions, embed=embed)
         if not sent_message:
             logger.error(
-                f"Failed to send reminder for match {reminder.message_id} to channel {channel.name}"
+                f"Failed to send reminder for match {reminder.message_id} to "
+                f"channel {channel.name}"
             )
             return 0
 
         # Schedule auto-deletion if enabled
         auto_delete_mgr = get_auto_delete_manager()
         logger.debug(
-            f"Auto-delete manager available: {auto_delete_mgr is not None}, AUTO_DELETE_REMINDERS: {Settings.AUTO_DELETE_REMINDERS}"
+            f"Auto-delete manager available: {auto_delete_mgr is not None}, "
+            f"AUTO_DELETE_REMINDERS: {Settings.AUTO_DELETE_REMINDERS}"
         )
         if auto_delete_mgr and Settings.AUTO_DELETE_REMINDERS:
             success = await auto_delete_mgr.schedule_deletion(sent_message)
             if success:
                 logger.debug(
-                    f"Scheduled auto-deletion for reminder message {sent_message.id} in {Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
+                    f"Scheduled auto-deletion for reminder message {sent_message.id} in "
+                    f"{Settings.format_auto_delete_display(Settings.AUTO_DELETE_DELAY_HOURS)}"
                 )
             else:
                 logger.warning(
@@ -463,7 +489,7 @@ async def send_reminder(
         await reminder_manager.save()
 
         logger.info(
-            f"Sent reminder for match {reminder.message_id} to {len(users_to_mention)} users"
+            f"Sent reminder for match {reminder.message_id} to " f"{len(users_to_mention)} users"
         )
 
         return len(users_to_mention)
@@ -597,7 +623,9 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             await ctx.send(embed=embed)
             logger.info(
-                f"Added match {link_info.message_id} to watch list on guild {ctx.guild.id} with {validated_interval}min interval (original: {original_interval})"
+                "Added match {} to watch list on guild {} with {}min interval (original: {})".format(
+                    link_info.message_id, ctx.guild.id, validated_interval, original_interval
+                )
             )
 
         except Exception as e:
@@ -663,11 +691,16 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             embed.add_field(
                 name=reminder.title[:100],
-                value=f"📍 {channel_mention}\n"
-                f"⏰ Intervalle: {Settings.format_interval_display(reminder.interval_minutes)}\n"
-                f"✅ Réponses: {reminder.get_response_count()}/{reminder.get_total_users_count()} ({reminder.get_response_percentage():.1f}%)\n"
-                f"📅 Prochain: {reminder.get_next_reminder_display()}\n"
-                f"🔗 [Lien](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{match_id})",
+                value=(
+                    f"📍 {channel_mention}\n"
+                    f"⏰ Intervalle: {Settings.format_interval_display(reminder.interval_minutes)}\n"
+                    f"✅ Réponses: {reminder.get_response_count()}/"
+                    f"{reminder.get_total_users_count()} ("
+                    f"{reminder.get_response_percentage():.1f}%)\n"
+                    f"📅 Prochain: {reminder.get_next_reminder_display()}\n"
+                    f"🔗 [Lien](https://discord.com/channels/"
+                    f"{reminder.guild_id}/{reminder.channel_id}/{match_id})"
+                ),
                 inline=False,
             )
 
@@ -747,7 +780,8 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
         try:
             await reminder_manager.schedule_reaction_update_debounced(message_id, bot)
             logger.debug(
-                f"Scheduled reaction update for message {message_id} (user {user.id} added {reaction.emoji})"
+                f"Scheduled reaction update for message {message_id} "
+                f"(user {user.id} added {reaction.emoji})"
             )
         except Exception as e:
             logger.error(f"Error scheduling reaction update for message {message_id}: {e}")
@@ -769,7 +803,8 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
         try:
             await reminder_manager.schedule_reaction_update_debounced(message_id, bot)
             logger.debug(
-                f"Scheduled reaction update for message {message_id} (user {user.id} removed {reaction.emoji})"
+                f"Scheduled reaction update for message {message_id} "
+                f"(user {user.id} removed {reaction.emoji})"
             )
         except Exception as e:
             logger.error(f"Error scheduling reaction update for message {message_id}: {e}")

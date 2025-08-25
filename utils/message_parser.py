@@ -7,7 +7,7 @@ relevant IDs and information.
 
 import logging
 import re
-from typing import NamedTuple, Optional, Tuple
+from typing import NamedTuple, Optional
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
