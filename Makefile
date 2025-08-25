@@ -92,9 +92,49 @@ docker-stop: ## Arrête le conteneur direct
 dev-install: ## Installe les dépendances pour le développement local
 	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
+	pip install pre-commit
+
+dev-setup: dev-install ## Configuration complète de développement
+	@echo "🔧 Configuration des pre-commit hooks..."
+	pre-commit install
+	@echo "✅ Pre-commit hooks installés!"
 
 dev-test: ## Lance les tests localement
 	python3 -m pytest tests/ -v
+
+# Formatage et qualité de code
+format: ## Formate automatiquement tout le code
+	@echo "🎨 Formatage du code avec Black..."
+	python -m black . --line-length=100
+	@echo "📦 Tri des imports avec isort..."
+	python -m isort . --profile=black --line-length=100
+	@echo "✅ Formatage terminé!"
+
+format-check: ## Vérifie le formatage sans modifier
+	@echo "🔍 Vérification du formatage..."
+	python -m black . --check --line-length=100
+	python -m isort . --check-only --profile=black --line-length=100
+	@echo "✅ Formatage vérifié!"
+
+lint: ## Lance tous les outils de vérification
+	@echo "🔍 Analyse avec flake8..."
+	python -m flake8 --max-line-length=100 --ignore=E203,W503
+	@echo "🔒 Scan de sécurité avec bandit..."
+	python -m bandit -r . --skip B101 -f json -o bandit-report.json || true
+	@echo "🎯 Vérification des types avec mypy..."
+	python -m mypy --ignore-missing-imports . || true
+	@echo "✅ Analyse terminée!"
+
+pre-commit-all: ## Lance tous les pre-commit hooks sur tous les fichiers
+	@echo "🚀 Lancement de tous les pre-commit hooks..."
+	pre-commit run --all-files
+
+pre-commit-update: ## Met à jour les pre-commit hooks
+	@echo "🔄 Mise à jour des pre-commit hooks..."
+	pre-commit autoupdate
+
+validate-ci: format-check lint ## Valide que le code passera les CI
+	@echo "✅ Code prêt pour CI/CD!"
 
 # Maintenance
 backup-data: ## Sauvegarde les données
