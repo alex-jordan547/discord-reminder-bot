@@ -2,7 +2,7 @@
 Discord command handlers for Discord Reminder Bot.
 
 This module contains all Discord command implementations and related
-functionality for managing match reminders.
+functionality for managing event reminders.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from discord.ext import commands
 
 from commands.command_utils import create_health_embed, sync_slash_commands_logic
 from config.settings import Messages, Settings
-from models.reminder import Reminder
+from models.reminder import Event
 from utils.auto_delete import get_auto_delete_manager
 from utils.concurrency import get_concurrency_stats
 from utils.error_recovery import retry_stats, safe_fetch_message, safe_send_message
@@ -235,7 +235,7 @@ async def start_dynamic_reminder_system() -> None:
 
 
 def reschedule_reminders() -> None:
-    """Replanifie les rappels après ajout/suppression d'un match."""
+    """Replanifie les rappels après ajout/suppression d'un événement."""
     # Annuler la tâche précédente
     if _dynamic_reminder_task and not _dynamic_reminder_task.done():
         _dynamic_reminder_task.cancel()
@@ -319,17 +319,17 @@ async def get_or_create_reminder_channel(guild: discord.Guild) -> Optional[disco
 
 
 async def send_reminder(
-    reminder: Reminder, channel: discord.TextChannel, bot_instance: commands.Bot
+    reminder: Event, channel: discord.TextChannel, bot_instance: commands.Bot
 ) -> int:
-    """Send a reminder for a specific match."""
+    """Send a reminder for a specific event."""
     try:
-        # Get the original match message to update reactions
-        match_channel = bot_instance.get_channel(reminder.channel_id)
-        if not match_channel:
-            logger.error(f"Could not find match channel {reminder.channel_id}")
+        # Get the original event message to update reactions
+        event_channel = bot_instance.get_channel(reminder.channel_id)
+        if not event_channel:
+            logger.error(f"Could not find event channel {reminder.channel_id}")
             return 0
 
-        message = await safe_fetch_message(match_channel, reminder.message_id)
+        message = await safe_fetch_message(event_channel, reminder.message_id)
         if not message:
             logger.error(
                 "Could not fetch message {} from channel {}".format(
@@ -377,7 +377,7 @@ async def send_reminder(
         missing_users = reminder.get_missing_users()
 
         if not missing_users:
-            logger.debug(f"No missing users for match {reminder.message_id}")
+            logger.debug(f"No missing users for event {reminder.message_id}")
             return 0
 
         # Limit mentions to avoid spam
@@ -442,7 +442,7 @@ async def send_reminder(
         sent_message = await safe_send_message(channel, content=mentions, embed=embed)
         if not sent_message:
             logger.error(
-                f"Failed to send reminder for match {reminder.message_id} to "
+                f"Failed to send reminder for event {reminder.message_id} to "
                 f"channel {channel.name}"
             )
             return 0
@@ -474,13 +474,13 @@ async def send_reminder(
         await reminder_manager.save()
 
         logger.info(
-            f"Sent reminder for match {reminder.message_id} to " f"{len(users_to_mention)} users"
+            f"Sent reminder for event {reminder.message_id} to " f"{len(users_to_mention)} users"
         )
 
         return len(users_to_mention)
 
     except Exception as e:
-        logger.error(f"Unexpected error in send_reminder for match {reminder.message_id}: {e}")
+        logger.error(f"Unexpected error in send_reminder for event {reminder.message_id}: {e}")
         # Update timestamp even on error to prevent retry loop
         reminder.last_reminder = datetime.now()
         await reminder_manager.save()
@@ -495,10 +495,10 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
     bot = bot_instance
 
     @bot.command(name="watch")
-    async def watch_match(
+    async def watch_event(
         ctx: commands.Context, message_link: str, interval_minutes: int = 60
     ) -> None:
-        """Add a match message to watch for availability responses."""
+        """Add an event message to watch for availability responses."""
         if not has_admin_permission(ctx.author):
             await ctx.send(get_permission_error_message())
             return
@@ -538,10 +538,10 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
                 return
 
             title = extract_message_title(message.content, Settings.MAX_TITLE_LENGTH)
-            if title == "Match sans titre":
-                title = f"Match #{link_info.message_id}"
+            if title == "Événement sans titre":
+                title = f"Événement #{link_info.message_id}"
 
-            reminder = Reminder(
+            reminder = Event(
                 link_info.message_id,
                 link_info.channel_id,
                 link_info.guild_id,
@@ -568,15 +568,15 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             success = await reminder_manager.add_reminder(reminder)
             if not success:
-                await ctx.send("❌ Erreur lors de l'ajout du match à surveiller.")
+                await ctx.send("❌ Erreur lors de l'ajout de l'événement à surveiller.")
                 return
 
             reschedule_reminders()
 
             embed = discord.Embed(
-                title=Messages.MATCH_ADDED, color=discord.Color.green(), timestamp=datetime.now()
+                title=Messages.EVENT_ADDED, color=discord.Color.green(), timestamp=datetime.now()
             )
-            embed.add_field(name="📌 Match", value=title, inline=False)
+            embed.add_field(name="📌 Événement", value=title, inline=False)
             embed.add_field(
                 name="⏰ Intervalle",
                 value=Settings.format_interval_display(validated_interval),
@@ -608,16 +608,16 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             await ctx.send(embed=embed)
             logger.info(
-                "Added match {} to watch list on guild {} with {}min interval (original: {})".format(
+                "Added event {} to watch list on guild {} with {}min interval (original: {})".format(
                     link_info.message_id, ctx.guild.id, validated_interval, original_interval
                 )
             )
 
         except Exception as e:
-            await send_error_to_user(ctx, e, "l'ajout du match à la surveillance")
+            await send_error_to_user(ctx, e, "l'ajout de l'événement à la surveillance")
 
     @bot.command(name="unwatch")
-    async def unwatch_match(ctx: commands.Context, message: str) -> None:
+    async def unwatch_event(ctx: commands.Context, message: str) -> None:
         """Remove a message from the watch list."""
         if not has_admin_permission(ctx.author):
             await ctx.send(get_permission_error_message())
@@ -646,22 +646,22 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
             title = reminder.title
             success = await reminder_manager.remove_reminder(message_id)
             if not success:
-                await ctx.send("❌ Erreur lors de la suppression du match.")
+                await ctx.send("❌ Erreur lors de la suppression de l'événement.")
                 return
 
             reschedule_reminders()
-            await ctx.send(Messages.MATCH_REMOVED.format(title))
-            logger.info(f"Removed match {message_id} from watch list")
+            await ctx.send(Messages.EVENT_REMOVED.format(title))
+            logger.info(f"Removed event {message_id} from watch list")
         else:
-            await ctx.send(Messages.MATCH_NOT_WATCHED)
+            await ctx.send(Messages.EVENT_NOT_WATCHED)
 
     @bot.command(name="list")
-    async def list_matches(ctx: commands.Context) -> None:
-        """List all watched matches on this server."""
-        server_matches = await reminder_manager.get_guild_reminders(ctx.guild.id)
+    async def list_events(ctx: commands.Context) -> None:
+        """List all watched events on this server."""
+        server_events = await reminder_manager.get_guild_reminders(ctx.guild.id)
 
-        if not server_matches:
-            await ctx.send(Messages.NO_WATCHED_MATCHES)
+        if not server_events:
+            await ctx.send(Messages.NO_WATCHED_EVENTS)
             return
 
         embed = discord.Embed(
@@ -670,7 +670,7 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
             timestamp=datetime.now(),
         )
 
-        for match_id, reminder in server_matches.items():
+        for event_id, reminder in server_events.items():
             # Update user counts to reflect current server state
             await reminder.update_accessible_users(bot)
 
@@ -687,18 +687,18 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
                     f"{reminder.get_response_percentage():.1f}%)\n"
                     f"📅 Prochain: {reminder.get_next_reminder_display()}\n"
                     f"🔗 [Lien](https://discord.com/channels/"
-                    f"{reminder.guild_id}/{reminder.channel_id}/{match_id})"
+                    f"{reminder.guild_id}/{reminder.channel_id}/{event_id})"
                 ),
                 inline=False,
             )
 
-        embed.set_footer(text=f"Total: {len(server_matches)} match(s) surveillé(s)")
+        embed.set_footer(text=f"Total: {len(server_events)} événement(s) surveillé(s)")
         await ctx.send(embed=embed)
 
     # Add other commands similarly...
     @bot.command(name="remind")
     async def manual_remind(ctx: commands.Context, message: Optional[str] = None) -> None:
-        """Send a manual reminder for a specific match or all matches on the server."""
+        """Send a manual reminder for a specific event or all events on the server."""
         if not has_admin_permission(ctx.author):
             await ctx.send(get_permission_error_message())
             return
@@ -724,23 +724,23 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
 
             reminder = await reminder_manager.get_reminder(message_id)
             if not reminder:
-                await ctx.send(Messages.MATCH_NOT_WATCHED)
+                await ctx.send(Messages.EVENT_NOT_WATCHED)
                 return
             if reminder.guild_id != ctx.guild.id:
-                await ctx.send(Messages.MATCH_NOT_ON_SERVER)
+                await ctx.send(Messages.EVENT_NOT_ON_SERVER)
                 return
-            matches_to_remind = {message_id: reminder}
+            events_to_remind = {message_id: reminder}
         else:
-            matches_to_remind = await reminder_manager.get_guild_reminders(ctx.guild.id)
+            events_to_remind = await reminder_manager.get_guild_reminders(ctx.guild.id)
 
-        if not matches_to_remind:
-            await ctx.send(Messages.NO_MATCHES_TO_REMIND)
+        if not events_to_remind:
+            await ctx.send(Messages.NO_EVENTS_TO_REMIND)
             return
 
         reminder_channel = await get_or_create_reminder_channel(ctx.guild)
         total_reminded = 0
 
-        for match_id, reminder in matches_to_remind.items():
+        for event_id, reminder in events_to_remind.items():
             if not reminder_channel:
                 reminder_channel = bot.get_channel(reminder.channel_id)
 

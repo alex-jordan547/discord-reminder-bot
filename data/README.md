@@ -14,7 +14,8 @@ data/
 ## Files
 
 ### Root Level
-- `watched_matches.json` - Main data file (created at runtime)
+- `watched_events.json` - Main data file (created at runtime)
+- `watched_matches.json` - Legacy filename (deprecated)
 
 ### Logs Directory
 - `bot_YYYYMMDD.log` - Daily log files
@@ -22,7 +23,8 @@ data/
 - `debug.log` - Debug information (when LOG_LEVEL=DEBUG)
 
 ### Backups Directory
-- `watched_matches_YYYYMMDD_HHMMSS.json` - Automatic backups
+- `watched_events_YYYYMMDD_HHMMSS.json` - Automatic backups
+- `watched_matches_YYYYMMDD_HHMMSS.json` - Legacy backup format
 - `recovery/` - Recovery data from error scenarios
 
 ## Configuration
@@ -45,7 +47,7 @@ Backups older than 30 days can be cleaned up manually or via automation.
 ### Data Recovery
 In case of data corruption:
 1. Check latest backup in `backups/`
-2. Copy to `watched_matches.json`
+2. Copy to `watched_events.json` (or `watched_matches.json` for legacy compatibility)
 3. Restart the bot
 
 ## Security

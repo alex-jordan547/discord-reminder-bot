@@ -53,7 +53,7 @@ discord-reminder-bot/
 ├── config/                   # Configuration
 │   └── settings.py          # Centralized settings
 ├── models/                   # Data models
-│   └── reminder.py          # MatchReminder class
+│   └── reminder.py          # Event class
 ├── persistence/              # Data persistence
 │   └── storage.py           # JSON storage layer
 ├── utils/                    # Utility modules

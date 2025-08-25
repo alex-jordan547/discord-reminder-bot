@@ -1,7 +1,7 @@
 """
-Match reminder model for Discord Reminder Bot.
+Event reminder model for Discord Reminder Bot.
 
-This module contains the MatchReminder class that represents a watched match
+This module contains the Event class that represents a watched event
 and its associated data including user reactions and timing information.
 """
 
@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 
 
-class Reminder:
+class Event:
     """
-    Represents an item being watched for user availability responses.
+    Represents an event being watched for user availability responses.
 
     This class stores all the information needed to track user reactions
     to a Discord message and send automated reminders.
@@ -20,14 +20,14 @@ class Reminder:
         message_id (int): The Discord message ID being watched
         channel_id (int): The Discord channel ID where the message is located
         guild_id (int): The Discord guild (server) ID
-        title (str): The title/description of the reminder
+        title (str): The title/description of the event
         required_reactions (List[str]): List of emoji reactions to track
         last_reminder (datetime): When the last reminder was sent
         users_who_reacted (Set[int]): Set of user IDs who have reacted
         all_users (Set[int]): Set of all user IDs in the server (excluding bots)
-        interval_minutes (float): Reminder interval in minutes for this specific reminder
-        is_paused (bool): Whether reminders are paused for this item
-        created_at (datetime): When this reminder was first added to watch
+        interval_minutes (float): Reminder interval in minutes for this specific event
+        is_paused (bool): Whether reminders are paused for this event
+        created_at (datetime): When this event was first added to watch
     """
 
     def __init__(
@@ -40,13 +40,13 @@ class Reminder:
         required_reactions: Optional[List[str]] = None,
     ) -> None:
         """
-        Initialize a new Reminder instance.
+        Initialize a new Event instance.
 
         Args:
             message_id: The Discord message ID to watch
             channel_id: The Discord channel ID containing the message
             guild_id: The Discord guild (server) ID
-            title: The title or description of the reminder
+            title: The title or description of the event
             interval_minutes: Reminder interval in minutes (default: 60)
             required_reactions: List of emoji reactions to track (defaults to ['✅', '❌', '❓'])
         """
@@ -67,7 +67,7 @@ class Reminder:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert the Reminder instance to a dictionary for JSON serialization.
+        Convert the Event instance to a dictionary for JSON serialization.
 
         Returns:
             Dict containing all instance data in serializable format
@@ -87,15 +87,15 @@ class Reminder:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Reminder":
+    def from_dict(cls, data: Dict[str, Any]) -> "Event":
         """
-        Create a Reminder instance from a dictionary (JSON deserialization).
+        Create an Event instance from a dictionary (JSON deserialization).
 
         Args:
-            data: Dictionary containing the serialized Reminder data
+            data: Dictionary containing the serialized Event data
 
         Returns:
-            Reminder instance reconstructed from the dictionary
+            Event instance reconstructed from the dictionary
         """
         # Handle backward compatibility - convert hours to minutes if needed
         interval_minutes = data.get("interval_minutes")
@@ -160,7 +160,7 @@ class Reminder:
 
     async def update_accessible_users(self, bot_instance) -> None:
         """
-        Update the list of users who can access the reminder's channel.
+        Update the list of users who can access the event's channel.
         This ensures accurate user counts when switching between servers.
 
         Args:
@@ -184,7 +184,7 @@ class Reminder:
                     if permissions.view_channel and permissions.send_messages:
                         accessible_users.add(member.id)
 
-            # Update the reminder's user list
+            # Update the event's user list
             self.all_users = accessible_users
 
         except Exception as e:
@@ -192,7 +192,7 @@ class Reminder:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to update accessible users for reminder {self.message_id}: {e}")
+            logger.warning(f"Failed to update accessible users for event {self.message_id}: {e}")
 
     def get_next_reminder_time(self) -> datetime:
         """
@@ -214,7 +214,7 @@ class Reminder:
 
     def is_reminder_due(self) -> bool:
         """
-        Check if a reminder is due for this item.
+        Check if a reminder is due for this event.
 
         Returns:
             bool: True if a reminder should be sent now
@@ -233,7 +233,7 @@ class Reminder:
         if is_due:
             time_diff = current_time - next_reminder_time
             logger.debug(
-                f"Reminder {self.message_id}: Reminder DUE! "
+                f"Event {self.message_id}: Reminder DUE! "
                 f"Current: {current_time.strftime('%H:%M:%S')}, "
                 f"Next: {next_reminder_time.strftime('%H:%M:%S')}, "
                 f"Overdue by: {time_diff}"
@@ -241,7 +241,7 @@ class Reminder:
         else:
             time_until = next_reminder_time - current_time
             logger.debug(
-                f"Reminder {self.message_id}: Reminder not due. "
+                f"Event {self.message_id}: Reminder not due. "
                 f"Current: {current_time.strftime('%H:%M:%S')}, "
                 f"Next: {next_reminder_time.strftime('%H:%M:%S')}, "
                 f"Time until: {time_until}"
@@ -251,18 +251,18 @@ class Reminder:
 
     def pause_reminders(self) -> None:
         """
-        Pause reminders for this item.
+        Pause reminders for this event.
         """
         self.is_paused = True
 
     def resume_reminders(self) -> None:
         """
-        Resume reminders for this item.
+        Resume reminders for this event.
         """
         self.is_paused = False
 
     def set_interval(self, interval_minutes: float) -> None:
-        """Set a new reminder interval for this item.
+        """Set a new reminder interval for this event.
 
         Uses centralized validation that accounts for test mode.
 
@@ -275,7 +275,7 @@ class Reminder:
 
     def get_status_summary(self) -> Dict[str, Any]:
         """
-        Get a comprehensive status summary for this reminder.
+        Get a comprehensive status summary for this event.
 
         Returns:
             Dict containing status information for display
@@ -302,6 +302,7 @@ class Reminder:
         }
 
 
-# Alias pour la compatibilité avec le code existant
-# TODO: Supprimer cet alias après la migration complète
-MatchReminder = Reminder
+# Aliases pour la compatibilité avec le code existant
+# TODO: Supprimer ces alias après la migration complète
+Reminder = Event
+MatchReminder = Event

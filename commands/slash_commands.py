@@ -16,7 +16,7 @@ from discord.ext import commands
 
 from commands.command_utils import create_health_embed, sync_slash_commands_logic
 from config.settings import Messages, Settings
-from models.reminder import Reminder
+from models.reminder import Event
 from utils.error_recovery import retry_stats, safe_fetch_message
 from utils.message_parser import extract_message_title, parse_message_link
 from utils.permissions import has_admin_permission
@@ -94,7 +94,7 @@ class SlashCommands(commands.Cog):
         ]
     )
     async def watch(self, interaction: discord.Interaction, message: str, interval: int = 3600):
-        """Add a match message to watch for availability responses."""
+        """Add an event message to watch for availability responses."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
@@ -150,8 +150,8 @@ class SlashCommands(commands.Cog):
 
             # Extract title from message content
             title = extract_message_title(discord_message.content, Settings.MAX_TITLE_LENGTH)
-            if title == "Match sans titre":
-                title = f"Match #{link_info.message_id}"
+            if title == "Événement sans titre":
+                title = f"Événement #{link_info.message_id}"
 
             # Create the reminder (or update existing)
             if is_existing_watch:
@@ -167,7 +167,7 @@ class SlashCommands(commands.Cog):
                 reminder = existing_reminder
             else:
                 # Create new reminder
-                reminder = Reminder(
+                reminder = Event(
                     link_info.message_id,
                     link_info.channel_id,
                     link_info.guild_id,
@@ -211,15 +211,15 @@ class SlashCommands(commands.Cog):
             # Create success embed - different for new watch vs edit
             if is_existing_watch:
                 embed = discord.Embed(
-                    title="🔄 Match modifié", color=discord.Color.blue(), timestamp=datetime.now()
+                    title="🔄 Événement modifié", color=discord.Color.blue(), timestamp=datetime.now()
                 )
             else:
                 embed = discord.Embed(
-                    title="✅ Match ajouté à la surveillance",
+                    title="✅ Événement ajouté à la surveillance",
                     color=discord.Color.green(),
                     timestamp=datetime.now(),
                 )
-            embed.add_field(name="📌 Match", value=title, inline=False)
+            embed.add_field(name="📌 Événement", value=title, inline=False)
 
             if is_existing_watch and old_interval != validated_interval:
                 # Show interval change for edits
@@ -288,19 +288,19 @@ class SlashCommands(commands.Cog):
 
             if is_existing_watch:
                 logger.info(
-                    f"Modified match {link_info.message_id} on guild {interaction.guild.id}: "
+                    f"Modified event {link_info.message_id} on guild {interaction.guild.id}: "
                     f"interval changed from {old_interval}min to {validated_interval}min "
                     f"(requested: {Settings.format_interval_display(original_interval_minutes)})"
                 )
             else:
                 logger.info(
-                    f"Added match {link_info.message_id} to watch list on guild "
+                    f"Added event {link_info.message_id} to watch list on guild "
                     f"{interaction.guild.id} with {validated_interval}min interval "
                     f"(original: {Settings.format_interval_display(original_interval_minutes)})"
                 )
 
         except Exception as e:
-            await send_error_to_user(interaction, e, "l'ajout du match à la surveillance")
+            await send_error_to_user(interaction, e, "l'ajout de l'événement à la surveillance")
 
     @app_commands.command(name="unwatch", description="Retirer un message de la surveillance")
     @app_commands.describe(message="Lien du message à ne plus surveiller")
@@ -340,30 +340,30 @@ class SlashCommands(commands.Cog):
             reschedule_reminders()
 
             embed = discord.Embed(
-                title="✅ Match retiré de la surveillance",
+                title="✅ Événement retiré de la surveillance",
                 description=f"**{title}** ne sera plus surveillé.",
                 color=discord.Color.orange(),
                 timestamp=datetime.now(),
             )
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            logger.info(f"Removed match {message_id} from watch list")
+            logger.info(f"Removed event {message_id} from watch list")
         else:
-            await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_WATCHED, ephemeral=True)
 
     @app_commands.command(
         name="list", description="Lister tous les rappels surveillés sur ce serveur"
     )
-    async def list_matches(self, interaction: discord.Interaction):
-        """List all watched matches on this server."""
+    async def list_events(self, interaction: discord.Interaction):
+        """List all watched events on this server."""
         # Utiliser le système thread-safe au lieu de l'ancien système
         from commands.handlers import reminder_manager
 
-        # Filter matches for this server only using thread-safe manager
-        server_matches = await reminder_manager.get_guild_reminders(interaction.guild.id)
+        # Filter events for this server only using thread-safe manager
+        server_events = await reminder_manager.get_guild_reminders(interaction.guild.id)
 
-        if not server_matches:
-            await interaction.response.send_message(Messages.NO_WATCHED_MATCHES, ephemeral=True)
+        if not server_events:
+            await interaction.response.send_message(Messages.NO_WATCHED_EVENTS, ephemeral=True)
             return
 
         embed = discord.Embed(
@@ -372,7 +372,7 @@ class SlashCommands(commands.Cog):
             timestamp=datetime.now(),
         )
 
-        for match_id, reminder in server_matches.items():
+        for event_id, reminder in server_events.items():
             # Update user counts to reflect current server state
             await reminder.update_accessible_users(self.bot)
 
@@ -405,11 +405,11 @@ class SlashCommands(commands.Cog):
                 f"✅ Réponses: {reminder.get_response_count()}/{reminder.get_total_users_count()} "
                 f"({reminder.get_status_summary()['response_percentage']}%)\n"
                 f"📅 Prochain: {next_reminder_text}\n"
-                f"🔗 [Lien](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{match_id})",
+                f"🔗 [Lien](https://discord.com/channels/{reminder.guild_id}/{reminder.channel_id}/{event_id})",
                 inline=False,
             )
 
-        embed.set_footer(text=f"Total: {len(server_matches)} match(s) surveillé(s)")
+        embed.set_footer(text=f"Total: {len(server_events)} événement(s) surveillé(s)")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
@@ -419,7 +419,7 @@ class SlashCommands(commands.Cog):
         message="Lien du message pour lequel envoyer un rappel (optionnel: tous les rappels si omis)"
     )
     async def remind(self, interaction: discord.Interaction, message: Optional[str] = None):
-        """Send a manual reminder for a specific match or all matches."""
+        """Send a manual reminder for a specific event or all events."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
@@ -431,7 +431,7 @@ class SlashCommands(commands.Cog):
         # Defer response for processing
         await interaction.response.defer(ephemeral=True)
 
-        # Determine which matches to remind using thread-safe manager
+        # Determine which events to remind using thread-safe manager
         if message:
             link_info = parse_message_link(message)
             if not link_info:
@@ -441,18 +441,18 @@ class SlashCommands(commands.Cog):
             message_id = link_info.message_id
             reminder = await reminder_manager.get_reminder(message_id)
             if not reminder:
-                await interaction.followup.send(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+                await interaction.followup.send(Messages.EVENT_NOT_WATCHED, ephemeral=True)
                 return
             if reminder.guild_id != interaction.guild.id:
-                await interaction.followup.send(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
+                await interaction.followup.send(Messages.EVENT_NOT_ON_SERVER, ephemeral=True)
                 return
-            matches_to_remind = {message_id: reminder}
+            events_to_remind = {message_id: reminder}
         else:
-            # Get all matches for this server using thread-safe manager
-            matches_to_remind = await reminder_manager.get_guild_reminders(interaction.guild.id)
+            # Get all events for this server using thread-safe manager
+            events_to_remind = await reminder_manager.get_guild_reminders(interaction.guild.id)
 
-        if not matches_to_remind:
-            await interaction.followup.send(Messages.NO_MATCHES_TO_REMIND, ephemeral=True)
+        if not events_to_remind:
+            await interaction.followup.send(Messages.NO_EVENTS_TO_REMIND, ephemeral=True)
             return
 
         # Import send_reminder function
@@ -460,7 +460,7 @@ class SlashCommands(commands.Cog):
 
         total_reminded = 0
 
-        for match_id, reminder in matches_to_remind.items():
+        for event_id, reminder in events_to_remind.items():
             # Determine reminder channel
             if Settings.USE_SEPARATE_REMINDER_CHANNEL:
                 reminder_channel = await get_or_create_reminder_channel(interaction.guild)
@@ -505,7 +505,7 @@ class SlashCommands(commands.Cog):
         ]
     )
     async def set_interval(self, interaction: discord.Interaction, message: str, interval: int):
-        """Set a new reminder interval for a watched match."""
+        """Set a new reminder interval for a watched event."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
@@ -525,11 +525,11 @@ class SlashCommands(commands.Cog):
         # Use thread-safe reminder manager
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
-            await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_WATCHED, ephemeral=True)
             return
 
         if reminder.guild_id != interaction.guild.id:
-            await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_ON_SERVER, ephemeral=True)
             return
 
         # Convert interval from seconds to minutes and validate
@@ -552,7 +552,7 @@ class SlashCommands(commands.Cog):
         embed = discord.Embed(
             title="✅ Intervalle mis à jour", color=discord.Color.green(), timestamp=datetime.now()
         )
-        embed.add_field(name="📌 Match", value=reminder.title, inline=False)
+        embed.add_field(name="📌 Événement", value=reminder.title, inline=False)
         embed.add_field(
             name="⏰ Ancien intervalle",
             value=Settings.format_interval_display(old_interval),
@@ -571,13 +571,13 @@ class SlashCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(
-            f"Updated interval for match {message_id} from {Settings.format_interval_display(old_interval)} to {Settings.format_interval_display(reminder.interval_minutes)}"
+            f"Updated interval for event {message_id} from {Settings.format_interval_display(old_interval)} to {Settings.format_interval_display(reminder.interval_minutes)}"
         )
 
     @app_commands.command(name="pause", description="Mettre en pause les rappels d'un élément")
     @app_commands.describe(message="Lien du message dont mettre en pause les rappels")
     async def pause(self, interaction: discord.Interaction, message: str):
-        """Pause reminders for a specific match."""
+        """Pause reminders for a specific event."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
@@ -597,15 +597,15 @@ class SlashCommands(commands.Cog):
         # Use thread-safe reminder manager
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
-            await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_WATCHED, ephemeral=True)
             return
 
         if reminder.guild_id != interaction.guild.id:
-            await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_ON_SERVER, ephemeral=True)
             return
 
         if reminder.is_paused:
-            await interaction.response.send_message("⚠️ Ce match est déjà en pause.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Cet événement est déjà en pause.", ephemeral=True)
             return
 
         # Use thread-safe manager to pause
@@ -629,12 +629,12 @@ class SlashCommands(commands.Cog):
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        logger.info(f"Paused reminders for match {message_id}")
+        logger.info(f"Paused reminders for event {message_id}")
 
     @app_commands.command(name="resume", description="Reprendre les rappels d'un élément en pause")
     @app_commands.describe(message="Lien du message dont reprendre les rappels")
     async def resume(self, interaction: discord.Interaction, message: str):
-        """Resume reminders for a paused match."""
+        """Resume reminders for a paused event."""
         # Check permissions
         if not has_admin_permission(interaction.user):
             await interaction.response.send_message(
@@ -654,16 +654,16 @@ class SlashCommands(commands.Cog):
         # Use thread-safe reminder manager
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
-            await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_WATCHED, ephemeral=True)
             return
 
         if reminder.guild_id != interaction.guild.id:
-            await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_ON_SERVER, ephemeral=True)
             return
 
         if not reminder.is_paused:
             await interaction.response.send_message(
-                "⚠️ Ce match n'est pas en pause.", ephemeral=True
+                "⚠️ Cet événement n'est pas en pause.", ephemeral=True
             )
             return
 
@@ -693,12 +693,12 @@ class SlashCommands(commands.Cog):
         )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        logger.info(f"Resumed reminders for match {message_id}")
+        logger.info(f"Resumed reminders for event {message_id}")
 
     @app_commands.command(name="status", description="Afficher le statut détaillé d'un rappel")
     @app_commands.describe(message="Lien du message dont afficher le statut")
     async def status(self, interaction: discord.Interaction, message: str):
-        """Show detailed status for a specific match."""
+        """Show detailed status for a specific event."""
         # Parse the message link
         link_info = parse_message_link(message)
         if not link_info:
@@ -710,11 +710,11 @@ class SlashCommands(commands.Cog):
         # Use thread-safe reminder manager
         reminder = await reminder_manager.get_reminder(message_id)
         if not reminder:
-            await interaction.response.send_message(Messages.MATCH_NOT_WATCHED, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_WATCHED, ephemeral=True)
             return
 
         if reminder.guild_id != interaction.guild.id:
-            await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
+            await interaction.response.send_message(Messages.EVENT_NOT_ON_SERVER, ephemeral=True)
             return
 
         # Update user counts to reflect current server state
@@ -734,7 +734,7 @@ class SlashCommands(commands.Cog):
             status_emoji = "▶️"
 
         embed = discord.Embed(
-            title=f"{status_emoji} Statut du Match",
+            title=f"{status_emoji} Statut de l'Événement",
             description=f"**{status['title']}**",
             color=color,
             timestamp=datetime.now(),
@@ -921,17 +921,17 @@ class SlashCommands(commands.Cog):
         # Footer avec informations supplémentaires
         if interaction.guild:
             # En serveur : afficher les statistiques du serveur using thread-safe manager
-            server_matches = await reminder_manager.get_guild_reminders(interaction.guild.id)
-            server_count = len(server_matches)
+            server_events = await reminder_manager.get_guild_reminders(interaction.guild.id)
+            server_count = len(server_events)
             footer_text = (
                 f"Bot développé avec discord.py • {server_count} rappel(s) actifs sur ce serveur"
             )
         else:
             # En DM : afficher les statistiques globales using thread-safe manager
             all_reminders = reminder_manager.reminders
-            total_matches = len(all_reminders)
+            total_events = len(all_reminders)
             footer_text = (
-                f"Bot développé avec discord.py • {total_matches} rappel(s) actifs au total"
+                f"Bot développé avec discord.py • {total_events} rappel(s) actifs au total"
             )
 
         embed.set_footer(text=footer_text)

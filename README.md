@@ -1,19 +1,19 @@
 # Discord Reminder Bot
 
-A Discord bot that helps track user availability for matches by monitoring reactions and sending automatic reminders to users who haven't responded.
+A Discord bot that helps track user availability for events by monitoring reactions and sending automatic reminders to users who haven't responded.
 
 ## ✨ Features
 
-- **🎯 Event Tracking**: Monitor Discord message reactions for match availability
+- **🎯 Event Tracking**: Monitor Discord message reactions for event availability
 - **🔔 Automated Reminders**: Send reminders to users who haven't responded
 - **⚡ Dynamic Scheduling**: ±5 second precision instead of ±30 seconds
-- **😴 Smart Sleep Mode**: 0% CPU usage when no matches are being tracked
+- **😴 Smart Sleep Mode**: 0% CPU usage when no events are being tracked
 - **🎮 Multi-Server Support**: Works across multiple Discord servers
 - **🛡️ Role-Based Permissions**: Configurable admin roles for management commands
 - **💾 Persistent Storage**: JSON-based data persistence without external databases
 - **🔄 Error Recovery**: Advanced retry system with statistics tracking
 - **🧪 Test Mode**: Short intervals (30s, 1min, 2min) for development
-- **⏸️ Pause/Resume**: Individual match control for maintenance periods
+- **⏸️ Pause/Resume**: Individual event control for maintenance periods
 
 ## 🚀 Quick Start
 
@@ -87,7 +87,7 @@ docker-compose down
 |---------|-------------|---------|
 | `/watch <message> [interval]` | Start monitoring a message with reminders | `/watch https://discord.com/channels/... 3600` |
 | `/unwatch <message>` | Stop monitoring a message | `/unwatch https://discord.com/channels/...` |
-| `/list` | List all tracked matches on this server | `/list` |
+| `/list` | List all tracked events on this server | `/list` |
 | `/remind [message]` | Send manual reminder (all if no message) | `/remind https://discord.com/channels/...` |
 | `/status <message>` | Show detailed status of a reminder | `/status https://discord.com/channels/...` |
 | `/pause <message>` | Pause reminders for a message | `/pause https://discord.com/channels/...` |
@@ -105,10 +105,10 @@ docker-compose down
 | 1 minute | 60 | Test mode only |
 | 2 minutes | 120 | Test mode only |
 | 5 minutes | 300 | Short-term events |
-| 15 minutes | 900 | Quick matches |
-| 30 minutes | 1800 | Standard matches |
-| 1 hour | 3600 | **Default** - Regular matches |
-| 2 hours | 7200 | Long matches |
+| 15 minutes | 900 | Quick events |
+| 30 minutes | 1800 | Standard events |
+| 1 hour | 3600 | **Default** - Regular events |
+| 2 hours | 7200 | Long events |
 | 6 hours | 21600 | Tournament events |
 | 12 hours | 43200 | Daily events |
 | 24 hours | 86400 | Weekly events |
@@ -126,7 +126,7 @@ docker-compose down
 | `LOG_TO_FILE` | true | Enable file logging |
 | `ADMIN_ROLES` | Admin,Moderateur,Coach | Comma-separated admin role names |
 | `USE_SEPARATE_REMINDER_CHANNEL` | false | Create separate reminder channel |
-| `REMINDER_CHANNEL_NAME` | rappels-matchs | Name for reminder channel |
+| `REMINDER_CHANNEL_NAME` | rappels-events | Name for reminder channel |
 
 ### Test Mode
 
@@ -152,7 +152,7 @@ discord-reminder-bot/
 ├── config/                   # ⚙️ Configuration management
 │   └── settings.py          # Centralized settings
 ├── models/                   # 📊 Data models
-│   └── reminder.py          # MatchReminder class
+│   └── reminder.py          # Event class
 ├── persistence/              # 💾 Data storage
 │   └── storage.py           # JSON persistence layer
 ├── utils/                    # 🛠️ Utilities
@@ -174,7 +174,7 @@ discord-reminder-bot/
 **1. Dynamic Scheduling System**
 - ⚡ **Precision**: ±5 seconds instead of ±30 seconds  
 - 🎯 **Smart Planning**: Calculates exact next reminder time
-- 😴 **Sleep Mode**: 0% CPU when no matches to track
+- 😴 **Sleep Mode**: 0% CPU when no events to track
 - 🔄 **Auto-Reschedule**: Recomputes timing after any changes
 
 **2. Error Recovery**
@@ -294,7 +294,7 @@ This project is open source. See the LICENSE file for details.
 ## 🎯 Recent Improvements
 
 - ✅ **Dynamic Scheduling**: Replaced 60-second polling with precise timestamp-based planning
-- ✅ **Smart Sleep Mode**: 0% CPU usage when no matches are being tracked (saves ~288 checks/day)
+- ✅ **Smart Sleep Mode**: 0% CPU usage when no events are being tracked (saves ~288 checks/day)
 - ✅ **Error Recovery**: Advanced retry system with statistics and health monitoring
 - ✅ **Test Mode**: Short intervals (30s/1min/2min) for rapid development and testing
 - ✅ **Slash Commands**: Full migration to modern Discord slash command interface
@@ -304,4 +304,4 @@ This project is open source. See the LICENSE file for details.
 
 ---
 
-**🚀 Ready to enhance your Discord community's match coordination!**
+**🚀 Ready to enhance your Discord community's event coordination!**

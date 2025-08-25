@@ -51,7 +51,7 @@ class TestConcurrency:
                     message_id=123450 + i,  # Use integers for message_id
                     channel_id=987654321,
                     guild_id=111111111,
-                    title=f"Test Match {i}",
+                    title=f"Test Event {i}",
                     interval_minutes=60,  # Use interval_minutes parameter
                 )
                 reminders.append(reminder)
@@ -73,7 +73,7 @@ class TestConcurrency:
             for i in range(5):
                 message_id = 123450 + i
                 assert message_id in final_data
-                assert final_data[message_id].title == f"Test Match {i}"
+                assert final_data[message_id].title == f"Test Event {i}"
 
     @pytest.mark.asyncio
     async def test_concurrent_storage_operations(self, temp_storage_file):
@@ -84,7 +84,7 @@ class TestConcurrency:
                 message_id=999999,  # Use integer for message_id
                 channel_id=987654321,
                 guild_id=111111111,
-                title="Initial Match",
+                title="Initial Event",
                 interval_minutes=60,  # Use interval_minutes parameter
             )
             initial_data = {initial_reminder.message_id: initial_reminder}
@@ -103,7 +103,7 @@ class TestConcurrency:
                     message_id=message_id,
                     channel_id=987654321,
                     guild_id=111111111,
-                    title=f"Concurrent Match {index}",
+                    title=f"Concurrent Event {index}",
                     interval_minutes=60,  # Use interval_minutes parameter
                 )
                 current_data[message_id] = reminder

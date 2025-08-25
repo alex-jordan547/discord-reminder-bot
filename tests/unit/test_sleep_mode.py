@@ -11,20 +11,20 @@ def test_sleep_mode_logic():
     # Simuler différents scénarios
     scenarios = [
         {
-            "name": "Démarrage sans aucun match",
-            "watched_matches": {},
+            "name": "Démarrage sans aucun événement",
+            "watched_events": {},
             "expected_behavior": "Mode veille (pas de vérifications périodiques)",
             "cpu_usage": "0%",
         },
         {
-            "name": "Ajout d'un premier match",
-            "watched_matches": {"123": {"interval": 60, "paused": False}},
+            "name": "Ajout d'un premier événement",
+            "watched_events": {"123": {"interval": 60, "paused": False}},
             "expected_behavior": "Réactivation immédiate + planification précise",
             "cpu_usage": "Minimal",
         },
         {
-            "name": "Suppression du dernier match",
-            "watched_matches": {},
+            "name": "Suppression du dernier événement",
+            "watched_events": {},
             "expected_behavior": "Retour en mode veille",
             "cpu_usage": "0%",
         },

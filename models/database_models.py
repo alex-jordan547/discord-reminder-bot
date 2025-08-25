@@ -217,7 +217,7 @@ class User(BaseModel):
 
 class Event(BaseModel):
     """
-    Model representing a Discord event (formerly called "match").
+    Model representing a Discord event.
     
     This is the main entity that tracks events being monitored for reminders.
     """

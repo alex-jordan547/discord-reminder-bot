@@ -17,9 +17,9 @@ from config.settings import Settings
 logger = logging.getLogger(__name__)
 
 
-def migrate_matches_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def migrate_events_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Migrate matches data from old format to new format.
+    Migrate events data from old format to new format.
 
     This function handles:
     - Converting from hour-based to minute-based intervals
@@ -35,67 +35,67 @@ def migrate_matches_data(data: Dict[str, Any]) -> Dict[str, Any]:
     migrated_data = {}
     migration_count = 0
 
-    for match_id_str, match_data in data.items():
+    for event_id_str, event_data in data.items():
         try:
             # Convert string keys back to integers
-            match_id = int(match_id_str)
+            event_id = int(event_id_str)
 
             # Check if migration is needed
             needs_migration = False
 
             # Add interval_minutes if missing
-            if "interval_minutes" not in match_data:
+            if "interval_minutes" not in event_data:
                 # Use global setting as default
-                match_data["interval_minutes"] = Settings.get_reminder_interval_minutes()
+                event_data["interval_minutes"] = Settings.get_reminder_interval_minutes()
                 needs_migration = True
-                logger.debug(f"Added interval_minutes to match {match_id}")
+                logger.debug(f"Added interval_minutes to event {event_id}")
 
             # Add is_paused if missing
-            if "is_paused" not in match_data:
-                match_data["is_paused"] = False
+            if "is_paused" not in event_data:
+                event_data["is_paused"] = False
                 needs_migration = True
-                logger.debug(f"Added is_paused to match {match_id}")
+                logger.debug(f"Added is_paused to event {event_id}")
 
             # Add created_at if missing
-            if "created_at" not in match_data:
+            if "created_at" not in event_data:
                 # Use last_reminder as fallback
-                if "last_reminder" in match_data:
-                    match_data["created_at"] = match_data["last_reminder"]
+                if "last_reminder" in event_data:
+                    event_data["created_at"] = event_data["last_reminder"]
                 else:
-                    match_data["created_at"] = datetime.now().isoformat()
+                    event_data["created_at"] = datetime.now().isoformat()
                 needs_migration = True
-                logger.debug(f"Added created_at to match {match_id}")
+                logger.debug(f"Added created_at to event {event_id}")
 
             # Ensure guild_id exists (backward compatibility)
-            if "guild_id" not in match_data:
-                match_data["guild_id"] = 0  # Will need manual fixing
+            if "guild_id" not in event_data:
+                event_data["guild_id"] = 0  # Will need manual fixing
                 needs_migration = True
-                logger.warning(f"Added missing guild_id to match {match_id}")
+                logger.warning(f"Added missing guild_id to event {event_id}")
 
             # Validate and clamp interval_minutes
-            if match_data["interval_minutes"] < Settings.MIN_INTERVAL_MINUTES:
-                match_data["interval_minutes"] = Settings.MIN_INTERVAL_MINUTES
+            if event_data["interval_minutes"] < Settings.MIN_INTERVAL_MINUTES:
+                event_data["interval_minutes"] = Settings.MIN_INTERVAL_MINUTES
                 needs_migration = True
-                logger.info(f"Clamped interval_minutes to minimum for match {match_id}")
-            elif match_data["interval_minutes"] > Settings.MAX_INTERVAL_MINUTES:
-                match_data["interval_minutes"] = Settings.MAX_INTERVAL_MINUTES
+                logger.info(f"Clamped interval_minutes to minimum for event {event_id}")
+            elif event_data["interval_minutes"] > Settings.MAX_INTERVAL_MINUTES:
+                event_data["interval_minutes"] = Settings.MAX_INTERVAL_MINUTES
                 needs_migration = True
-                logger.info(f"Clamped interval_minutes to maximum for match {match_id}")
+                logger.info(f"Clamped interval_minutes to maximum for event {event_id}")
 
-            migrated_data[match_id] = match_data
+            migrated_data[event_id] = event_data
 
             if needs_migration:
                 migration_count += 1
 
         except (ValueError, KeyError) as e:
-            logger.error(f"Error migrating match {match_id_str}: {e}")
+            logger.error(f"Error migrating event {event_id_str}: {e}")
             # Skip problematic entries
             continue
 
     if migration_count > 0:
-        logger.info(f"Migrated {migration_count} matches to new format")
+        logger.info(f"Migrated {migration_count} events to new format")
     else:
-        logger.debug("No migration needed - all matches already in current format")
+        logger.debug("No migration needed - all events already in current format")
 
     return migrated_data
 
@@ -149,10 +149,10 @@ def run_migration() -> bool:
         with open(data_file, "r", encoding="utf-8") as f:
             raw_data = json.load(f)
 
-        logger.info(f"Loaded {len(raw_data)} matches from {data_file}")
+        logger.info(f"Loaded {len(raw_data)} events from {data_file}")
 
         # Migrate data
-        migrated_data = migrate_matches_data(raw_data)
+        migrated_data = migrate_events_data(raw_data)
 
         # Save migrated data
         with open(data_file, "w", encoding="utf-8") as f:
@@ -193,11 +193,11 @@ def check_migration_needed() -> bool:
             data = json.load(f)
 
         # Check a few entries to see if migration is needed
-        for match_data in list(data.values())[:3]:  # Check first 3 entries
+        for event_data in list(data.values())[:3]:  # Check first 3 entries
             if (
-                "interval_minutes" not in match_data
-                or "is_paused" not in match_data
-                or "created_at" not in match_data
+                "interval_minutes" not in event_data
+                or "is_paused" not in event_data
+                or "created_at" not in event_data
             ):
                 return True
 
@@ -219,8 +219,8 @@ def get_migration_status() -> Dict[str, Any]:
     status = {
         "file_exists": os.path.exists(data_file),
         "migration_needed": False,
-        "total_matches": 0,
-        "matches_needing_migration": 0,
+        "total_events": 0,
+        "events_needing_migration": 0,
         "backup_available": False,
     }
 
@@ -229,17 +229,17 @@ def get_migration_status() -> Dict[str, Any]:
             with open(data_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            status["total_matches"] = len(data)
+            status["total_events"] = len(data)
 
-            for match_data in data.values():
+            for event_data in data.values():
                 if (
-                    "interval_minutes" not in match_data
-                    or "is_paused" not in match_data
-                    or "created_at" not in match_data
+                    "interval_minutes" not in event_data
+                    or "is_paused" not in event_data
+                    or "created_at" not in event_data
                 ):
-                    status["matches_needing_migration"] += 1
+                    status["events_needing_migration"] += 1
 
-            status["migration_needed"] = status["matches_needing_migration"] > 0
+            status["migration_needed"] = status["events_needing_migration"] > 0
 
             # Check for existing backups
             import glob
@@ -252,3 +252,7 @@ def get_migration_status() -> Dict[str, Any]:
         logger.error(f"Error getting migration status: {e}")
 
     return status
+
+
+# Legacy compatibility aliases
+migrate_matches_data = migrate_events_data

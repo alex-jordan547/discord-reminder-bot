@@ -69,7 +69,7 @@ Pewee ORM models for all data entities:
 
 - **Guild**: Discord server information and settings
 - **User**: User information per guild
-- **Event**: Events being monitored (formerly "matches")
+- **Event**: Events being monitored (formerly called "matches")
 - **Reaction**: User reactions to events
 - **ReminderLog**: History of sent reminders
 

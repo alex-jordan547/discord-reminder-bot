@@ -28,12 +28,12 @@ def main():
         print("✓ Settings configuration accessible")
 
         # Test basic model imports
-        from models.reminder import MatchReminder  # noqa: F401
+        from models.reminder import Event  # noqa: F401
 
-        print("✓ MatchReminder model accessible")
+        print("✓ Event model accessible")
 
         # Test persistence layer
-        from persistence.storage import load_matches, save_matches  # noqa: F401
+        from persistence.storage import load_events, save_events  # noqa: F401
 
         print("✓ Persistence layer accessible")
 

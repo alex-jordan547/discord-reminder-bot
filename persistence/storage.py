@@ -1,7 +1,7 @@
 """
 Storage and persistence module for Discord Reminder Bot.
 
-This module handles saving and loading match reminder data to/from JSON files.
+This module handles saving and loading event data to/from JSON files.
 It provides functions to persist the application state across restarts.
 """
 
@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 
-from models.reminder import Reminder
+from models.reminder import Event
 
 # Constants
 SAVE_FILE = "watched_reminders.json"
@@ -25,45 +25,50 @@ logger = logging.getLogger(__name__)
 _file_lock = asyncio.Lock()
 
 
-def save_matches(watched_matches: Dict[int, Reminder]) -> bool:
+def save_events(watched_events: Dict[int, Event]) -> bool:
     """
-    Save the watched matches dictionary to a JSON file.
+    Save the watched events dictionary to a JSON file.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to Reminder instances
+        watched_events: Dictionary mapping message IDs to Event instances
 
     Returns:
         bool: True if save was successful, False otherwise
     """
     try:
-        # Convert Reminder instances to dictionaries for JSON serialization
-        data = {str(k): v.to_dict() for k, v in watched_matches.items()}
+        # Convert Event instances to dictionaries for JSON serialization
+        data = {str(k): v.to_dict() for k, v in watched_events.items()}
 
         with open(SAVE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        logger.debug(f"Successfully saved {len(watched_matches)} matches to {SAVE_FILE}")
+        logger.debug(f"Successfully saved {len(watched_events)} events to {SAVE_FILE}")
         return True
 
     except IOError as e:
-        logger.error(f"Failed to save matches to {SAVE_FILE}: {e}")
+        logger.error(f"Failed to save events to {SAVE_FILE}: {e}")
         return False
     except json.JSONEncodeError as e:
-        logger.error(f"Failed to encode matches to JSON: {e}")
+        logger.error(f"Failed to encode events to JSON: {e}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error while saving matches: {e}")
+        logger.error(f"Unexpected error while saving events: {e}")
         return False
 
+# Legacy compatibility
+def save_matches(watched_matches: Dict[int, Event]) -> bool:
+    """Save watched events (legacy compatibility)."""
+    return save_events(watched_matches)
 
-def load_matches() -> Dict[int, Reminder]:
+
+def load_events() -> Dict[int, Event]:
     """
-    Load watched matches from the JSON save file.
+    Load watched events from the JSON save file.
 
     This function now includes automatic migration for older data formats.
 
     Returns:
-        Dict[int, Reminder]: Dictionary mapping message IDs to Reminder instances
+        Dict[int, Event]: Dictionary mapping message IDs to Event instances
         Returns empty dict if file doesn't exist or loading fails
     """
     try:
@@ -78,14 +83,14 @@ def load_matches() -> Dict[int, Reminder]:
         with open(SAVE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Convert dictionaries back to Reminder instances
-        watched_matches = {int(k): Reminder.from_dict(v) for k, v in data.items()}
+        # Convert dictionaries back to Event instances
+        watched_events = {int(k): Event.from_dict(v) for k, v in data.items()}
 
-        logger.info(f"Successfully loaded {len(watched_matches)} matches from {SAVE_FILE}")
-        return watched_matches
+        logger.info(f"Successfully loaded {len(watched_events)} events from {SAVE_FILE}")
+        return watched_events
 
     except FileNotFoundError:
-        logger.info(f"No save file found at {SAVE_FILE}, starting with empty matches")
+        logger.info(f"No save file found at {SAVE_FILE}, starting with empty events")
         return {}
     except json.decoder.JSONDecodeError as e:
         logger.error(f"Failed to decode JSON from {SAVE_FILE}: {e}")
@@ -94,18 +99,23 @@ def load_matches() -> Dict[int, Reminder]:
         logger.error(f"Invalid data structure in {SAVE_FILE}, missing key: {e}")
         return {}
     except Exception as e:
-        logger.error(f"Unexpected error while loading matches: {e}")
+        logger.error(f"Unexpected error while loading events: {e}")
         return {}
 
+# Legacy compatibility
+def load_matches() -> Dict[int, Event]:
+    """Load watched events (legacy compatibility)."""
+    return load_events()
 
-def backup_matches(
-    watched_matches: Dict[int, Reminder], backup_suffix: Optional[str] = None
+
+def backup_events(
+    watched_events: Dict[int, Event], backup_suffix: Optional[str] = None
 ) -> bool:
     """
-    Create a backup of the current matches data.
+    Create a backup of the current events data.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to Reminder instances
+        watched_events: Dictionary mapping message IDs to Event instances
         backup_suffix: Optional suffix for the backup file name
 
     Returns:
@@ -113,15 +123,15 @@ def backup_matches(
     """
     try:
         if backup_suffix:
-            backup_file = f"watched_matches_{backup_suffix}.json"
+            backup_file = f"watched_events_{backup_suffix}.json"
         else:
             from datetime import datetime
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = f"watched_matches_backup_{timestamp}.json"
+            backup_file = f"watched_events_backup_{timestamp}.json"
 
-        # Convert Reminder instances to dictionaries for JSON serialization
-        data = {str(k): v.to_dict() for k, v in watched_matches.items()}
+        # Convert Event instances to dictionaries for JSON serialization
+        data = {str(k): v.to_dict() for k, v in watched_events.items()}
 
         with open(backup_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -133,24 +143,31 @@ def backup_matches(
         logger.error(f"Failed to create backup: {e}")
         return False
 
+# Legacy compatibility
+def backup_matches(
+    watched_matches: Dict[int, Event], backup_suffix: Optional[str] = None
+) -> bool:
+    """Create a backup of events data (legacy compatibility)."""
+    return backup_events(watched_matches, backup_suffix)
 
-async def save_matches_atomic(watched_matches: Dict[int, Reminder]) -> bool:
+
+async def save_events_atomic(watched_events: Dict[int, Event]) -> bool:
     """
-    Save the watched matches dictionary atomically to prevent corruption.
+    Save the watched events dictionary atomically to prevent corruption.
 
     This function uses atomic file operations and locks to ensure thread-safety
     and prevents data corruption during concurrent operations.
 
     Args:
-        watched_matches: Dictionary mapping message IDs to Reminder instances
+        watched_events: Dictionary mapping message IDs to Event instances
 
     Returns:
         bool: True if save was successful, False otherwise
     """
     async with _file_lock:
         try:
-            # Convert Reminder instances to dictionaries for JSON serialization
-            data = {str(k): v.to_dict() for k, v in watched_matches.items()}
+            # Convert Event instances to dictionaries for JSON serialization
+            data = {str(k): v.to_dict() for k, v in watched_events.items()}
 
             # Create temporary file in same directory to ensure atomic operation
             save_path = Path(SAVE_FILE)
@@ -172,7 +189,7 @@ async def save_matches_atomic(watched_matches: Dict[int, Reminder]) -> bool:
                 # Atomic move - this is atomic on most filesystems
                 os.replace(temp_file_path, SAVE_FILE)
 
-                logger.debug(f"Atomically saved {len(watched_matches)} reminders to {SAVE_FILE}")
+                logger.debug(f"Atomically saved {len(watched_events)} events to {SAVE_FILE}")
                 return True
 
             except Exception as e:
@@ -185,25 +202,30 @@ async def save_matches_atomic(watched_matches: Dict[int, Reminder]) -> bool:
                 raise e
 
         except IOError as e:
-            logger.error(f"Failed to save reminders to {SAVE_FILE}: {e}")
+            logger.error(f"Failed to save events to {SAVE_FILE}: {e}")
             return False
         except json.JSONEncodeError as e:
-            logger.error(f"Failed to encode reminders to JSON: {e}")
+            logger.error(f"Failed to encode events to JSON: {e}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error while saving reminders: {e}")
+            logger.error(f"Unexpected error while saving events: {e}")
             return False
 
+# Legacy compatibility
+async def save_matches_atomic(watched_matches: Dict[int, Event]) -> bool:
+    """Save watched events atomically (legacy compatibility)."""
+    return await save_events_atomic(watched_matches)
 
-async def load_matches_safe() -> Dict[int, Reminder]:
+
+async def load_events_safe() -> Dict[int, Event]:
     """
-    Load watched matches from the JSON save file with safety checks.
+    Load watched events from the JSON save file with safety checks.
 
     This function includes retry logic and validation to handle
     concurrent access and potential file corruption.
 
     Returns:
-        Dict[int, Reminder]: Dictionary mapping message IDs to Reminder instances
+        Dict[int, Event]: Dictionary mapping message IDs to Event instances
         Returns empty dict if file doesn't exist or loading fails
     """
     max_retries = 3
@@ -227,24 +249,24 @@ async def load_matches_safe() -> Dict[int, Reminder]:
                 if not isinstance(data, dict):
                     raise ValueError("Invalid data structure: expected dictionary")
 
-                # Convert dictionaries back to Reminder instances with validation
-                watched_matches = {}
+                # Convert dictionaries back to Event instances with validation
+                watched_events = {}
                 for k, v in data.items():
                     try:
                         message_id = int(k)
-                        reminder = Reminder.from_dict(v)
-                        watched_matches[message_id] = reminder
+                        event = Event.from_dict(v)
+                        watched_events[message_id] = event
                     except (ValueError, KeyError, TypeError) as e:
-                        logger.warning(f"Skipping invalid reminder data for key {k}: {e}")
+                        logger.warning(f"Skipping invalid event data for key {k}: {e}")
                         continue
 
                 logger.info(
-                    f"Successfully loaded {len(watched_matches)} reminders from {SAVE_FILE}"
+                    f"Successfully loaded {len(watched_events)} events from {SAVE_FILE}"
                 )
-                return watched_matches
+                return watched_events
 
         except FileNotFoundError:
-            logger.info(f"No save file found at {SAVE_FILE}, starting with empty reminders")
+            logger.info(f"No save file found at {SAVE_FILE}, starting with empty events")
             return {}
         except json.decoder.JSONDecodeError as e:
             if attempt < max_retries - 1:
@@ -259,53 +281,58 @@ async def load_matches_safe() -> Dict[int, Reminder]:
                 return {}
         except Exception as e:
             if attempt < max_retries - 1:
-                logger.warning(f"Error loading reminders on attempt {attempt + 1}, retrying: {e}")
+                logger.warning(f"Error loading events on attempt {attempt + 1}, retrying: {e}")
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
                 continue
             else:
-                logger.error(f"Failed to load reminders after {max_retries} attempts: {e}")
+                logger.error(f"Failed to load events after {max_retries} attempts: {e}")
                 return {}
 
     return {}  # Fallback
 
+# Legacy compatibility
+async def load_matches_safe() -> Dict[int, Event]:
+    """Load watched events safely (legacy compatibility)."""
+    return await load_events_safe()
 
-async def verify_data_integrity(watched_matches: Dict[int, Reminder]) -> bool:
+
+async def verify_data_integrity(watched_events: Dict[int, Event]) -> bool:
     """
-    Verify the integrity of reminder data.
+    Verify the integrity of event data.
 
     Args:
-        watched_matches: Dictionary of reminders to verify
+        watched_events: Dictionary of events to verify
 
     Returns:
         bool: True if data is valid, False otherwise
     """
     try:
-        for message_id, reminder in watched_matches.items():
+        for message_id, event in watched_events.items():
             # Basic type checks
             if not isinstance(message_id, int):
                 logger.error(f"Invalid message_id type: {type(message_id)}")
                 return False
 
-            if not isinstance(reminder, Reminder):
-                logger.error(f"Invalid reminder type: {type(reminder)}")
+            if not isinstance(event, Event):
+                logger.error(f"Invalid event type: {type(event)}")
                 return False
 
             # Check required attributes
             required_attrs = ["message_id", "channel_id", "guild_id", "title"]
             for attr in required_attrs:
-                if not hasattr(reminder, attr):
-                    logger.error(f"Reminder missing required attribute: {attr}")
+                if not hasattr(event, attr):
+                    logger.error(f"Event missing required attribute: {attr}")
                     return False
 
             # Validate data consistency
-            if reminder.message_id != message_id:
+            if event.message_id != message_id:
                 logger.error(
-                    f"Message ID mismatch: key={message_id}, reminder={reminder.message_id}"
+                    f"Message ID mismatch: key={message_id}, event={event.message_id}"
                 )
                 return False
 
-        logger.debug(f"Data integrity check passed for {len(watched_matches)} reminders")
+        logger.debug(f"Data integrity check passed for {len(watched_events)} events")
         return True
 
     except Exception as e:

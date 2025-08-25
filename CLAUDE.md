@@ -96,7 +96,7 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 ├── config/
 │   └── settings.py          # Configuration centralisée
 ├── models/
-│   └── reminder.py          # Modèle MatchReminder
+│   └── reminder.py          # Modèle Event
 ├── persistence/
 │   └── storage.py           # Persistance JSON
 ├── utils/
@@ -112,7 +112,7 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 
 ### Composants principaux
 
-**1. Classe MatchReminder** (`models/reminder.py`)
+**1. Classe Event** (`models/reminder.py`)
 - Structure de données centrale pour l'état des évènements
 - Sérialisation JSON avec `to_dict()`/`from_dict()`
 - Calcul intelligent des rappels avec `is_reminder_due()`
@@ -136,16 +136,16 @@ USE_SEPARATE_REMINDER_CHANNEL=false
 
 ## 🔄 Flux de données principal
 
-### 1. Surveillance d'un match
+### 1. Surveillance d'un événement
 ```
-Commande !watch → parse_message_link() → MatchReminder() → 
-scan réactions existantes → save_matches() → reschedule_reminders()
+Commande !watch → parse_message_link() → Event() → 
+scan réactions existantes → save_events() → reschedule_reminders()
 ```
 
 ### 2. Suivi des réactions
 ```
 Événement Discord → on_reaction_add/remove → 
-update users_who_reacted → save_matches()
+update users_who_reacted → save_events()
 ```
 
 ### 3. Rappels automatiques
@@ -157,9 +157,9 @@ check_reminders_dynamic() → send_reminder() → reschedule_next()
 ## 🛠️ Fonctionnalités spéciales
 
 ### Mode veille intelligent
-- **Activation** : Automatique quand aucun match surveillé
+- **Activation** : Automatique quand aucun événement surveillé
 - **Performance** : Économie de 288 vérifications/jour
-- **Réactivation** : Instantanée lors d'ajout de match
+- **Réactivation** : Instantanée lors d'ajout d'événement
 
 ### Planification dynamique
 - **Précision** : Calcul au timestamp exact du prochain rappel

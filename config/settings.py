@@ -388,14 +388,25 @@ class Messages:
     NO_CHANNEL_PERMISSIONS = "⚠️ Pas les permissions pour créer le canal #{}"
     MENTION_LIMIT_EXCEEDED = "⚠️ +{} autres personnes non mentionnées (limite Discord)"
 
+    # Event-related messages (new terminology)
+    EVENT_ADDED = "✅ Événement ajouté à la surveillance!"
+    EVENT_REMOVED = "✅ Événement **{}** retiré de la surveillance."
+    EVENT_PAUSED = "⏸️ Événement **{}** mis en pause."
+    EVENT_RESUMED = "▶️ Événement **{}** repris."
+    EVENT_NOT_WATCHED = "❌ Cet événement n'est pas surveillé."
+    EVENT_NOT_ON_SERVER = "❌ Cet événement n'est pas sur ce serveur."
+    NO_EVENTS_TO_REMIND = "📭 Aucun événement à rappeler sur ce serveur."
+    NO_WATCHED_EVENTS = "📭 Aucun événement surveillé sur ce serveur."
+    EVENTS_LOADED = "✅ {} événement(s) chargés depuis la sauvegarde"
+
     # Alias pour la compatibilité avec le code existant
     # TODO: Supprimer ces alias après la migration complète
-    MATCH_ADDED = REMINDER_ADDED
-    MATCH_REMOVED = REMINDER_REMOVED
-    MATCH_PAUSED = REMINDER_PAUSED
-    MATCH_RESUMED = REMINDER_RESUMED
-    MATCH_NOT_WATCHED = REMINDER_NOT_WATCHED
-    MATCH_NOT_ON_SERVER = REMINDER_NOT_ON_SERVER
-    NO_MATCHES_TO_REMIND = NO_REMINDERS_TO_REMIND
-    NO_WATCHED_MATCHES = NO_WATCHED_REMINDERS
-    MATCHES_LOADED = REMINDERS_LOADED
+    MATCH_ADDED = EVENT_ADDED
+    MATCH_REMOVED = EVENT_REMOVED
+    MATCH_PAUSED = EVENT_PAUSED
+    MATCH_RESUMED = EVENT_RESUMED
+    MATCH_NOT_WATCHED = EVENT_NOT_WATCHED
+    MATCH_NOT_ON_SERVER = EVENT_NOT_ON_SERVER
+    NO_MATCHES_TO_REMIND = NO_EVENTS_TO_REMIND
+    NO_WATCHED_MATCHES = NO_WATCHED_EVENTS
+    MATCHES_LOADED = EVENTS_LOADED
