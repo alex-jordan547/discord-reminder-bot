@@ -300,19 +300,22 @@ class Event(BaseModel):
         Returns:
             List[int]: User IDs who haven't reacted
         """
-        # Get all users in the guild who aren't bots
-        all_users = User.select().where(
-            (User.guild == self.guild) & 
-            (User.is_bot == False)
-        )
-        all_user_ids = {user.user_id for user in all_users}
+        # Optimized query using LEFT JOIN to find users who haven't reacted
+        from peewee import fn
         
-        # Get users who have reacted
-        reacted_users = Reaction.select().where(Reaction.event == self)
-        reacted_user_ids = {reaction.user_id for reaction in reacted_users}
+        missing_users = (User
+                        .select(User.user_id)
+                        .left_outer_join(Reaction, on=(
+                            (Reaction.user_id == User.user_id) & 
+                            (Reaction.event == self)
+                        ))
+                        .where(
+                            (User.guild == self.guild) & 
+                            (User.is_bot == False) &
+                            (Reaction.id.is_null())
+                        ))
         
-        # Return the difference
-        return list(all_user_ids - reacted_user_ids)
+        return [user.user_id for user in missing_users]
     
     def get_reaction_count(self) -> int:
         """
@@ -414,6 +417,7 @@ class Event(BaseModel):
             (('guild', 'is_paused'), False),  # For finding active events per guild
             (('last_reminder', 'interval_minutes'), False),  # For scheduler queries
             (('guild', 'created_at'), False),  # For chronological queries per guild
+            (('guild', 'is_paused', 'last_reminder'), False),  # Composite index for due events
         )
     
     # Legacy compatibility methods for slash commands

@@ -2,6 +2,38 @@
 
 Guide complet pour éviter les erreurs de CI et maintenir la qualité du code.
 
+## 🗄️ Architecture Base de Données
+
+Le bot utilise maintenant SQLite avec l'ORM Pewee pour la persistance des données.
+
+### Structure de la Base de Données
+
+- **SQLite Database**: `discord_bot.db` (créé automatiquement)
+- **ORM**: Pewee pour la gestion des modèles
+- **Migration**: Migration automatique depuis JSON
+- **Isolation**: Données isolées par serveur Discord (`guild_id`)
+
+### Modèles Principaux
+
+- `Guild`: Serveurs Discord et leurs paramètres
+- `Event`: Événements surveillés pour les rappels
+- `User`: Utilisateurs Discord par serveur
+- `Reaction`: Réactions des utilisateurs aux événements
+- `ReminderLog`: Historique des rappels envoyés
+
+### Commandes de Base de Données
+
+```bash
+# Vérifier le statut de la base de données
+python -c "from models.schema_manager import get_database_status; print(get_database_status())"
+
+# Réinitialiser la base de données (ATTENTION: supprime toutes les données)
+python -c "from models.schema_manager import reset_database; reset_database()"
+
+# Vérifier l'intégrité de la base
+python -c "from models.schema_manager import verify_database_integrity; print(verify_database_integrity())"
+```
+
 ## 🚀 Configuration initiale
 
 ### Pour les nouveaux développeurs
