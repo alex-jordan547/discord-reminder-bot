@@ -80,6 +80,12 @@ class Settings:
 
     # File Configuration
     REMINDERS_SAVE_FILE: str = "watched_reminders.json"
+    
+    # Database Configuration
+    USE_SQLITE: bool = os.getenv("USE_SQLITE", "false").lower() == "true"
+    DATABASE_PATH: str = os.getenv("DATABASE_PATH", "discord_bot.db")
+    AUTO_MIGRATE: bool = os.getenv("AUTO_MIGRATE", "true").lower() == "true"
+    BACKUP_JSON_ON_MIGRATION: bool = os.getenv("BACKUP_JSON_ON_MIGRATION", "true").lower() == "true"
 
     @classmethod
     def validate_interval_minutes(cls, interval_minutes: float) -> float:
@@ -270,6 +276,15 @@ class Settings:
         logger.info(f"Admin roles: {', '.join(cls.ADMIN_ROLES)}")
         logger.info(f"Max mentions per reminder: {cls.MAX_MENTIONS_PER_REMINDER}")
         logger.info(f"Default reactions: {', '.join(cls.DEFAULT_REACTIONS)}")
+        
+        # Log database configuration
+        if cls.USE_SQLITE:
+            logger.info(f"Database: SQLite ({cls.DATABASE_PATH})")
+            logger.info(f"Auto-migration: {'Enabled' if cls.AUTO_MIGRATE else 'Disabled'}")
+            logger.info(f"JSON backup on migration: {'Enabled' if cls.BACKUP_JSON_ON_MIGRATION else 'Disabled'}")
+        else:
+            logger.info("Database: JSON file storage")
+        
         logger.info("==========================================")
 
     @classmethod
