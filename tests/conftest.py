@@ -20,6 +20,9 @@ from peewee import SqliteDatabase
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Import advanced fixture managers
+from tests.fixtures import DiscordMockManager, FixtureManager, TestDatabaseManager
+
 # Set up test environment
 os.environ["TEST_MODE"] = "true"
 os.environ["DISCORD_TOKEN"] = "test_token_for_pytest"
@@ -300,3 +303,207 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.discord)
         if "slow" in item.name.lower() or "performance" in item.name.lower():
             item.add_marker(pytest.mark.slow)
+
+
+# =============================================================================
+# Advanced Fixture Manager Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def fixture_manager():
+    """Provide a FixtureManager instance with automatic cleanup."""
+    manager = FixtureManager()
+    yield manager
+    manager.cleanup()
+
+
+@pytest.fixture
+def discord_mock_manager():
+    """Provide a DiscordMockManager instance with automatic cleanup."""
+    manager = DiscordMockManager()
+    yield manager
+    manager.cleanup()
+
+
+@pytest.fixture
+def test_database_manager():
+    """Provide a TestDatabaseManager instance with automatic cleanup."""
+    manager = TestDatabaseManager(enable_performance_monitoring=True)
+    yield manager
+    manager.cleanup_all()
+
+
+@pytest.fixture
+def isolated_database(test_database_manager, request):
+    """Provide an isolated test database for the current test."""
+    test_id = f"{request.node.name}_{id(request)}"
+    database = test_database_manager.create_test_database(test_id)
+    yield database
+    test_database_manager.cleanup_database(test_id)
+
+
+@pytest.fixture
+def populated_database(test_database_manager, request):
+    """Provide a pre-populated test database with realistic data."""
+    test_id = f"{request.node.name}_{id(request)}_populated"
+    database = test_database_manager.create_test_database(test_id, populate=True)
+    yield {
+        "database": database,
+        "fixture_manager": test_database_manager.get_fixture_manager(test_id),
+        "transaction_manager": test_database_manager.get_transaction_manager(test_id),
+    }
+    test_database_manager.cleanup_database(test_id)
+
+
+@pytest.fixture
+def complete_discord_server(discord_mock_manager):
+    """Provide a complete Discord server setup with guild, channels, and users."""
+    return discord_mock_manager.create_complete_server_mock(
+        guild_name="Test Server", channel_count=3, user_count=5
+    )
+
+
+@pytest.fixture
+def realistic_event_scenario(fixture_manager):
+    """Provide a realistic event scenario with multiple entities."""
+    return fixture_manager.create_complete_scenario("standard")
+
+
+@pytest.fixture
+def transactional_test(populated_database):
+    """Provide a transactional test context that rolls back automatically."""
+    db_info = populated_database
+    with db_info["transaction_manager"].transaction(rollback_on_exit=True):
+        yield db_info
+
+
+# =============================================================================
+# Performance Testing Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def performance_test_database(test_database_manager, request):
+    """Provide a database optimized for performance testing."""
+    test_id = f"{request.node.name}_perf_{id(request)}"
+    database = test_database_manager.create_test_database(
+        test_id,
+        config="minimal",  # Fastest configuration
+        populate=False,  # Don't populate for clean performance tests
+    )
+    yield database
+
+    # Get performance stats before cleanup
+    stats = test_database_manager.get_database_stats(test_id)
+    if stats:
+        print(f"\nPerformance test database stats: {stats}")
+
+    test_database_manager.cleanup_database(test_id)
+
+
+@pytest.fixture
+def stress_test_scenario(fixture_manager):
+    """Provide a stress test scenario with many entities."""
+    return fixture_manager.create_complete_scenario("stress")
+
+
+# =============================================================================
+# Integration Testing Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def full_integration_setup(discord_mock_manager, populated_database):
+    """Provide a complete integration test setup."""
+    server_setup = discord_mock_manager.create_complete_server_mock()
+
+    return {
+        "database": populated_database["database"],
+        "fixture_manager": populated_database["fixture_manager"],
+        "transaction_manager": populated_database["transaction_manager"],
+        "discord_server": server_setup,
+        "bot": server_setup["guild"],  # Main bot context
+        "test_guild": server_setup["guild"],
+        "test_channels": server_setup["channels"],
+        "test_users": server_setup["users"],
+        "test_messages": server_setup["messages"],
+    }
+
+
+# =============================================================================
+# Validation and Debugging Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def validated_mocks(discord_mock_manager):
+    """Provide Discord mocks with automatic relationship validation."""
+    server_setup = discord_mock_manager.create_complete_server_mock()
+
+    yield server_setup
+
+    # Validate relationships after test
+    validation_report = discord_mock_manager.validate_mock_relationships()
+    if not validation_report["valid"]:
+        print(f"\nMock validation failed: {validation_report['errors']}")
+        print(f"Warnings: {validation_report['warnings']}")
+
+
+@pytest.fixture
+def debug_database(populated_database, request):
+    """Provide a database with debug logging and statistics."""
+    db_info = populated_database
+
+    # Log initial state
+    initial_stats = {
+        model.__name__: model.select().count()
+        for model in [
+            db_info["fixture_manager"].Guild,
+            db_info["fixture_manager"].User,
+            db_info["fixture_manager"].Event,
+            db_info["fixture_manager"].Reaction,
+        ]
+        if hasattr(db_info["fixture_manager"], model.__name__)
+    }
+
+    print(f"\nDebug database initial state: {initial_stats}")
+
+    yield db_info
+
+    # Log final state
+    final_stats = {
+        model.__name__: model.select().count()
+        for model in [
+            db_info["fixture_manager"].Guild,
+            db_info["fixture_manager"].User,
+            db_info["fixture_manager"].Event,
+            db_info["fixture_manager"].Reaction,
+        ]
+        if hasattr(db_info["fixture_manager"], model.__name__)
+    }
+
+    print(f"Debug database final state: {final_stats}")
+
+    # Show fixture manager stats
+    fixture_stats = db_info["fixture_manager"].get_fixture_stats()
+    print(f"Fixture manager stats: {fixture_stats}")
+
+
+# =============================================================================
+# Scenario-Based Testing Fixtures
+# =============================================================================
+
+
+@pytest.fixture(params=["minimal", "standard", "complex"])
+def scenario_database(fixture_manager, request):
+    """Provide databases with different scenario complexities."""
+    scenario_name = request.param
+    scenario_data = fixture_manager.create_complete_scenario(scenario_name)
+
+    return {
+        "scenario_name": scenario_name,
+        "scenario_data": scenario_data,
+        "fixture_manager": fixture_manager,
+        "metadata": scenario_data["metadata"],
+    }
