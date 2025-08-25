@@ -192,6 +192,10 @@ def main() -> None:
     async def on_ready():
         await setup_bot_ready(bot)
 
+    # Set up event manager adapter
+    from utils.event_manager_adapter import setup_event_manager_for_bot
+    setup_event_manager_for_bot(bot)
+
     # Register all commands and event handlers
     setup_bot_handlers(bot)
 

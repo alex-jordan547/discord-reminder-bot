@@ -21,7 +21,7 @@ from utils.concurrency import get_concurrency_stats
 from utils.error_recovery import retry_stats, safe_fetch_message, safe_send_message
 from utils.message_parser import extract_message_title, parse_message_link
 from utils.permissions import get_permission_error_message, has_admin_permission
-from utils.reminder_manager import reminder_manager
+from utils.event_manager_adapter import event_manager_adapter as reminder_manager
 from utils.validation import (
     ValidationError,
     get_validation_error_embed,
