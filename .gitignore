@@ -157,3 +157,21 @@ fix_environment.sh
 .Trashes
 ehthumbs.db
 Thumbs.db
+# SQLite databases
+*.db
+*.db-shm  
+*.db-wal
+
+# Deployment reports
+deployment_report_*.json
+staging_validation_report_*.json
+
+# Staging environment
+staging_environment/
+staging_test_data_*/
+staging_backups/
+staging_setup_*.log
+
+# Backup directories
+data/backups/
+.kiro/*
