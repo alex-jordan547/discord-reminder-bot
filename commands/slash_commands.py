@@ -20,7 +20,7 @@ from models.reminder import Event
 from utils.error_recovery import retry_stats, safe_fetch_message
 from utils.message_parser import extract_message_title, parse_message_link
 from utils.permissions import has_admin_permission
-from utils.reminder_manager import reminder_manager
+from utils.event_manager_adapter import event_manager_adapter as reminder_manager
 from utils.validation import ValidationError, get_validation_error_embed, validate_message_link
 
 # Get logger for this module
@@ -34,14 +34,27 @@ async def send_error_to_user(
     Send a descriptive error message to the user via interaction.
 
     Args:
-        interaction: Discord interaction to send the message to
+        interaction: Discord interaction to send the messages to
         error: The exception that occurred
         context: Additional context about what was being attempted
     """
-    error_msg = f"❌ **Erreur** ({error.__class__.__name__})"
-    if context:
-        error_msg += f" lors de {context}"
-    error_msg += f"\n💬 **Description**: {str(error)}"
+    # Handle database-specific errors
+    if "database" in str(error).lower() or "sqlite" in str(error).lower():
+        error_msg = f"❌ **Erreur de base de données**"
+        if context:
+            error_msg += f" lors de {context}"
+        error_msg += f"\n💬 **Description**: Problème de connexion à la base de données"
+        error_msg += f"\n🔧 **Action**: Veuillez réessayer dans quelques instants"
+    elif "IntegrityError" in error.__class__.__name__:
+        error_msg = f"❌ **Erreur de données**"
+        if context:
+            error_msg += f" lors de {context}"
+        error_msg += f"\n💬 **Description**: Conflit de données (élément déjà existant)"
+    else:
+        error_msg = f"❌ **Erreur** ({error.__class__.__name__})"
+        if context:
+            error_msg += f" lors de {context}"
+        error_msg += f"\n💬 **Description**: {str(error)}"
 
     logger.error(f"Error in {context}: {error}")
 
@@ -204,9 +217,9 @@ class SlashCommands(commands.Cog):
                     return
 
             # Replanifier les rappels après ajout/modification
-            from commands.handlers import reschedule_reminders
-
-            reschedule_reminders()
+            from utils.event_manager_adapter import get_scheduler_functions
+            _, reschedule_func, _ = get_scheduler_functions()
+            reschedule_func()
 
             # Create success embed - different for new watch vs edit
             if is_existing_watch:
@@ -335,9 +348,9 @@ class SlashCommands(commands.Cog):
                 return
 
             # Replanifier les rappels après suppression
-            from commands.handlers import reschedule_reminders
-
-            reschedule_reminders()
+            from utils.event_manager_adapter import get_scheduler_functions
+            _, reschedule_func, _ = get_scheduler_functions()
+            reschedule_func()
 
             embed = discord.Embed(
                 title="✅ Événement retiré de la surveillance",
@@ -545,9 +558,9 @@ class SlashCommands(commands.Cog):
             return
 
         # Replanifier les rappels après modification
-        from commands.handlers import reschedule_reminders
-
-        reschedule_reminders()
+        from utils.event_manager_adapter import get_scheduler_functions
+        _, reschedule_func, _ = get_scheduler_functions()
+        reschedule_func()
 
         embed = discord.Embed(
             title="✅ Intervalle mis à jour", color=discord.Color.green(), timestamp=datetime.now()
@@ -617,9 +630,9 @@ class SlashCommands(commands.Cog):
             return
 
         # Replanifier les rappels après modification
-        from commands.handlers import reschedule_reminders
-
-        reschedule_reminders()
+        from utils.event_manager_adapter import get_scheduler_functions
+        _, reschedule_func, _ = get_scheduler_functions()
+        reschedule_func()
 
         embed = discord.Embed(
             title="⏸️ Rappels mis en pause",
@@ -676,9 +689,9 @@ class SlashCommands(commands.Cog):
             return
 
         # Replanifier les rappels après modification
-        from commands.handlers import reschedule_reminders
-
-        reschedule_reminders()
+        from utils.event_manager_adapter import get_scheduler_functions
+        _, reschedule_func, _ = get_scheduler_functions()
+        reschedule_func()
 
         embed = discord.Embed(
             title="▶️ Rappels repris",
@@ -694,6 +707,268 @@ class SlashCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(f"Resumed reminders for event {message_id}")
+
+    @app_commands.command(name="db_status", description="Afficher le statut de la base de données (admin)")
+    async def db_status(self, interaction: discord.Interaction):
+        """Show database status and statistics."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            from utils.event_manager_adapter import get_backend_info, event_manager_adapter
+            
+            # Get backend information
+            backend_info = get_backend_info()
+            stats = event_manager_adapter.get_stats()
+            
+            embed = discord.Embed(
+                title="📊 Statut de la Base de Données",
+                color=discord.Color.blue(),
+                timestamp=datetime.now(),
+            )
+            
+            # Backend information
+            embed.add_field(
+                name="🔧 Type de Backend",
+                value=f"**{backend_info['backend_type']}**",
+                inline=True,
+            )
+            
+            if backend_info['backend_type'] == 'SQLite':
+                embed.add_field(
+                    name="💾 Base de Données",
+                    value=backend_info.get('database_path', 'N/A'),
+                    inline=True,
+                )
+                
+                if 'database_size' in backend_info:
+                    embed.add_field(
+                        name="📏 Taille",
+                        value=f"{backend_info['database_size']} MB",
+                        inline=True,
+                    )
+            
+            # Statistics
+            embed.add_field(
+                name="📈 Statistiques",
+                value=f"**Total événements**: {stats['total_events']}\n"
+                      f"**Événements actifs**: {stats['active_events']}\n"
+                      f"**Événements en pause**: {stats['paused_events']}\n"
+                      f"**Serveurs avec événements**: {stats['guilds_with_events']}",
+                inline=False,
+            )
+            
+            # Performance info for SQLite
+            if backend_info['backend_type'] == 'SQLite':
+                try:
+                    from utils.concurrency_sqlite import sqlite_concurrency_stats
+                    concurrency_stats = sqlite_concurrency_stats.get_stats()
+                    
+                    embed.add_field(
+                        name="⚡ Performance SQLite",
+                        value=f"**Transactions traitées**: {concurrency_stats.get('transactions_processed', 0)}\n"
+                              f"**Mises à jour de réactions**: {concurrency_stats.get('reaction_updates_processed', 0)}\n"
+                              f"**Opérations en attente**: {concurrency_stats.get('pending_operations', 0)}",
+                        inline=False,
+                    )
+                except Exception as e:
+                    embed.add_field(
+                        name="⚠️ Performance",
+                        value=f"Impossible de récupérer les statistiques: {e}",
+                        inline=False,
+                    )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await send_error_to_user(interaction, e, "la récupération du statut de la base de données")
+
+    @app_commands.command(name="db_migrate", description="Migrer manuellement vers SQLite (admin)")
+    async def db_migrate(self, interaction: discord.Interaction):
+        """Manually trigger migration to SQLite."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True,
+            )
+            return
+
+        # Defer response for longer processing
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            from utils.event_manager_adapter import get_backend_info
+            backend_info = get_backend_info()
+            
+            if backend_info['backend_type'] == 'SQLite':
+                await interaction.followup.send(
+                    "ℹ️ Le système utilise déjà SQLite. Aucune migration nécessaire.",
+                    ephemeral=True
+                )
+                return
+            
+            # For JSON to SQLite migration, we would need to implement the migration logic
+            embed = discord.Embed(
+                title="🚧 Migration Non Disponible",
+                description="La migration automatique JSON → SQLite n'est pas encore implémentée.\n"
+                           "Veuillez utiliser la variable d'environnement `USE_SQLITE=true` et redémarrer le bot.",
+                color=discord.Color.orange(),
+                timestamp=datetime.now(),
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await send_error_to_user(interaction, e, "la migration de la base de données")
+
+    @app_commands.command(name="db_optimize", description="Optimiser la base de données SQLite (admin)")
+    async def db_optimize(self, interaction: discord.Interaction):
+        """Optimize the SQLite database."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True,
+            )
+            return
+
+        # Defer response for processing
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            from utils.event_manager_adapter import get_backend_info
+            backend_info = get_backend_info()
+            
+            if backend_info['backend_type'] != 'SQLite':
+                await interaction.followup.send(
+                    "❌ L'optimisation n'est disponible que pour les bases de données SQLite.",
+                    ephemeral=True
+                )
+                return
+            
+            # Perform SQLite optimization
+            from persistence.database import get_database
+            database = get_database()
+            
+            # Run VACUUM to optimize database
+            database.execute_sql('VACUUM;')
+            
+            # Run ANALYZE to update statistics
+            database.execute_sql('ANALYZE;')
+            
+            # Get updated size info
+            updated_info = get_backend_info()
+            
+            embed = discord.Embed(
+                title="✅ Optimisation Terminée",
+                description="La base de données SQLite a été optimisée avec succès.",
+                color=discord.Color.green(),
+                timestamp=datetime.now(),
+            )
+            
+            if 'database_size' in updated_info:
+                embed.add_field(
+                    name="📏 Nouvelle Taille",
+                    value=f"{updated_info['database_size']} MB",
+                    inline=True,
+                )
+            
+            embed.add_field(
+                name="🔧 Opérations Effectuées",
+                value="• VACUUM (compactage)\n• ANALYZE (mise à jour des statistiques)",
+                inline=False,
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Database optimization completed by {interaction.user}")
+            
+        except Exception as e:
+            await send_error_to_user(interaction, e, "l'optimisation de la base de données")
+
+    @app_commands.command(name="db_backup", description="Créer une sauvegarde de la base de données (admin)")
+    async def db_backup(self, interaction: discord.Interaction):
+        """Create a backup of the database."""
+        # Check permissions
+        if not has_admin_permission(interaction.user):
+            await interaction.response.send_message(
+                f"❌ Vous devez avoir l'un de ces rôles: {Settings.get_admin_roles_str()}",
+                ephemeral=True,
+            )
+            return
+
+        # Defer response for processing
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            from utils.event_manager_adapter import get_backend_info
+            backend_info = get_backend_info()
+            
+            if backend_info['backend_type'] != 'SQLite':
+                await interaction.followup.send(
+                    "❌ La sauvegarde automatique n'est disponible que pour SQLite.\n"
+                    "Pour JSON, les fichiers sont déjà sauvegardés automatiquement.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create backup
+            import shutil
+            import os
+            from datetime import datetime
+            
+            db_path = backend_info.get('database_path', 'discord_bot.db')
+            backup_dir = 'data/backups'
+            
+            # Ensure backup directory exists
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # Create backup filename with timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_filename = f"discord_bot_backup_{timestamp}.db"
+            backup_path = os.path.join(backup_dir, backup_filename)
+            
+            # Copy database file
+            shutil.copy2(db_path, backup_path)
+            
+            # Get backup file size
+            backup_size = os.path.getsize(backup_path) / (1024 * 1024)  # MB
+            
+            embed = discord.Embed(
+                title="✅ Sauvegarde Créée",
+                description=f"La base de données a été sauvegardée avec succès.",
+                color=discord.Color.green(),
+                timestamp=datetime.now(),
+            )
+            
+            embed.add_field(
+                name="📁 Fichier de Sauvegarde",
+                value=f"`{backup_filename}`",
+                inline=False,
+            )
+            
+            embed.add_field(
+                name="📏 Taille",
+                value=f"{backup_size:.2f} MB",
+                inline=True,
+            )
+            
+            embed.add_field(
+                name="📍 Emplacement",
+                value=f"`{backup_path}`",
+                inline=False,
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Database backup created: {backup_path} by {interaction.user}")
+            
+        except Exception as e:
+            await send_error_to_user(interaction, e, "la création de la sauvegarde")
 
     @app_commands.command(name="status", description="Afficher le statut détaillé d'un rappel")
     @app_commands.describe(message="Lien du message dont afficher le statut")

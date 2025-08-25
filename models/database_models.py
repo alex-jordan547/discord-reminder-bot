@@ -416,6 +416,80 @@ class Event(BaseModel):
             (('guild', 'created_at'), False),  # For chronological queries per guild
         )
     
+    # Legacy compatibility methods for slash commands
+    def get_response_count(self) -> int:
+        """Legacy compatibility method."""
+        return self.get_reaction_count()
+    
+    def get_missing_count(self) -> int:
+        """Legacy compatibility method."""
+        return self.missing_users_count
+    
+    def get_status_summary(self) -> Dict[str, Any]:
+        """
+        Get a comprehensive status summary for this event (legacy compatibility).
+        
+        Returns:
+            Dict containing status information for display
+        """
+        from datetime import timedelta
+        
+        time_until_next = self.get_next_reminder_time() - datetime.now()
+        
+        return {
+            "title": self.title,
+            "message_id": self.message_id,
+            "channel_id": self.channel_id,
+            "guild_id": self.guild.guild_id,
+            "interval_minutes": self.interval_minutes,
+            "is_paused": self.is_paused,
+            "response_count": self.get_response_count(),
+            "missing_count": self.get_missing_count(),
+            "total_count": self.get_total_users_count(),
+            "response_percentage": self.response_percentage,
+            "next_reminder": self.get_next_reminder_time(),
+            "time_until_next": time_until_next,
+            "is_overdue": time_until_next.total_seconds() < 0,
+            "created_at": self.created_at,
+        }
+    
+    async def update_accessible_users(self, bot_instance) -> None:
+        """
+        Update the list of users who can access the event's channel (legacy compatibility).
+        For SQLite, this updates the User table with current guild members.
+        
+        Args:
+            bot_instance: The Discord bot instance
+        """
+        try:
+            # Get the guild and channel
+            guild = bot_instance.get_guild(self.guild.guild_id)
+            if not guild:
+                return
+
+            channel = guild.get_channel(self.channel_id)
+            if not channel:
+                return
+
+            # Update users in the database
+            for member in guild.members:
+                if not member.bot:
+                    permissions = channel.permissions_for(member)
+                    if permissions.view_channel and permissions.send_messages:
+                        # Ensure user exists in database
+                        User.get_or_create(
+                            user_id=member.id,
+                            guild=self.guild,
+                            defaults={
+                                'username': member.display_name,
+                                'is_bot': member.bot,
+                                'last_seen': datetime.now()
+                            }
+                        )
+
+        except Exception as e:
+            logger.warning(f"Failed to update accessible users for event {self.message_id}: {e}")
+
     def __str__(self) -> str:
         return f"Event({self.message_id}, {self.title}, Guild:{self.guild.guild_id})"
 

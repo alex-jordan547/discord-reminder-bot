@@ -295,8 +295,23 @@ def get_backend_info() -> Dict[str, Any]:
     
     if use_sqlite:
         try:
-            from persistence.database import get_database_info
-            info.update(get_database_info())
+            # Get database information
+            import os
+            db_path = "discord_bot.db"  # Default path
+            
+            if os.path.exists(db_path):
+                db_size = os.path.getsize(db_path) / (1024 * 1024)  # MB
+                info.update({
+                    "database_path": db_path,
+                    "database_size": round(db_size, 2),
+                    "database_exists": True
+                })
+            else:
+                info.update({
+                    "database_path": db_path,
+                    "database_exists": False
+                })
+                
         except Exception as e:
             info["database_error"] = str(e)
     
