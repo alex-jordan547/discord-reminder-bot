@@ -41,7 +41,29 @@ cp .env.example .env
 # Or manually: python bot.py
 ```
 
-### Docker Deployment
+### Production Docker Deployment
+
+**Pull from GitHub Container Registry (GHCR):**
+
+```bash
+# Pull the latest production-ready image
+docker pull ghcr.io/alex-jordan547/discord-reminder-bot:latest
+
+# Run with your configuration
+docker run -d \
+  --name discord-reminder-bot \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  ghcr.io/alex-jordan547/discord-reminder-bot:latest
+```
+
+**Available Image Tags:**
+- `ghcr.io/alex-jordan547/discord-reminder-bot:latest` - Latest production build
+- `ghcr.io/alex-jordan547/discord-reminder-bot:main-YYYY-MM-DD` - Date-tagged releases
+- `ghcr.io/alex-jordan547/discord-reminder-bot:vX.Y.Z` - Semantic version releases
+
+### Local Docker Development
 
 ```bash
 # Development with auto-rebuild

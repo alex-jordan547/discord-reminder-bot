@@ -60,9 +60,10 @@ README.md
 *.md
 docs/
 
-# Test files (allow tests/ directory for Docker builds)
+# Test files (exclude from production build)
 test_*.py
 *_test.py
+tests/
 
 # Log files
 *.log
@@ -71,8 +72,9 @@ logs/
 # Data directories (will be mounted as volumes)
 data/
 
-# Development files (allow pyproject.toml for Docker builds)
+# Development files (exclude from production)
 requirements-dev.txt
+pyproject.toml
 
 # Backup files
 *_original.py
@@ -82,11 +84,28 @@ bot_original.py
 bot_new.py
 bot_new_unused.py
 
-# Migration and verification scripts
+# Development and migration scripts
 verify_imports.py
 test_loading.py
 test_compatibility.json
+scripts/
+run_dev.sh
+prepare_commit.sh
+Makefile
 
-# Build artifacts
+# Build artifacts and CI files
 *.tar.gz
 *.zip
+bandit-report.json
+safety-report.json
+coverage.xml
+htmlcov/
+pytest.xml
+.pytest_cache/
+.coverage
+
+# GitHub workflows (not needed in container)
+.github/
+
+# Issue tracking
+issues/

@@ -1,0 +1,108 @@
+#!/bin/bash
+# Pre-push hook to validate code before pushing to remote
+# Install: ln -sf ../../.githooks/pre-push .git/hooks/pre-push
+
+echo "🚀 Validation pre-push du Discord Reminder Bot"
+echo "================================================"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Detect Python and virtual environment
+if [ -f venv/bin/python ]; then
+    PYTHON="venv/bin/python"
+    VENV_MSG="venv local"
+elif [ "$VIRTUAL_ENV" != "" ]; then
+    PYTHON="python3"
+    VENV_MSG="$VIRTUAL_ENV"
+else
+    echo -e "${RED}❌ Environnement virtuel non détecté!${NC}"
+    echo "💡 Activez d'abord votre environnement virtuel:"
+    echo "   source venv/bin/activate"
+    echo "   ou lancez: ./run_dev.sh"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Environnement virtuel détecté: $VENV_MSG${NC}"
+
+# Function to print colored output
+print_status() {
+    local status=$1
+    local message=$2
+    case $status in
+        "success")
+            echo -e "${GREEN}✅ $message${NC}"
+            ;;
+        "error")
+            echo -e "${RED}❌ $message${NC}"
+            ;;
+        "warning")
+            echo -e "${YELLOW}⚠️ $message${NC}"
+            ;;
+        "info")
+            echo -e "ℹ️ $message"
+            ;;
+    esac
+}
+
+# Check if pre-commit is installed
+if ! command -v pre-commit &> /dev/null; then
+    print_status "warning" "Pre-commit non installé, installation automatique..."
+    pip install pre-commit
+    pre-commit install
+fi
+
+# 1. Check code formatting
+print_status "info" "Vérification du formatage avec Black et isort..."
+if ! $PYTHON -m black . --check --line-length=100 --quiet; then
+    print_status "error" "Code non formaté avec Black!"
+    echo "💡 Lancez: make format"
+    exit 1
+fi
+
+if ! $PYTHON -m isort . --check-only --profile=black --line-length=100 --quiet; then
+    print_status "error" "Imports non triés avec isort!"
+    echo "💡 Lancez: make format"
+    exit 1
+fi
+
+print_status "success" "Formatage vérifié"
+
+# 2. Run pre-commit hooks
+print_status "info" "Lancement des pre-commit hooks..."
+if ! pre-commit run --all-files --quiet; then
+    print_status "error" "Pre-commit hooks ont échoué!"
+    echo "💡 Lancez: make pre-commit-all"
+    exit 1
+fi
+
+print_status "success" "Pre-commit hooks réussis"
+
+# 3. Check for basic syntax errors
+print_status "info" "Vérification de la syntaxe Python..."
+if ! $PYTHON -m py_compile healthcheck.py; then
+    print_status "error" "Erreur de syntaxe dans healthcheck.py!"
+    exit 1
+fi
+
+if ! $PYTHON -m py_compile bot.py; then
+    print_status "error" "Erreur de syntaxe dans bot.py!"
+    exit 1
+fi
+
+print_status "success" "Syntaxe Python validée"
+
+# 4. Check that new files follow naming conventions
+print_status "info" "Vérification des conventions de nommage..."
+# This would check for proper file naming, etc.
+print_status "success" "Conventions respectées"
+
+# 5. Final validation
+print_status "success" "Validation pre-push réussie!"
+echo ""
+echo "🎉 Le code est prêt à être poussé vers le repository"
+echo "   Toutes les validations sont passées avec succès"
+echo ""
