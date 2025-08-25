@@ -1,0 +1,13 @@
+{
+  "test_data_size": 50,
+  "anonymize_data": true,
+  "test_migration": true,
+  "test_rollback": true,
+  "test_error_scenarios": true,
+  "test_performance": true,
+  "test_concurrency": true,
+  "performance_threshold_ms": 2000,
+  "concurrent_operations": 5,
+  "cleanup_after_tests": true,
+  "create_detailed_report": true
+}

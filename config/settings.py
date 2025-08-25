@@ -86,6 +86,16 @@ class Settings:
     DATABASE_PATH: str = os.getenv("DATABASE_PATH", "discord_bot.db")
     AUTO_MIGRATE: bool = os.getenv("AUTO_MIGRATE", "true").lower() == "true"
     BACKUP_JSON_ON_MIGRATION: bool = os.getenv("BACKUP_JSON_ON_MIGRATION", "true").lower() == "true"
+    
+    # Feature Flags Configuration
+    ENABLE_FEATURE_FLAGS: bool = os.getenv("ENABLE_FEATURE_FLAGS", "true").lower() == "true"
+    ENABLE_AUTO_FALLBACK: bool = os.getenv("ENABLE_AUTO_FALLBACK", "true").lower() == "true"
+    ENABLE_HEALTH_MONITORING: bool = os.getenv("ENABLE_HEALTH_MONITORING", "true").lower() == "true"
+    
+    # Fallback Configuration
+    FALLBACK_RETRY_DELAY_MINUTES: int = int(os.getenv("FALLBACK_RETRY_DELAY_MINUTES", "30"))
+    MAX_FALLBACK_RETRIES: int = int(os.getenv("MAX_FALLBACK_RETRIES", "3"))
+    DEGRADED_MODE_TIMEOUT_HOURS: int = int(os.getenv("DEGRADED_MODE_TIMEOUT_HOURS", "24"))
 
     @classmethod
     def validate_interval_minutes(cls, interval_minutes: float) -> float:
@@ -284,6 +294,14 @@ class Settings:
             logger.info(f"JSON backup on migration: {'Enabled' if cls.BACKUP_JSON_ON_MIGRATION else 'Disabled'}")
         else:
             logger.info("Database: JSON file storage")
+        
+        # Log feature flags configuration
+        if cls.ENABLE_FEATURE_FLAGS:
+            logger.info("Feature flags: Enabled")
+            logger.info(f"Auto-fallback: {'Enabled' if cls.ENABLE_AUTO_FALLBACK else 'Disabled'}")
+            logger.info(f"Health monitoring: {'Enabled' if cls.ENABLE_HEALTH_MONITORING else 'Disabled'}")
+        else:
+            logger.info("Feature flags: Disabled")
         
         logger.info("==========================================")
 
