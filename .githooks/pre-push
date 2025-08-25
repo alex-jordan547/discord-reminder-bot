@@ -40,13 +40,13 @@ fi
 
 # 1. Check code formatting
 print_status "info" "Vérification du formatage avec Black et isort..."
-if ! python -m black . --check --line-length=100 --quiet; then
+if ! python3 -m black . --check --line-length=100 --quiet; then
     print_status "error" "Code non formaté avec Black!"
     echo "💡 Lancez: make format"
     exit 1
 fi
 
-if ! python -m isort . --check-only --profile=black --line-length=100 --quiet; then
+if ! python3 -m isort . --check-only --profile=black --line-length=100 --quiet; then
     print_status "error" "Imports non triés avec isort!"
     echo "💡 Lancez: make format"
     exit 1
@@ -66,12 +66,12 @@ print_status "success" "Pre-commit hooks réussis"
 
 # 3. Check for basic syntax errors
 print_status "info" "Vérification de la syntaxe Python..."
-if ! python -m py_compile healthcheck.py; then
+if ! python3 -m py_compile healthcheck.py; then
     print_status "error" "Erreur de syntaxe dans healthcheck.py!"
     exit 1
 fi
 
-if ! python -m py_compile bot.py; then
+if ! python3 -m py_compile bot.py; then
     print_status "error" "Erreur de syntaxe dans bot.py!"
     exit 1
 fi

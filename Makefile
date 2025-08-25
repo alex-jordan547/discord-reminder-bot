@@ -105,24 +105,24 @@ dev-test: ## Lance les tests localement
 # Formatage et qualité de code
 format: ## Formate automatiquement tout le code
 	@echo "🎨 Formatage du code avec Black..."
-	python -m black . --line-length=100
+	python3 -m black . --line-length=100
 	@echo "📦 Tri des imports avec isort..."
-	python -m isort . --profile=black --line-length=100
+	python3 -m isort . --profile=black --line-length=100
 	@echo "✅ Formatage terminé!"
 
 format-check: ## Vérifie le formatage sans modifier
 	@echo "🔍 Vérification du formatage..."
-	python -m black . --check --line-length=100
-	python -m isort . --check-only --profile=black --line-length=100
+	python3 -m black . --check --line-length=100
+	python3 -m isort . --check-only --profile=black --line-length=100
 	@echo "✅ Formatage vérifié!"
 
 lint: ## Lance tous les outils de vérification
 	@echo "🔍 Analyse avec flake8..."
-	python -m flake8 --max-line-length=100 --ignore=E203,W503
+	python3 -m flake8 --max-line-length=100 --ignore=E203,W503
 	@echo "🔒 Scan de sécurité avec bandit..."
-	python -m bandit -r . --skip B101 -f json -o bandit-report.json || true
+	python3 -m bandit -r . --skip B101 -f json -o bandit-report.json || true
 	@echo "🎯 Vérification des types avec mypy..."
-	python -m mypy --ignore-missing-imports . || true
+	python3 -m mypy --ignore-missing-imports . || true
 	@echo "✅ Analyse terminée!"
 
 pre-commit-all: ## Lance tous les pre-commit hooks sur tous les fichiers
