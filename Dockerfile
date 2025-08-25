@@ -34,11 +34,14 @@ COPY models/ ./models/
 COPY persistence/ ./persistence/
 COPY utils/ ./utils/
 COPY bot.py .
+COPY healthcheck.py .
 
 # Validate imports and basic functionality
 RUN python -c "import discord; print('✓ discord.py imports successfully')"
 RUN python -c "import bot; print('✓ Bot module imports successfully')"
 RUN python -m py_compile bot.py && echo "✓ Bot syntax validation passed"
+RUN python -m py_compile healthcheck.py && echo "✓ Health check script validation passed"
+RUN python healthcheck.py && echo "✓ Health check execution successful"
 
 # Production Stage - Minimal runtime environment
 # ==============================================
@@ -61,9 +64,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Create non-root user early for security
-RUN groupadd --gid 1000 app \
-    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash app
+# Create non-root system user for enhanced security
+RUN groupadd --system --gid 1000 app \
+    && useradd --system --uid 1000 --gid 1000 --no-create-home --shell /bin/false app
 
 # Copy Python environment from builder
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
@@ -76,6 +79,7 @@ COPY --from=builder --chown=app:app /build/models/ ./models/
 COPY --from=builder --chown=app:app /build/persistence/ ./persistence/
 COPY --from=builder --chown=app:app /build/utils/ ./utils/
 COPY --from=builder --chown=app:app /build/bot.py ./
+COPY --from=builder --chown=app:app /build/healthcheck.py ./
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/data /app/logs \
@@ -86,13 +90,7 @@ USER app
 
 # Health check - verify production readiness
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "\
-import sys; \
-import discord; \
-import bot; \
-from config.settings import Settings; \
-print('✓ Health check passed - all modules ready'); \
-sys.exit(0)" || exit 1
+    CMD ["python", "healthcheck.py"]
 
 # Expose common port (though bot doesn't serve HTTP)
 EXPOSE 8080
