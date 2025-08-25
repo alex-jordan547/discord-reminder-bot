@@ -158,6 +158,41 @@ class Reminder:
         """
         return len(self.all_users)
 
+    async def update_accessible_users(self, bot_instance) -> None:
+        """
+        Update the list of users who can access the reminder's channel.
+        This ensures accurate user counts when switching between servers.
+
+        Args:
+            bot_instance: The Discord bot instance
+        """
+        try:
+            # Get the guild and channel
+            guild = bot_instance.get_guild(self.guild_id)
+            if not guild:
+                return
+
+            channel = guild.get_channel(self.channel_id)
+            if not channel:
+                return
+
+            # Recalculate accessible users for the current server
+            accessible_users = set()
+            for member in guild.members:
+                if not member.bot:
+                    permissions = channel.permissions_for(member)
+                    if permissions.view_channel and permissions.send_messages:
+                        accessible_users.add(member.id)
+
+            # Update the reminder's user list
+            self.all_users = accessible_users
+
+        except Exception as e:
+            # Log error but don't fail - keep existing data as fallback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to update accessible users for reminder {self.message_id}: {e}")
+
     def get_next_reminder_time(self) -> datetime:
         """
         Calculate when the next reminder should be sent.

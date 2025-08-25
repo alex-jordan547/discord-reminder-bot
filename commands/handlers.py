@@ -370,23 +370,8 @@ async def send_reminder(
                     if not user.bot:
                         reminder.users_who_reacted.add(user.id)
 
-        # Filter all_users to only include users who can see the match channel
-        guild = bot_instance.get_guild(reminder.guild_id)
-        if not guild:
-            logger.error(f"Could not find guild {reminder.guild_id}")
-            return 0
-
-        # Get users who can actually see and access the match channel
-        accessible_users = set()
-        for member in guild.members:
-            if not member.bot:
-                # Check if user can view the match channel
-                permissions = match_channel.permissions_for(member)
-                if permissions.view_channel and permissions.send_messages:
-                    accessible_users.add(member.id)
-
-        # Update the reminder's user list to only include accessible users
-        reminder.all_users = accessible_users
+        # Update the reminder's user list to reflect current server state
+        await reminder.update_accessible_users(bot_instance)
 
         # Identify missing users (only from those who can access the channel)
         missing_users = reminder.get_missing_users()
@@ -686,6 +671,9 @@ def setup_bot_handlers(bot_instance: commands.Bot) -> None:
         )
 
         for match_id, reminder in server_matches.items():
+            # Update user counts to reflect current server state
+            await reminder.update_accessible_users(bot)
+            
             channel = bot.get_channel(reminder.channel_id)
             channel_mention = f"<#{reminder.channel_id}>" if channel else "Canal inconnu"
 

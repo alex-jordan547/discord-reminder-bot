@@ -155,9 +155,8 @@ class SlashCommands(commands.Cog):
 
             # Create the reminder (or update existing)
             if is_existing_watch:
-                # Update existing reminder
-                existing_reminder.set_interval(validated_interval)
-                success = await reminder_manager.update_reminder(existing_reminder)
+                # Update existing reminder using thread-safe manager
+                success = await reminder_manager.update_reminder_interval(link_info.message_id, validated_interval)
                 if not success:
                     await interaction.followup.send(
                         "❌ Erreur lors de la mise à jour du rappel.", ephemeral=True
@@ -372,6 +371,9 @@ class SlashCommands(commands.Cog):
         )
 
         for match_id, reminder in server_matches.items():
+            # Update user counts to reflect current server state
+            await reminder.update_accessible_users(self.bot)
+            
             channel = self.bot.get_channel(reminder.channel_id)
             channel_mention = f"<#{reminder.channel_id}>" if channel else "Canal inconnu"
 
@@ -531,10 +533,9 @@ class SlashCommands(commands.Cog):
         # Convert interval from seconds to minutes and validate
         interval_minutes = interval / 60.0
         old_interval = reminder.interval_minutes
-        reminder.set_interval(interval_minutes)
 
         # Update using thread-safe manager
-        success = await reminder_manager.update_reminder(reminder)
+        success = await reminder_manager.update_reminder_interval(message_id, interval_minutes)
         if not success:
             await interaction.response.send_message(
                 "❌ Erreur lors de la mise à jour de l'intervalle.", ephemeral=True
@@ -605,10 +606,8 @@ class SlashCommands(commands.Cog):
             await interaction.response.send_message("⚠️ Ce match est déjà en pause.", ephemeral=True)
             return
 
-        reminder.pause_reminders()
-
-        # Update using thread-safe manager
-        success = await reminder_manager.update_reminder(reminder)
+        # Use thread-safe manager to pause
+        success = await reminder_manager.pause_reminder(message_id)
         if not success:
             await interaction.response.send_message(
                 "❌ Erreur lors de la mise en pause du rappel.", ephemeral=True
@@ -666,10 +665,8 @@ class SlashCommands(commands.Cog):
             )
             return
 
-        reminder.resume_reminders()
-
-        # Update using thread-safe manager
-        success = await reminder_manager.update_reminder(reminder)
+        # Use thread-safe manager to resume
+        success = await reminder_manager.resume_reminder(message_id)
         if not success:
             await interaction.response.send_message(
                 "❌ Erreur lors de la reprise du rappel.", ephemeral=True
@@ -718,6 +715,9 @@ class SlashCommands(commands.Cog):
             await interaction.response.send_message(Messages.MATCH_NOT_ON_SERVER, ephemeral=True)
             return
 
+        # Update user counts to reflect current server state
+        await reminder.update_accessible_users(self.bot)
+        
         status = reminder.get_status_summary()
 
         # Determine status color and emoji
