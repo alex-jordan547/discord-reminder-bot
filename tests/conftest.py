@@ -223,6 +223,33 @@ def clean_database():
         pass  # Ignore cleanup errors
 
 
+@pytest.fixture(scope="function")
+def working_database():
+    """Create a working in-memory database for functional tests."""
+    from peewee import SqliteDatabase
+    from models.database_models import ALL_MODELS, initialize_models
+    
+    # Create in-memory database
+    test_db = SqliteDatabase(':memory:')
+    
+    # Set up test database for all models
+    for model in ALL_MODELS:
+        model._meta.database = test_db
+    
+    # Connect and create tables
+    test_db.connect()
+    test_db.create_tables(ALL_MODELS, safe=True)
+    
+    yield test_db
+    
+    # Clean up
+    try:
+        test_db.drop_tables(ALL_MODELS, safe=True)
+        test_db.close()
+    except Exception:
+        pass  # Ignore cleanup errors
+
+
 @pytest.fixture(autouse=True)
 def setup_test_environment():
     """Automatically set up test environment for all tests."""

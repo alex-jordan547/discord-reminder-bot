@@ -95,12 +95,15 @@ class FixtureManager:
         except Exception as e:
             raise FixtureError(f"Failed to create guild fixture: {e}")
 
-    def create_user(self, **kwargs) -> User:
+    def create_user(self, guild: Optional[Guild] = None, **kwargs) -> User:
         """Create a User model with sensible defaults."""
+        if guild is None:
+            guild = self.create_guild()
+        
         defaults = {
             "user_id": self.get_unique_id("user"),
+            "guild": guild,
             "username": f"TestUser{self.get_unique_id('user')}",
-            "display_name": f"Test User {self.get_unique_id('user')}",
             "is_bot": False,
         }
         defaults.update(kwargs)
@@ -145,11 +148,11 @@ class FixtureManager:
         if event is None:
             event = self.create_event()
         if user is None:
-            user = self.create_user()
+            user = self.create_user(guild=event.guild)
 
         defaults = {
             "event": event,
-            "user": user,
+            "user_id": user.user_id,
             "emoji": random.choice(["✅", "❌", "🎯", "⭐", "🔥"]),
             "added_at": datetime.now(),
         }
@@ -172,7 +175,7 @@ class FixtureManager:
     ) -> Tuple[Guild, List[User]]:
         """Create a guild with multiple users."""
         guild = self.create_guild(**guild_kwargs)
-        users = [self.create_user() for _ in range(user_count)]
+        users = [self.create_user(guild=guild) for _ in range(user_count)]
 
         logger.debug(f"Created guild with {user_count} users: {guild.name}")
         return guild, users
@@ -188,17 +191,17 @@ class FixtureManager:
 
         for _ in range(reaction_count):
             if unique_users:
-                # Create new user for each reaction
-                user = self.create_user()
+                # Create new user for each reaction in the same guild as the event
+                user = self.create_user(guild=event.guild)
             else:
                 # Reuse users or create new ones
                 if len(users_used) < reaction_count:
-                    user = self.create_user()
+                    user = self.create_user(guild=event.guild)
                     users_used.add(user.user_id)
                 else:
-                    # Pick random existing user
+                    # Pick random existing user from the same guild
                     existing_user_id = random.choice(list(users_used))
-                    user = User.get(User.user_id == existing_user_id)
+                    user = User.get((User.user_id == existing_user_id) & (User.guild == event.guild))
 
             reaction = self.create_reaction(event=event, user=user)
             reactions.append(reaction)
@@ -234,8 +237,9 @@ class FixtureManager:
             scenario_data["guilds"].append(guild)
 
         # Create users (distributed across guilds)
-        for _ in range(config["users"]):
-            user = self.create_user()
+        for i in range(config["users"]):
+            guild = scenario_data["guilds"][i % len(scenario_data["guilds"])]
+            user = self.create_user(guild=guild)
             scenario_data["users"].append(user)
 
         # Create events (distributed across guilds)

@@ -10,6 +10,10 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
+# Load environment variables at module import
+from dotenv import load_dotenv
+load_dotenv()
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
