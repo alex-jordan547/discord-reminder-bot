@@ -18,6 +18,7 @@ class TestDatabaseOperations:
     """Tests des opérations de base de données."""
 
     @pytest.mark.database
+    @pytest.mark.asyncio
     async def test_database_initialization(self, temp_database):
         """Test de l'initialisation de la base de données."""
         from models.schema_manager import get_database_status, setup_database
@@ -29,24 +30,31 @@ class TestDatabaseOperations:
         # Test du statut
         status = get_database_status()
         assert status["database_available"], "La base de données doit être disponible"
-        assert "schema_version" in status, "Le statut doit inclure la version du schéma"
+        assert "schema_info" in status, "Le statut doit inclure les informations du schéma"
+        assert "current_version" in status["schema_info"], "Le statut doit inclure la version actuelle du schéma"
 
     @pytest.mark.database
-    async def test_guild_creation(self, clean_database):
+    @pytest.mark.asyncio
+    async def test_guild_creation(self, working_database):
         """Test de création de guildes."""
+        # Utiliser la base de données de test configurée
+        # Les modèles sont déjà liés à working_database par la fixture
+        
         # Créer une guilde
         guild = Guild.create(guild_id=123456789, name="Test Guild", settings="{}")
-
-        assert guild.id is not None, "La guilde doit avoir un ID"
+        
+        # Vérifier les propriétés de base
         assert guild.guild_id == 123456789, "L'ID Discord doit être correct"
         assert guild.name == "Test Guild", "Le nom doit être correct"
 
-        # Vérifier que la guilde existe
+        # Vérifier que la guilde existe dans la base de données
         found_guild = Guild.get(Guild.guild_id == 123456789)
         assert found_guild.name == "Test Guild"
+        assert found_guild.guild_id == 123456789
 
     @pytest.mark.database
-    async def test_event_creation_and_retrieval(self, clean_database, sample_event_data):
+    @pytest.mark.asyncio
+    async def test_event_creation_and_retrieval(self, working_database, sample_event_data):
         """Test de création et récupération d'événements."""
         # Créer une guilde d'abord
         guild = Guild.create(
@@ -75,7 +83,8 @@ class TestDatabaseOperations:
         assert found_event.title == sample_event_data["title"]
 
     @pytest.mark.database
-    async def test_event_reactions(self, clean_database, sample_event_data):
+    @pytest.mark.asyncio
+    async def test_event_reactions(self, working_database, sample_event_data):
         """Test des réactions aux événements."""
         # Créer une guilde et un événement
         guild = Guild.create(
@@ -112,6 +121,7 @@ class TestEventManager:
     """Tests du gestionnaire d'événements."""
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_unified_event_manager_initialization(self):
         """Test de l'initialisation du gestionnaire unifié."""
         from utils.unified_event_manager import unified_event_manager
@@ -123,6 +133,7 @@ class TestEventManager:
         assert "backend" in status or "backend_type" in status, "Le statut doit inclure le backend"
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_event_manager_adapter(self):
         """Test de l'adaptateur du gestionnaire d'événements."""
         from utils.event_manager_adapter import event_manager_adapter
@@ -139,6 +150,7 @@ class TestStorageAdapter:
     """Tests de l'adaptateur de stockage."""
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_storage_adapter_initialization(self):
         """Test de l'initialisation de l'adaptateur de stockage."""
         from utils.storage_adapter import storage_adapter
@@ -147,6 +159,7 @@ class TestStorageAdapter:
         assert success, "L'adaptateur de stockage doit s'initialiser"
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_storage_adapter_operations(self, temp_json_file):
         """Test des opérations de l'adaptateur de stockage."""
         from utils.storage_adapter import StorageAdapter
@@ -179,6 +192,7 @@ class TestMigrationSystem:
     """Tests du système de migration."""
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_migration_check(self):
         """Test de vérification de migration."""
         from utils.data_migration import check_and_migrate_if_needed
@@ -188,6 +202,7 @@ class TestMigrationSystem:
         assert isinstance(result, bool), "Le résultat doit être un booléen"
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_migration_status(self):
         """Test du statut de migration."""
         from utils.data_migration import get_migration_status
@@ -242,24 +257,32 @@ class TestValidation:
         """Test de validation de l'environnement."""
         from utils.validation import validate_environment_config
 
-        # Configurer un environnement de test valide avec un token réaliste
+        # Configurer un environnement de test valide
         original_token = os.environ.get("DISCORD_TOKEN")
-        # Utiliser un token de test factice pour les tests
-        os.environ["DISCORD_TOKEN"] = "TEST_DISCORD_TOKEN_FOR_COMPREHENSIVE_TESTS_ONLY"
+        original_admin_roles = os.environ.get("ADMIN_ROLES")
+        
+        # Utiliser un token de test réaliste (longueur Discord token ~59 caractères)
+        os.environ["DISCORD_TOKEN"] = "TEST_DISCORD_TOKEN_1234567890123456789012345678901234567890"
+        os.environ["ADMIN_ROLES"] = "Admin,Moderateur,Coach"
 
         try:
-            # Le test doit passer avec un token configuré
+            # Le test doit passer avec un token et des rôles configurés
             result = validate_environment_config()
             # On accepte True ou une liste vide (pas d'erreurs)
             assert (
                 result is True or result == []
-            ), f"La validation doit réussir avec un token configuré, mais trouvé: {result}"
+            ), f"La validation doit réussir avec un token et rôles configurés, mais trouvé: {result}"
         finally:
             # Restaurer l'environnement
             if original_token:
                 os.environ["DISCORD_TOKEN"] = original_token
             elif "DISCORD_TOKEN" in os.environ:
                 del os.environ["DISCORD_TOKEN"]
+                
+            if original_admin_roles:
+                os.environ["ADMIN_ROLES"] = original_admin_roles
+            elif "ADMIN_ROLES" in os.environ:
+                del os.environ["ADMIN_ROLES"]
 
     @pytest.mark.unit
     def test_validation_functions(self):
@@ -343,7 +366,8 @@ class TestIntegration:
 
     @pytest.mark.integration
     @pytest.mark.slow
-    async def test_full_workflow(self, temp_database, sample_event_data):
+    @pytest.mark.asyncio
+    async def test_full_workflow(self, working_database, sample_event_data):
         """Test du workflow complet."""
         from models.database_models import Event, Guild
         from models.schema_manager import setup_database
@@ -388,7 +412,8 @@ class TestPerformance:
 
     @pytest.mark.slow
     @pytest.mark.database
-    async def test_bulk_event_creation(self, clean_database):
+    @pytest.mark.asyncio
+    async def test_bulk_event_creation(self, working_database):
         """Test de création en masse d'événements."""
         from models.database_models import Event, Guild
 
