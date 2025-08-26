@@ -32,14 +32,6 @@ export enum FeatureFlag {
 }
 
 /**
- * Fallback information for a feature flag
- */
-interface FallbackInfo {
-  reason: string;
-  timestamp: Date;
-}
-
-/**
  * Feature flag status summary
  */
 export interface FeatureFlagStatus {
@@ -338,3 +330,4 @@ export const featureFlagManager = new FeatureFlagManager();
 
 // Export the manager as default for convenience
 export default featureFlagManager;
+

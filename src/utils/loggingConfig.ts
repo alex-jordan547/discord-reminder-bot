@@ -5,21 +5,23 @@
  * with full ANSI color support matching the Python implementation.
  */
 
-import pino, { Logger, LoggerOptions } from 'pino';
-import { Settings } from '@/config/settings';
+import pino, {Logger, LoggerOptions} from 'pino';
+import {Settings} from '@/config/settings';
 import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
 
 /**
- * Log level mappings
+ * Log level mappings - using string levels as required by Pino
  */
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
-const LOG_LEVEL_MAP: Record<LogLevel, number> = {
-  DEBUG: 20,
-  INFO: 30,
-  WARNING: 40,
-  ERROR: 50,
-  CRITICAL: 60,
+const LOG_LEVEL_MAP: Record<LogLevel, string> = {
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARNING: 'warn',
+  ERROR: 'error',
+  CRITICAL: 'fatal',
 };
 
 /**
@@ -79,23 +81,29 @@ function shouldUseColors(): boolean {
 /**
  * Custom formatter for colorized console output
  */
-function createColoredFormatter(useColors: boolean): (obj: any) => string {
-  return (obj: any): string => {
+function createColoredFormatter(useColors: boolean): (obj: Record<string, unknown>) => string {
+  return (obj: Record<string, unknown>): string => {
     const { level, time, name, msg, ...extra } = obj;
+
+    // Type assertion for pino log object properties
+    const pinoLevel = level as number;
+    const pinoTime = time as number;
+    const pinoName = name as string;
+    const pinoMsg = msg as string;
 
     // Convert pino level to our log level
     let logLevel: LogLevel = 'INFO';
-    if (level >= 60) logLevel = 'CRITICAL';
-    else if (level >= 50) logLevel = 'ERROR';
-    else if (level >= 40) logLevel = 'WARNING';
-    else if (level >= 30) logLevel = 'INFO';
-    else if (level >= 20) logLevel = 'DEBUG';
+    if (pinoLevel >= 60) logLevel = 'CRITICAL';
+    else if (pinoLevel >= 50) logLevel = 'ERROR';
+    else if (pinoLevel >= 40) logLevel = 'WARNING';
+    else if (pinoLevel >= 30) logLevel = 'INFO';
+    else if (pinoLevel >= 20) logLevel = 'DEBUG';
 
     // Format timestamp
-    const timestamp = new Date(time).toISOString().replace('T', ' ').slice(0, 19);
+    const timestamp = new Date(pinoTime).toISOString().replace('T', ' ').slice(0, 19);
 
     // Format logger name (truncate if too long)
-    const loggerName = (name || 'app').padEnd(20).slice(0, 20);
+    const loggerName = (pinoName || 'app').padEnd(20).slice(0, 20);
 
     // Format level name
     const levelName = logLevel.padEnd(8);
@@ -109,7 +117,7 @@ function createColoredFormatter(useColors: boolean): (obj: any) => string {
       const coloredTimestamp = COMPONENT_COLORS.timestamp(timestamp);
       const coloredLevel = levelColor.bold(`${emoji} ${levelName}`);
       const coloredLogger = COMPONENT_COLORS.logger(loggerName);
-      const coloredMessage = levelColor(msg);
+      const coloredMessage = levelColor(pinoMsg);
       const separator = COMPONENT_COLORS.separator(' | ');
 
       // Construct the formatted message with colored components
@@ -127,7 +135,7 @@ function createColoredFormatter(useColors: boolean): (obj: any) => string {
     } else {
       // Non-colored format
       const emoji = LEVEL_EMOJIS[logLevel];
-      let formatted = `${timestamp} | ${emoji} ${levelName} | ${loggerName} | ${msg}`;
+      let formatted = `${timestamp} | ${emoji} ${levelName} | ${loggerName} | ${pinoMsg}`;
 
       // Add extra fields if present
       if (Object.keys(extra).length > 0) {
@@ -159,7 +167,7 @@ export function setupLogging(options: {
   } = options;
 
   // Convert string log level to pino level
-  const pinoLevel = LOG_LEVEL_MAP[logLevel] || 30;
+  const pinoLevel = LOG_LEVEL_MAP[logLevel] || 'info';
 
   const pinoOptions: LoggerOptions = {
     level: pinoLevel,
@@ -171,7 +179,7 @@ export function setupLogging(options: {
 
   // Console stream with colored formatter
   streams.push({
-    level: pinoLevel,
+    level: pinoLevel as pino.Level,
     stream: {
       write: (chunk: string) => {
         // Parse the JSON log entry
@@ -193,8 +201,6 @@ export function setupLogging(options: {
 
     // Create logs directory if it doesn't exist
     try {
-      const fs = require('fs');
-      const path = require('path');
       const dir = path.dirname(filePath);
       fs.mkdirSync(dir, { recursive: true });
     } catch (err) {
@@ -203,7 +209,7 @@ export function setupLogging(options: {
     }
 
     streams.push({
-      level: pinoLevel,
+      level: pinoLevel as pino.Level,
       stream: pino.destination({
         dest: filePath,
         sync: false,

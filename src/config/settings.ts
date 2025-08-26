@@ -5,7 +5,7 @@
  * a clean interface for configuration management with TypeScript validation.
  */
 
-import { z } from 'zod';
+import {z} from 'zod';
 import dotenv from 'dotenv';
 
 // Load environment variables

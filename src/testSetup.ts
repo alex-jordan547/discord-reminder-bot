@@ -4,9 +4,9 @@
  * This file validates the configuration system and colorized logging
  */
 
-import { Settings } from '@/config/settings';
-import { featureFlagManager, FeatureFlag } from '@/config/featureFlags';
-import { setupLogging, testColorizedLogging, createLogger } from '@/utils/loggingConfig';
+import {Settings} from '@/config/settings';
+import {FeatureFlag, featureFlagManager} from '@/config/featureFlags';
+import {createLogger, setupLogging} from '@/utils/loggingConfig';
 
 /**
  * Test the configuration system
@@ -131,6 +131,6 @@ export function runSetupTests(): void {
 }
 
 // Run tests if this file is executed directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   runSetupTests();
 }

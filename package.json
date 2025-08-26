@@ -47,27 +47,27 @@
   },
   "homepage": "https://github.com/alex-jordan547/discord-reminder-bot#readme",
   "dependencies": {
-    "discord.js": "^14.14.1",
     "@fastify/env": "^4.2.0",
-    "fastify": "^4.24.3",
+    "chalk": "^5.3.0",
+    "discord.js": "^14.14.1",
     "dotenv": "^16.3.1",
-    "sqlite3": "^5.1.6",
+    "fastify": "^4.24.3",
     "pino": "^8.16.2",
     "pino-pretty": "^10.2.3",
-    "chalk": "^5.3.0",
+    "sqlite3": "^5.1.6",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.8.10",
-    "typescript": "^5.2.2",
-    "tsx": "^4.1.2",
-    "nodemon": "^3.0.1",
-    "vitest": "^0.34.6",
+    "@types/sqlite3": "^3.1.9",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.52.0",
-    "@typescript-eslint/eslint-plugin": "^6.9.1",
-    "@typescript-eslint/parser": "^6.9.1",
+    "nodemon": "^3.0.1",
     "prettier": "^3.0.3",
-    "@types/sqlite3": "^3.1.9"
+    "tsx": "^4.20.5",
+    "typescript": "^5.2.2",
+    "vitest": "^0.34.6"
   }
 }

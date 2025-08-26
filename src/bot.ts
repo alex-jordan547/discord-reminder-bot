@@ -4,16 +4,16 @@
  * Main bot entry point with configuration loading and basic Discord.js setup
  */
 
-import { Client, GatewayIntentBits } from 'discord.js';
-import { Settings } from '@/config/settings';
-import { featureFlagManager } from '@/config/featureFlags';
-import { setupLogging, createLogger } from '@/utils/loggingConfig';
+import {Client, GatewayIntentBits} from 'discord.js';
+import {Settings} from '@/config/settings';
+import {featureFlagManager} from '@/config/featureFlags';
+import {createLogger, setupLogging} from '@/utils/loggingConfig';
 
 // Initialize logging
-const mainLogger = setupLogging({
+setupLogging({
   logLevel: Settings.LOG_LEVEL,
   logToFile: Settings.LOG_TO_FILE,
-  useColors: Settings.LOG_COLORS,
+  useColors: Settings.LOG_COLORS === undefined ? true : Settings.LOG_COLORS,
 });
 
 // Create bot-specific logger
