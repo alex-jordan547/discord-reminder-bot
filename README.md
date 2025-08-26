@@ -1,19 +1,19 @@
 # Discord Reminder Bot
 
-A Discord bot that helps track user availability for matches by monitoring reactions and sending automatic reminders to users who haven't responded.
+A Discord bot that helps track user availability for events by monitoring reactions and sending automatic reminders to users who haven't responded.
 
 ## ✨ Features
 
-- **🎯 Event Tracking**: Monitor Discord message reactions for match availability
+- **🎯 Event Tracking**: Monitor Discord message reactions for event availability
 - **🔔 Automated Reminders**: Send reminders to users who haven't responded
 - **⚡ Dynamic Scheduling**: ±5 second precision instead of ±30 seconds
-- **😴 Smart Sleep Mode**: 0% CPU usage when no matches are being tracked
+- **😴 Smart Sleep Mode**: 0% CPU usage when no events are being tracked
 - **🎮 Multi-Server Support**: Works across multiple Discord servers
 - **🛡️ Role-Based Permissions**: Configurable admin roles for management commands
-- **💾 Persistent Storage**: JSON-based data persistence without external databases
+- **💾 Persistent Storage**: SQLite database with automatic migration from JSON
 - **🔄 Error Recovery**: Advanced retry system with statistics tracking
 - **🧪 Test Mode**: Short intervals (30s, 1min, 2min) for development
-- **⏸️ Pause/Resume**: Individual match control for maintenance periods
+- **⏸️ Pause/Resume**: Individual event control for maintenance periods
 
 ## 🚀 Quick Start
 
@@ -87,7 +87,7 @@ docker-compose down
 |---------|-------------|---------|
 | `/watch <message> [interval]` | Start monitoring a message with reminders | `/watch https://discord.com/channels/... 3600` |
 | `/unwatch <message>` | Stop monitoring a message | `/unwatch https://discord.com/channels/...` |
-| `/list` | List all tracked matches on this server | `/list` |
+| `/list` | List all tracked events on this server | `/list` |
 | `/remind [message]` | Send manual reminder (all if no message) | `/remind https://discord.com/channels/...` |
 | `/status <message>` | Show detailed status of a reminder | `/status https://discord.com/channels/...` |
 | `/pause <message>` | Pause reminders for a message | `/pause https://discord.com/channels/...` |
@@ -105,13 +105,22 @@ docker-compose down
 | 1 minute | 60 | Test mode only |
 | 2 minutes | 120 | Test mode only |
 | 5 minutes | 300 | Short-term events |
-| 15 minutes | 900 | Quick matches |
-| 30 minutes | 1800 | Standard matches |
-| 1 hour | 3600 | **Default** - Regular matches |
-| 2 hours | 7200 | Long matches |
+| 15 minutes | 900 | Quick events |
+| 30 minutes | 1800 | Standard events |
+| 1 hour | 3600 | **Default** - Regular events |
+| 2 hours | 7200 | Long events |
 | 6 hours | 21600 | Tournament events |
 | 12 hours | 43200 | Daily events |
 | 24 hours | 86400 | Weekly events |
+
+### Administrative Commands
+
+| Command | Description | Admin Only |
+|---------|-------------|------------|
+| `/db_status` | Show database status and statistics | ✅ |
+| `/db_migrate` | Manually trigger JSON to SQLite migration | ✅ |
+| `/db_backup` | Create database backup | ✅ |
+| `/db_cleanup` | Clean up old reminder logs | ✅ |
 
 ## ⚙️ Configuration
 
@@ -126,7 +135,10 @@ docker-compose down
 | `LOG_TO_FILE` | true | Enable file logging |
 | `ADMIN_ROLES` | Admin,Moderateur,Coach | Comma-separated admin role names |
 | `USE_SEPARATE_REMINDER_CHANNEL` | false | Create separate reminder channel |
-| `REMINDER_CHANNEL_NAME` | rappels-matchs | Name for reminder channel |
+| `REMINDER_CHANNEL_NAME` | rappels-events | Name for reminder channel |
+| `DATABASE_PATH` | discord_bot.db | SQLite database file path |
+| `ENABLE_SQLITE` | true | Enable SQLite storage (vs JSON fallback) |
+| `AUTO_MIGRATE` | true | Automatically migrate from JSON to SQLite |
 
 ### Test Mode
 
@@ -140,7 +152,7 @@ LOG_LEVEL=DEBUG
 
 ## 🏗️ Architecture
 
-The bot uses a modern, modular architecture:
+The bot uses a modern, modular architecture with SQLite database:
 
 ```
 discord-reminder-bot/
@@ -151,11 +163,17 @@ discord-reminder-bot/
 │   └── command_utils.py      # Utility functions
 ├── config/                   # ⚙️ Configuration management
 │   └── settings.py          # Centralized settings
-├── models/                   # 📊 Data models
-│   └── reminder.py          # MatchReminder class
+├── models/                   # 📊 Database models (Pewee ORM)
+│   ├── database_models.py   # SQLite models (Guild, Event, User, etc.)
+│   ├── schema_manager.py    # Database schema management
+│   ├── migrations.py        # Database migrations
+│   └── validation.py        # Data validation
 ├── persistence/              # 💾 Data storage
-│   └── storage.py           # JSON persistence layer
+│   ├── database.py          # SQLite connection management
+│   └── storage.py           # Legacy JSON storage (fallback)
 ├── utils/                    # 🛠️ Utilities
+│   ├── event_manager_sqlite.py  # SQLite-based event management
+│   ├── data_migration.py    # JSON to SQLite migration
 │   ├── logging_config.py    # Logging setup
 │   ├── message_parser.py    # Discord message parsing
 │   ├── permissions.py       # Role-based permissions
@@ -165,29 +183,92 @@ discord-reminder-bot/
 │   ├── unit/                # Unit tests
 │   ├── integration/         # Integration tests
 │   └── fixtures/            # Test data
+├── docs/                     # 📚 Documentation
+│   ├── DATABASE_ARCHITECTURE.md  # Database design
+│   └── API_REFERENCE.md     # API documentation
 └── scripts/                  # 🔧 Development utilities
     └── dev/                 # Development tools
 ```
 
 ### Key Components
 
-**1. Dynamic Scheduling System**
+**1. SQLite Database System**
+- 🗄️ **Robust Storage**: SQLite database with Pewee ORM
+- 🔄 **Auto Migration**: Seamless migration from JSON to SQLite
+- 🛡️ **Data Integrity**: Foreign key constraints and validation
+- 🏢 **Multi-Server Isolation**: Complete data separation per Discord server
+- 📊 **Performance**: Optimized queries with proper indexing
+
+**2. Dynamic Scheduling System**
 - ⚡ **Precision**: ±5 seconds instead of ±30 seconds  
 - 🎯 **Smart Planning**: Calculates exact next reminder time
-- 😴 **Sleep Mode**: 0% CPU when no matches to track
+- 😴 **Sleep Mode**: 0% CPU when no events to track
 - 🔄 **Auto-Reschedule**: Recomputes timing after any changes
 
-**2. Error Recovery**
+**3. Error Recovery & Monitoring**
 - 📊 **Statistics Tracking**: Success rates, retry counts, error types
 - 🔄 **Automatic Retries**: Configurable retry logic with exponential backoff
 - 🚨 **Graceful Degradation**: Continues operating despite individual failures
-- 📈 **Health Monitoring**: `/health` command shows system statistics
+- 📈 **Health Monitoring**: `/health` and `/db_status` commands
+- 🔙 **Rollback Support**: Automatic rollback to JSON if migration fails
 
-**3. Modern Discord Integration**
+**4. Modern Discord Integration**
 - 💬 **Slash Commands**: Native Discord interface with autocomplete
 - 🔐 **Permission System**: Role-based access control
 - 🌐 **Multi-Server**: Isolated operation per Discord server
 - 📝 **Rich Embeds**: Beautiful formatted responses
+
+## 🔄 Database Migration
+
+The bot automatically migrates from JSON storage to SQLite on first startup.
+
+### Automatic Migration
+
+When you start the bot for the first time after the SQLite update:
+
+1. **Backup Creation**: Your existing `watched_reminders.json` is automatically backed up
+2. **Data Migration**: All events, reactions, and settings are migrated to SQLite
+3. **Validation**: The migration is validated to ensure no data loss
+4. **Archive**: Original JSON files are archived with timestamp
+
+### Manual Migration Commands
+
+If you need to manually control the migration process:
+
+```bash
+# Check migration status
+python -c "from utils.data_migration import get_migration_status; print(get_migration_status())"
+
+# Force migration (if automatic migration failed)
+python -c "from utils.data_migration import DataMigration; import asyncio; asyncio.run(DataMigration('watched_reminders.json').migrate_from_json())"
+
+# Rollback to JSON (emergency only)
+python -c "from utils.data_migration import DataMigration; import asyncio; asyncio.run(DataMigration('watched_reminders.json').rollback_to_json())"
+```
+
+### Migration Troubleshooting
+
+**Migration fails with "JSON corrupt" error:**
+```bash
+# Validate your JSON file
+python -c "import json; json.load(open('watched_reminders.json'))"
+```
+
+**Database locked error:**
+```bash
+# Stop the bot and try again
+# Check if discord_bot.db file has proper permissions
+ls -la discord_bot.db
+```
+
+**Data missing after migration:**
+```bash
+# Check migration logs
+tail -f logs/bot_$(date +%Y%m%d).log | grep -i migration
+
+# Verify data in database
+python -c "from models.schema_manager import get_database_status; print(get_database_status())"
+```
 
 ## 🧪 Testing & Development
 
@@ -238,6 +319,40 @@ Check bot status with `/health` command:
 ```bash
 # Sync commands manually
 # Use /sync command in Discord (admin only)
+```
+
+**Database migration issues:**
+```bash
+# Check database status
+python -c "from models.schema_manager import get_database_status; print(get_database_status())"
+
+# Verify database integrity
+python -c "from models.schema_manager import verify_database_integrity; print(verify_database_integrity())"
+
+# Reset database (CAUTION: deletes all data)
+python -c "from models.schema_manager import reset_database; reset_database()"
+```
+
+**Database locked errors:**
+```bash
+# Stop the bot completely
+pkill -f "python bot.py"
+
+# Check for database locks
+lsof discord_bot.db
+
+# Restart the bot
+python bot.py
+```
+
+**Migration rollback needed:**
+```bash
+# Emergency rollback to JSON
+python -c "from utils.data_migration import DataMigration; import asyncio; asyncio.run(DataMigration('watched_reminders.json').rollback_to_json())"
+
+# Disable SQLite temporarily
+export ENABLE_SQLITE=false
+python bot.py
 ```
 
 **Python 3.13 compatibility:**
@@ -293,15 +408,20 @@ This project is open source. See the LICENSE file for details.
 
 ## 🎯 Recent Improvements
 
+- ✅ **SQLite Migration**: Complete migration from JSON to SQLite database with Pewee ORM
+- ✅ **Automatic Data Migration**: Seamless migration from JSON with backup and rollback support
+- ✅ **Enhanced Multi-Server Isolation**: Complete data separation per Discord server with foreign key constraints
+- ✅ **Database Administration**: New admin commands for database management and monitoring
+- ✅ **Improved Data Integrity**: Comprehensive validation and constraint enforcement
+- ✅ **Performance Optimization**: Indexed queries and optimized database operations
 - ✅ **Dynamic Scheduling**: Replaced 60-second polling with precise timestamp-based planning
-- ✅ **Smart Sleep Mode**: 0% CPU usage when no matches are being tracked (saves ~288 checks/day)
+- ✅ **Smart Sleep Mode**: 0% CPU usage when no events are being tracked (saves ~288 checks/day)
 - ✅ **Error Recovery**: Advanced retry system with statistics and health monitoring
 - ✅ **Test Mode**: Short intervals (30s/1min/2min) for rapid development and testing
 - ✅ **Slash Commands**: Full migration to modern Discord slash command interface
 - ✅ **Modular Architecture**: Clean separation of concerns with organized codebase
-- ✅ **Health Monitoring**: `/health` command provides detailed system statistics
-- ✅ **Multi-Server**: Proper isolation and permission handling per Discord server
+- ✅ **Health Monitoring**: `/health` and `/db_status` commands provide detailed system statistics
 
 ---
 
-**🚀 Ready to enhance your Discord community's match coordination!**
+**🚀 Ready to enhance your Discord community's event coordination!**

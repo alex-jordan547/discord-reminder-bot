@@ -9,7 +9,7 @@ The Discord Reminder Bot has been completely refactored to improve maintainabili
 ```
 ├── models/
 │   ├── __init__.py
-│   └── reminder.py          # MatchReminder class with type hints and documentation
+│   └── reminder.py          # Event class with type hints and documentation
 ├── persistence/
 │   ├── __init__.py
 │   └── storage.py           # JSON save/load operations with error handling
@@ -59,7 +59,7 @@ The Discord Reminder Bot has been completely refactored to improve maintainabili
 - ✅ Development requirements file
 
 ### Compatibility
-- ✅ Maintains full backward compatibility with existing `watched_matches.json` files
+- ✅ Maintains full backward compatibility with existing `watched_events.json` files (and legacy `watched_matches.json`)
 - ✅ Same Discord command interface and behavior
 - ✅ Same environment variable configuration
 - ✅ Same Docker setup compatibility
@@ -69,7 +69,7 @@ The Discord Reminder Bot has been completely refactored to improve maintainabili
 The refactored bot is a drop-in replacement:
 
 1. **No configuration changes needed** - All environment variables work the same
-2. **Existing data preserved** - `watched_matches.json` files are fully compatible
+2. **Existing data preserved** - `watched_events.json` files are fully compatible (legacy `watched_matches.json` supported)
 3. **Same command interface** - All Discord commands work identically
 4. **Enhanced reliability** - Better error handling and logging
 

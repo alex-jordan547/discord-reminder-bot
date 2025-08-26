@@ -3,7 +3,10 @@
 Unit tests for sleep mode logic in dynamic scheduling.
 """
 
+import pytest
 
+
+@pytest.mark.unit
 def test_sleep_mode_logic():
     """Test de la logique du mode veille."""
     print("😴 Test du mode veille intelligent...")
@@ -11,20 +14,20 @@ def test_sleep_mode_logic():
     # Simuler différents scénarios
     scenarios = [
         {
-            "name": "Démarrage sans aucun match",
-            "watched_matches": {},
+            "name": "Démarrage sans aucun événement",
+            "watched_events": {},
             "expected_behavior": "Mode veille (pas de vérifications périodiques)",
             "cpu_usage": "0%",
         },
         {
-            "name": "Ajout d'un premier match",
-            "watched_matches": {"123": {"interval": 60, "paused": False}},
+            "name": "Ajout d'un premier événement",
+            "watched_events": {"123": {"interval": 60, "paused": False}},
             "expected_behavior": "Réactivation immédiate + planification précise",
             "cpu_usage": "Minimal",
         },
         {
-            "name": "Suppression du dernier match",
-            "watched_matches": {},
+            "name": "Suppression du dernier événement",
+            "watched_events": {},
             "expected_behavior": "Retour en mode veille",
             "cpu_usage": "0%",
         },
@@ -44,6 +47,7 @@ def test_sleep_mode_logic():
     return True
 
 
+@pytest.mark.unit
 def test_efficiency_comparison():
     """Comparaison d'efficacité avant/après le mode veille."""
     print("⚡ Comparaison d'efficacité...")
@@ -68,6 +72,7 @@ def test_efficiency_comparison():
     return True
 
 
+@pytest.mark.unit
 def test_reactivation_speed():
     """Test de la vitesse de réactivation."""
     print("🚀 Test de réactivation du système...")
@@ -88,6 +93,7 @@ def test_reactivation_speed():
     return True
 
 
+@pytest.mark.unit
 def test_user_experience():
     """Test de l'expérience utilisateur."""
     print("👤 Test d'expérience utilisateur...")

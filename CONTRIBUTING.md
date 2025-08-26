@@ -52,10 +52,14 @@ discord-reminder-bot/
 │   └── command_utils.py      # Command utilities
 ├── config/                   # Configuration
 │   └── settings.py          # Centralized settings
-├── models/                   # Data models
-│   └── reminder.py          # MatchReminder class
+├── models/                   # Database models (Pewee ORM)
+│   ├── database_models.py   # SQLite models (Guild, Event, User, etc.)
+│   ├── schema_manager.py    # Database schema management
+│   ├── migrations.py        # Database migrations
+│   └── validation.py        # Data validation
 ├── persistence/              # Data persistence
-│   └── storage.py           # JSON storage layer
+│   ├── database.py          # SQLite connection management
+│   └── storage.py           # Legacy JSON storage (fallback)
 ├── utils/                    # Utility modules
 │   ├── logging_config.py    # Logging configuration
 │   ├── message_parser.py    # Discord message parsing
@@ -93,8 +97,30 @@ python -m pytest tests/unit/ -v
 # Integration tests only
 python -m pytest tests/integration/ -v
 
+# Database-specific tests
+python -m pytest tests/unit/test_database_models.py -v
+python -m pytest tests/unit/test_migration.py -v
+
 # Specific test file
 python tests/unit/test_dynamic_scheduling.py
+```
+
+### Database Development
+
+When working with database models:
+
+```bash
+# Initialize database for development
+python -c "from models.schema_manager import setup_database; setup_database()"
+
+# Check database status
+python -c "from models.schema_manager import get_database_status; print(get_database_status())"
+
+# Reset database (CAUTION: deletes all data)
+python -c "from models.schema_manager import reset_database; reset_database()"
+
+# Run migration tests
+python -m pytest tests/unit/test_migration.py -v
 ```
 
 ### Code Quality
@@ -206,15 +232,19 @@ When requesting features:
 ### 🔧 Code Contributions
 
 **High-Priority Areas:**
-- Test coverage improvements
-- Performance optimizations
+- Database model improvements and optimizations
+- Migration system enhancements
+- Test coverage improvements for SQLite functionality
+- Performance optimizations for database queries
 - Error handling enhancements
 - Documentation updates
-- New slash commands
+- New administrative slash commands
 
 **Medium-Priority Areas:**
-- Code refactoring
-- Additional utility functions
+- Database schema evolution and migrations
+- Advanced database features (full-text search, analytics)
+- Code refactoring for better database integration
+- Additional utility functions for database management
 - Docker improvements
 - CI/CD enhancements
 

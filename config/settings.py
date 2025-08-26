@@ -10,6 +10,10 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
+# Load environment variables at module import
+from dotenv import load_dotenv
+load_dotenv()
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
@@ -80,6 +84,22 @@ class Settings:
 
     # File Configuration
     REMINDERS_SAVE_FILE: str = "watched_reminders.json"
+
+    # Database Configuration
+    USE_SQLITE: bool = os.getenv("USE_SQLITE", "false").lower() == "true"
+    DATABASE_PATH: str = os.getenv("DATABASE_PATH", "discord_bot.db")
+    AUTO_MIGRATE: bool = os.getenv("AUTO_MIGRATE", "true").lower() == "true"
+    BACKUP_JSON_ON_MIGRATION: bool = os.getenv("BACKUP_JSON_ON_MIGRATION", "true").lower() == "true"
+
+    # Feature Flags Configuration
+    ENABLE_FEATURE_FLAGS: bool = os.getenv("ENABLE_FEATURE_FLAGS", "true").lower() == "true"
+    ENABLE_AUTO_FALLBACK: bool = os.getenv("ENABLE_AUTO_FALLBACK", "true").lower() == "true"
+    ENABLE_HEALTH_MONITORING: bool = os.getenv("ENABLE_HEALTH_MONITORING", "true").lower() == "true"
+
+    # Fallback Configuration
+    FALLBACK_RETRY_DELAY_MINUTES: int = int(os.getenv("FALLBACK_RETRY_DELAY_MINUTES", "30"))
+    MAX_FALLBACK_RETRIES: int = int(os.getenv("MAX_FALLBACK_RETRIES", "3"))
+    DEGRADED_MODE_TIMEOUT_HOURS: int = int(os.getenv("DEGRADED_MODE_TIMEOUT_HOURS", "24"))
 
     @classmethod
     def validate_interval_minutes(cls, interval_minutes: float) -> float:
@@ -270,6 +290,27 @@ class Settings:
         logger.info(f"Admin roles: {', '.join(cls.ADMIN_ROLES)}")
         logger.info(f"Max mentions per reminder: {cls.MAX_MENTIONS_PER_REMINDER}")
         logger.info(f"Default reactions: {', '.join(cls.DEFAULT_REACTIONS)}")
+
+        # Log database configuration
+        if cls.USE_SQLITE:
+            logger.info(f"Database: SQLite ({cls.DATABASE_PATH})")
+            logger.info(f"Auto-migration: {'Enabled' if cls.AUTO_MIGRATE else 'Disabled'}")
+            logger.info(
+                f"JSON backup on migration: {'Enabled' if cls.BACKUP_JSON_ON_MIGRATION else 'Disabled'}"
+            )
+        else:
+            logger.info("Database: JSON file storage")
+
+        # Log feature flags configuration
+        if cls.ENABLE_FEATURE_FLAGS:
+            logger.info("Feature flags: Enabled")
+            logger.info(f"Auto-fallback: {'Enabled' if cls.ENABLE_AUTO_FALLBACK else 'Disabled'}")
+            logger.info(
+                f"Health monitoring: {'Enabled' if cls.ENABLE_HEALTH_MONITORING else 'Disabled'}"
+            )
+        else:
+            logger.info("Feature flags: Disabled")
+
         logger.info("==========================================")
 
     @classmethod
@@ -373,14 +414,25 @@ class Messages:
     NO_CHANNEL_PERMISSIONS = "⚠️ Pas les permissions pour créer le canal #{}"
     MENTION_LIMIT_EXCEEDED = "⚠️ +{} autres personnes non mentionnées (limite Discord)"
 
+    # Event-related messages (new terminology)
+    EVENT_ADDED = "✅ Événement ajouté à la surveillance!"
+    EVENT_REMOVED = "✅ Événement **{}** retiré de la surveillance."
+    EVENT_PAUSED = "⏸️ Événement **{}** mis en pause."
+    EVENT_RESUMED = "▶️ Événement **{}** repris."
+    EVENT_NOT_WATCHED = "❌ Cet événement n'est pas surveillé."
+    EVENT_NOT_ON_SERVER = "❌ Cet événement n'est pas sur ce serveur."
+    NO_EVENTS_TO_REMIND = "📭 Aucun événement à rappeler sur ce serveur."
+    NO_WATCHED_EVENTS = "📭 Aucun événement surveillé sur ce serveur."
+    EVENTS_LOADED = "✅ {} événement(s) chargés depuis la sauvegarde"
+
     # Alias pour la compatibilité avec le code existant
     # TODO: Supprimer ces alias après la migration complète
-    MATCH_ADDED = REMINDER_ADDED
-    MATCH_REMOVED = REMINDER_REMOVED
-    MATCH_PAUSED = REMINDER_PAUSED
-    MATCH_RESUMED = REMINDER_RESUMED
-    MATCH_NOT_WATCHED = REMINDER_NOT_WATCHED
-    MATCH_NOT_ON_SERVER = REMINDER_NOT_ON_SERVER
-    NO_MATCHES_TO_REMIND = NO_REMINDERS_TO_REMIND
-    NO_WATCHED_MATCHES = NO_WATCHED_REMINDERS
-    MATCHES_LOADED = REMINDERS_LOADED
+    MATCH_ADDED = EVENT_ADDED
+    MATCH_REMOVED = EVENT_REMOVED
+    MATCH_PAUSED = EVENT_PAUSED
+    MATCH_RESUMED = EVENT_RESUMED
+    MATCH_NOT_WATCHED = EVENT_NOT_WATCHED
+    MATCH_NOT_ON_SERVER = EVENT_NOT_ON_SERVER
+    NO_MATCHES_TO_REMIND = NO_EVENTS_TO_REMIND
+    NO_WATCHED_MATCHES = NO_WATCHED_EVENTS
+    MATCHES_LOADED = EVENTS_LOADED

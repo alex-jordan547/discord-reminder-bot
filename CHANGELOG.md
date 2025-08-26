@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎮 **Slash Commands**: Full Discord slash command interface
   - `/watch` - Monitor message with configurable intervals
   - `/unwatch` - Stop monitoring a message
-  - `/list` - List all tracked matches
+  - `/list` - List all tracked events
   - `/remind` - Send manual reminders
   - `/status` - Show detailed reminder status
   - `/pause` / `/resume` - Control individual reminders
@@ -44,9 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic rescheduling after any changes
 
 - 😴 **Smart Sleep Mode**
-  - 0% CPU usage when no matches are being tracked
+  - 0% CPU usage when no events are being tracked
   - Saves approximately 288 unnecessary checks per day
-  - Instant reactivation when matches are added
+  - Instant reactivation when events are added
 
 - 🧪 **Test Mode Support**
   - Short intervals: 30 seconds, 1 minute, 2 minutes
@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2024-01-15
 
 ### Added
-- 🎯 **Match Tracking**: Monitor Discord message reactions
+- 🎯 **Event Tracking**: Monitor Discord message reactions
 - 🔔 **Automated Reminders**: Send reminders to non-responsive users
 - 💾 **JSON Persistence**: File-based data storage
 - 🐳 **Docker Support**: Containerized deployment
@@ -100,10 +100,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🌐 **Multi-Server**: Support for multiple Discord servers
 
 ### Added - Legacy Commands
-- `!watch <message_link>` - Start tracking a match message
-- `!unwatch <message_link>` - Stop tracking a match message
+- `!watch <message_link>` - Start tracking an event message
+- `!unwatch <message_link>` - Stop tracking an event message
 - `!remind <message_link>` - Send immediate reminder
-- `!list` - List all tracked matches
+- `!list` - List all tracked events
 
 ### Technical
 - **Python 3.12+** compatibility
@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - 🎉 **Initial Release**
-- 📊 **Basic Match Tracking**
+- 📊 **Basic Event Tracking**
 - 🔄 **Simple Reminder System**
 - 📱 **Discord Bot Integration**
 

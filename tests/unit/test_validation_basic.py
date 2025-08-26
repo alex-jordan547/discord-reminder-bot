@@ -6,14 +6,16 @@ Basic validation unit tests.
 import os
 import sys
 
-# Add project root to Python path when running standalone
-if __name__ == "__main__":
-    project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-    sys.path.insert(0, project_root)
+import pytest
+
+# Add project root to Python path
+project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+sys.path.insert(0, project_root)
 
 from utils.message_parser import parse_message_link
 
 
+@pytest.mark.unit
 def test_message_link_validation():
     """Test basic message link validation."""
     print("🧪 Testing message link validation...")
@@ -48,7 +50,8 @@ def test_message_link_validation():
             print(f"  ❌ Link should be invalid but was accepted: {link}")
             raise AssertionError(f"Expected invalid parsing for {link}")
 
-    return True
+    # Test passes if we get here
+    assert True
 
 
 def main():

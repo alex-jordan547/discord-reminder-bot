@@ -138,13 +138,13 @@ def extract_message_title(message_content: str, max_length: int = 100) -> str:
         str: Extracted and potentially truncated title
     """
     if not message_content:
-        return "Match sans titre"
+        return "Événement sans titre"
 
     # Split into lines and find the first meaningful line
     lines = [line.strip() for line in message_content.split("\n") if line.strip()]
 
     if not lines:
-        return "Match sans titre"
+        return "Événement sans titre"
 
     # Filter out bot commands and very short messages
     for line in lines:
@@ -160,15 +160,15 @@ def extract_message_title(message_content: str, max_length: int = 100) -> str:
     if first_line.startswith(("!", "/")):
         # For commands, create a more user-friendly title
         command_name = first_line.split()[0] if " " in first_line else first_line
-        return f"Match avec commande {command_name}"
+        return f"Événement avec commande {command_name}"
 
     # For mentions or other short content, be more descriptive
     if first_line.startswith("@"):
-        return "Match avec mentions"
+        return "Événement avec mentions"
 
     # Default fallback
     if len(first_line) <= 5:
-        return "Match de test"
+        return "Événement de test"
 
     # Truncate if too long
     if len(first_line) > max_length:

@@ -2,7 +2,7 @@
 """
 Discord Reminder Bot - Main Entry Point
 
-A Discord bot that helps track user availability for matches by monitoring
+A Discord bot that helps track user availability for events by monitoring
 reactions and sending automatic reminders to users who haven't responded.
 
 This is the refactored version using the new modular architecture.
@@ -15,9 +15,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-# Load environment variables from .env file FIRST
-load_dotenv()
-
 from commands.handlers import setup_bot_handlers
 from config.settings import Messages, Settings
 from utils.auto_delete import init_auto_delete_manager
@@ -28,6 +25,9 @@ from utils.logging_config import (
     should_use_colors,
 )
 from utils.validation import validate_environment_config
+
+# Load environment variables from .env file FIRST
+load_dotenv()
 
 
 def create_bot() -> commands.Bot:
@@ -86,32 +86,42 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         logger.error("Failed to register or sync slash commands: {}".format(e))
         print("❌ Erreur lors de la synchronisation des commandes slash: {}".format(e))
 
-    # Load reminders from storage using thread-safe manager
-    if hasattr(bot, "reminder_manager"):
+    # Load events from storage using thread-safe manager
+    if hasattr(bot, "event_manager"):
+        success = await bot.event_manager.load_from_storage()
+        if success:
+            total_loaded = len(bot.event_manager.events)
+            logger.info("Loaded {} events from storage".format(total_loaded))
+            print("📥 Chargé {} événement(s) depuis le stockage".format(total_loaded))
+        else:
+            logger.warning("Failed to load events from storage")
+            print("⚠️ Échec du chargement des événements depuis le stockage")
+    # Legacy compatibility
+    elif hasattr(bot, "reminder_manager"):
         success = await bot.reminder_manager.load_from_storage()
         if success:
             total_loaded = len(bot.reminder_manager.reminders)
-            logger.info("Loaded {} reminders from storage".format(total_loaded))
-            print("📥 Chargé {} rappel(s) depuis le stockage".format(total_loaded))
+            logger.info("Loaded {} events from storage".format(total_loaded))
+            print("📥 Chargé {} événement(s) depuis le stockage".format(total_loaded))
         else:
-            logger.warning("Failed to load reminders from storage")
-            print("⚠️ Échec du chargement des rappels depuis le stockage")
+            logger.warning("Failed to load events from storage")
+            print("⚠️ Échec du chargement des événements depuis le stockage")
 
     # Initialize and start auto-delete manager BEFORE starting reminder system
     auto_delete_mgr = init_auto_delete_manager(bot)
     await auto_delete_mgr.start()
 
-    # Start the dynamic reminder system (after auto-delete manager is ready)
+    # Start the dynamic event system (after auto-delete manager is ready)
     if hasattr(bot, "start_dynamic_reminder_system"):
         await bot.start_dynamic_reminder_system()
 
-        # Display reminder interval information
+        # Display event interval information
         if Settings.is_test_mode():
-            logger.info("Dynamic reminder system enabled (TEST MODE) - Intervals: 1-10080 min")
-            print("⏰ Système de rappels dynamique activé (MODE TEST)")
+            logger.info("Dynamic event system enabled (TEST MODE) - Intervals: 1-10080 min")
+            print("⏰ Système d'événements dynamique activé (MODE TEST)")
         else:
-            logger.info("Dynamic reminder system enabled (PRODUCTION) - Intervals: 5-1440 min")
-            print("⏰ Système de rappels dynamique activé")
+            logger.info("Dynamic event system enabled (PRODUCTION) - Intervals: 5-1440 min")
+            print("⏰ Système d'événements dynamique activé")
 
     if Settings.AUTO_DELETE_REMINDERS:
         logger.info(
@@ -134,7 +144,7 @@ async def setup_bot_ready(bot: commands.Bot) -> None:
         print("📢 Mode: Rappels dans un canal séparé (#{})".format(Settings.REMINDER_CHANNEL_NAME))
     else:
         logger.info("Reminder mode: Same channel as event")
-        print("📢 Mode: Rappels dans le même canal que l'évènement")
+        print("📢 Mode: Rappels dans le même canal que l'événement")
 
 
 def main() -> None:
@@ -181,9 +191,44 @@ def main() -> None:
     @bot.event
     async def on_ready():
         await setup_bot_ready(bot)
+        # Setup the unified event manager after bot is ready
+        await setup_unified_event_manager()
+
+    # Set up unified event manager with feature flags
+    from config.feature_flags import feature_flags
+    from utils.unified_event_manager import unified_event_manager
+
+    # Initialize unified event manager
+    async def setup_unified_event_manager():
+        success = await unified_event_manager.initialize()
+        if success:
+            bot.event_manager = unified_event_manager
+            logger.info("Unified event manager initialized successfully")
+
+            # Log current backend and feature flag status
+            status = unified_event_manager.get_status()
+            logger.info(
+                f"Using {status['backend_type']} backend with {status['event_count']} events"
+            )
+
+            if feature_flags.is_sqlite_fully_enabled():
+                logger.info("SQLite features fully enabled")
+            elif feature_flags.is_degraded_mode():
+                logger.warning("Running in degraded mode")
+
+        else:
+            logger.error(
+                "Failed to initialize unified event manager, falling back to legacy adapter"
+            )
+            # Fallback to legacy adapter
+            from utils.event_manager_adapter import setup_event_manager_for_bot
+
+            setup_event_manager_for_bot(bot)
 
     # Register all commands and event handlers
     setup_bot_handlers(bot)
+
+    # Setup the event manager will be done in the on_ready event
 
     # Start the bot
     try:

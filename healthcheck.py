@@ -27,15 +27,23 @@ def main():
 
         print("✓ Settings configuration accessible")
 
-        # Test basic model imports
-        from models.reminder import MatchReminder  # noqa: F401
+        # Test database models
+        from models.database_models import Event, Guild, User  # noqa: F401
 
-        print("✓ MatchReminder model accessible")
+        print("✓ Database models accessible")
 
-        # Test persistence layer
-        from persistence.storage import load_matches, save_matches  # noqa: F401
+        # Test database connection
+        from persistence.database import is_database_available  # noqa: F401
 
-        print("✓ Persistence layer accessible")
+        if is_database_available():
+            print("✓ Database connection available")
+        else:
+            print("⚠️ Database connection not available")
+
+        # Test schema management
+        from models.schema_manager import get_database_status  # noqa: F401
+
+        print("✓ Schema management accessible")
 
         print("🎉 Health check passed - all modules ready")
         sys.exit(0)
