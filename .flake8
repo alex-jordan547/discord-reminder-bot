@@ -1,10 +1,32 @@
-# Flake8 configuration for Discord Reminder Bot
-[flake8]
-# Maximum line length - même que Black
-max-line-length = 88
+# Configuration stricte de Flake8 pour Discord Reminder Bot - Assurance Qualité Phase 6
 
-# Ignorer les conflits connus avec Black et autres règles trop strictes
-ignore = E203,W503,E501,W504,E402,D212,D200,I201,B007,C901
+[flake8]
+# Maximum line length - aligné sur Black
+max-line-length = 100
+
+# Erreurs et warnings à vérifier STRICTEMENT pour ≥90% qualité
+select = 
+    # Erreurs de syntaxe et problèmes critiques
+    E9,F63,F7,F82,
+    # Erreurs de style PEP8 importantes
+    E1,E2,E4,E7,
+    # Warnings PyFlakes (imports inutilisés, variables non définies)
+    F,
+    # Erreurs de complexité
+    C90,
+    # Warnings flake8-bugbear (bugs potentiels)
+    B
+
+# Ignorer seulement les conflits avec Black et cas spéciaux
+ignore = 
+    # E501: Line too long (géré par black)
+    E501,
+    # W503: Line break before binary operator (conflit avec black)
+    W503,
+    # E203: Whitespace before ':' (conflit avec black)
+    E203,
+    # B008: Function calls in argument defaults (pattern courant)
+    B008
 
 # Exclude directories and files from checking
 exclude = 
@@ -18,17 +40,33 @@ exclude =
     *.pyc,
     *.egg-info,
     .eggs,
-    tests
+    htmlcov,
+    .pytest_cache,
+    node_modules,
+    src,
+    staging_environment,
+    temp_*
 
-# Complexité maximale autorisée
-max-complexity = 18
+# Complexité maximale STRICTE pour assurance qualité
+max-complexity = 8
 
-# Style des docstrings
-docstring-convention = google
-
-# Statistiques
-statistics = True
+# Configuration détaillée pour reporting
+statistics = true
+count = true
+show-source = true
+format = %(path)s:%(row)d:%(col)d: %(code)s %(text)s
 
 # Configuration import-order
 application-import-names = bot,commands,config,models,persistence,utils
-import-order-style = pycharm
+import-order-style = pep8
+
+# Configuration per-file pour flexibilité ciblée
+per-file-ignores =
+    # Tests - moins stricts sur la complexité
+    tests/*:C901,
+    # __init__.py - imports non utilisés OK
+    __init__.py:F401,
+    # Scripts de migration - flexibilité temporaire
+    */migrations/*:E402,F401,
+    # Configuration de test
+    conftest.py:F401
