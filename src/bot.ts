@@ -1,41 +1,99 @@
 /**
- * Discord Reminder Bot - TypeScript/Node.js Version
- *
- * Main bot entry point with configuration loading and basic Discord.js setup
+ * Discord Reminder Bot - Discord Client Setup and Event Handlers
+ * 
+ * Comprehensive Discord client setup with event handlers for:
+ * - Bot ready event with slash command synchronization
+ * - Message events for command parsing
+ * - Reaction events for tracking user responses
+ * - Error handling and reconnection logic
  */
 
-import {Client, GatewayIntentBits} from 'discord.js';
-import {Settings} from '@/config/settings';
-import {featureFlagManager} from '@/config/featureFlags';
-import {createLogger, setupLogging} from '@/utils/loggingConfig';
+import {
+  Client,
+  GatewayIntentBits,
+  Events,
+  Message,
+  MessageReaction,
+  User,
+  PartialMessageReaction,
+  PartialUser,
+  ActivityType
+} from 'discord.js';
+import { Settings } from '@/config/settings';
+import { featureFlagManager } from '@/config/featureFlags';
+import { createLogger } from '@/utils/loggingConfig';
+import { setupSlashCommands, syncSlashCommands } from '@/commands/slash';
+import { setupEventHandlers } from '@/commands/handlers';
+import { EventManager } from '@/services/eventManager';
+import { ReminderScheduler } from '@/services/reminderScheduler';
+import { ReactionTracker } from '@/services/reactionTracker';
 
-// Initialize logging
-setupLogging({
-  logLevel: Settings.LOG_LEVEL,
-  logToFile: Settings.LOG_TO_FILE,
-  useColors: Settings.LOG_COLORS === undefined ? true : Settings.LOG_COLORS,
-});
-
-// Create bot-specific logger
 const logger = createLogger('bot');
 
 /**
- * Initialize Discord client with required intents
+ * Create and configure Discord client with all necessary intents and event handlers
  */
-function createDiscordClient(): Client {
+export async function createDiscordClient(): Promise<Client> {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMembers, // For permission checking
     ],
   });
 
-  // Set up basic event listeners
-  client.once('ready', () => {
-    logger.info(`✅ Bot connecté en tant que ${client.user?.tag}`);
-    Settings.logConfiguration(logger);
+  // Initialize services
+  const eventManager = new EventManager();
+  const reminderScheduler = new ReminderScheduler(client, eventManager);
+  const reactionTracker = new ReactionTracker(eventManager);
+
+  // Store services on client for access in commands
+  (client as any).eventManager = eventManager;
+  (client as any).reminderScheduler = reminderScheduler;
+  (client as any).reactionTracker = reactionTracker;
+
+  // Bot ready event - called when bot is fully connected
+  client.once(Events.ClientReady, async (readyClient) => {
+    logger.info(`✅ Bot connected as ${readyClient.user.tag}`);
+    logger.info(`📊 Present on ${readyClient.guilds.cache.size} server(s)`);
+
+    // Log server information
+    readyClient.guilds.cache.forEach(guild => {
+      logger.info(`  - ${guild.name} (ID: ${guild.id})`);
+    });
+
+    // Set bot status
+    readyClient.user.setActivity('events and reminders', { type: ActivityType.Watching });
+
+    try {
+      // Setup and synchronize slash commands
+      setupSlashCommands(readyClient);
+      const synced = await syncSlashCommands(readyClient);
+      logger.info(`⚡ Synchronized ${synced.length} slash command(s) with Discord`);
+    } catch (error) {
+      logger.error(`Failed to sync slash commands: ${error}`);
+    }
+
+    // Setup command handlers
+    setupEventHandlers(readyClient);
+
+    // Load events from storage
+    try {
+      const loadedEvents = await eventManager.loadFromStorage();
+      logger.info(`📥 Loaded ${loadedEvents.length} events from storage`);
+    } catch (error) {
+      logger.error(`Failed to load events from storage: ${error}`);
+    }
+
+    // Initialize reminder scheduler
+    try {
+      await reminderScheduler.initialize();
+      logger.info('⏰ Reminder scheduler initialized');
+    } catch (error) {
+      logger.error(`Failed to initialize reminder scheduler: ${error}`);
+    }
 
     // Set logger for feature flag manager
     featureFlagManager.setLogger({
@@ -43,53 +101,90 @@ function createDiscordClient(): Client {
       warning: (msg: string) => logger.warn(msg),
       error: (msg: string) => logger.error(msg),
     });
+
+    logger.info('🎉 Bot initialization complete!');
   });
 
-  client.on('error', error => {
+  // Message events for legacy command support
+  client.on(Events.MessageCreate, async (message: Message) => {
+    if (message.author.bot) return;
+    
+    // Handle legacy text commands if needed
+    // This can be removed once full migration to slash commands is complete
+  });
+
+  // Reaction events for tracking user responses
+  client.on(Events.MessageReactionAdd, async (
+    reaction: MessageReaction | PartialMessageReaction,
+    user: User | PartialUser
+  ) => {
+    try {
+      // Fetch partial data
+      if (reaction.partial) {
+        await reaction.fetch();
+      }
+      if (user.partial) {
+        await user.fetch();
+      }
+
+      // Skip bot reactions
+      if (user.bot) return;
+
+      await reactionTracker.handleReactionAdd(reaction as MessageReaction, user as User);
+    } catch (error) {
+      logger.error(`Error handling reaction add: ${error}`);
+    }
+  });
+
+  client.on(Events.MessageReactionRemove, async (
+    reaction: MessageReaction | PartialMessageReaction,
+    user: User | PartialUser
+  ) => {
+    try {
+      // Fetch partial data
+      if (reaction.partial) {
+        await reaction.fetch();
+      }
+      if (user.partial) {
+        await user.fetch();
+      }
+
+      // Skip bot reactions
+      if (user.bot) return;
+
+      await reactionTracker.handleReactionRemove(reaction as MessageReaction, user as User);
+    } catch (error) {
+      logger.error(`Error handling reaction remove: ${error}`);
+    }
+  });
+
+  // Error handling
+  client.on(Events.Error, (error) => {
     logger.error(`Discord client error: ${error.message}`);
   });
 
-  client.on('warn', warning => {
+  client.on(Events.Warn, (warning) => {
     logger.warn(`Discord client warning: ${warning}`);
+  });
+
+  // Disconnect handling
+  client.on(Events.ShardDisconnect, (closeEvent, id) => {
+    logger.warn(`Shard ${id} disconnected: ${closeEvent.code} ${closeEvent.reason}`);
+  });
+
+  client.on(Events.ShardReconnecting, (id) => {
+    logger.info(`Shard ${id} reconnecting...`);
+  });
+
+  client.on(Events.ShardResume, (id, replayedEvents) => {
+    logger.info(`Shard ${id} resumed, replayed ${replayedEvents} events`);
   });
 
   return client;
 }
 
 /**
- * Main function to start the bot
+ * Helper function to create a fully configured Discord client
+ * This is used by the main application entry point
  */
-async function main(): Promise<void> {
-  try {
-    logger.info('🚀 Starting Discord Reminder Bot (TypeScript)...');
-
-    // Create Discord client
-    const client = createDiscordClient();
-
-    // Login to Discord
-    await client.login(Settings.TOKEN);
-
-    // Handle process signals for graceful shutdown
-    const handleShutdown = (signal: string): void => {
-      logger.info(`📥 Received ${signal}, shutting down gracefully...`);
-      client.destroy();
-      process.exit(0);
-    };
-
-    process.on('SIGINT', () => handleShutdown('SIGINT'));
-    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-  } catch (error) {
-    logger.error(`❌ Failed to start bot: ${error}`);
-    process.exit(1);
-  }
-}
-
-// Start the bot if this file is run directly
-if (require.main === module) {
-  main().catch(error => {
-    console.error('Fatal error starting bot:', error);
-    process.exit(1);
-  });
-}
-
-export default main;
+export { createDiscordClient };
