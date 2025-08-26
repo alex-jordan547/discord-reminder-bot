@@ -23,7 +23,7 @@ const logger = createLogger('slash-commands');
 
 export interface SlashCommand {
   data: SlashCommandBuilder;
-  execute: (interaction: CommandInteraction) => Promise<void>;
+  execute: (interaction: CommandInteraction, client?: Client) => Promise<void>;
 }
 
 // Collection to store all slash commands
@@ -58,9 +58,9 @@ const watchCommand: SlashCommand = {
           { name: '24 hours', value: 1440 }
         )
     ),
-  execute: async (interaction: CommandInteraction) => {
-    // Implementation will be added in handlers
-    await interaction.reply('⚠️ Watch command implementation in progress...');
+  execute: async (interaction: CommandInteraction, client: Client) => {
+    const { handleWatchCommand } = await import('./handlers');
+    await handleWatchCommand(interaction, client);
   },
 };
 
@@ -77,8 +77,9 @@ const unwatchCommand: SlashCommand = {
         .setDescription('Discord message link to stop watching')
         .setRequired(true)
     ),
-  execute: async (interaction: CommandInteraction) => {
-    await interaction.reply('⚠️ Unwatch command implementation in progress...');
+  execute: async (interaction: CommandInteraction, client: Client) => {
+    const { handleUnwatchCommand } = await import('./handlers');
+    await handleUnwatchCommand(interaction, client);
   },
 };
 
@@ -89,8 +90,9 @@ const listCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('list')
     .setDescription('List all watched events in this server'),
-  execute: async (interaction: CommandInteraction) => {
-    await interaction.reply('⚠️ List command implementation in progress...');
+  execute: async (interaction: CommandInteraction, client: Client) => {
+    const { handleListCommand } = await import('./handlers');
+    await handleListCommand(interaction, client);
   },
 };
 
@@ -101,8 +103,9 @@ const statusCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('status')
     .setDescription('Show bot status and statistics'),
-  execute: async (interaction: CommandInteraction) => {
-    await interaction.reply('⚠️ Status command implementation in progress...');
+  execute: async (interaction: CommandInteraction, client: Client) => {
+    const { handleStatusCommand } = await import('./handlers');
+    await handleStatusCommand(interaction, client);
   },
 };
 
@@ -180,7 +183,7 @@ export function setupSlashCommands(client: Client): void {
     }
 
     try {
-      await command.execute(interaction);
+      await command.execute(interaction, client);
       logger.info(`Command ${interaction.commandName} executed by ${interaction.user.tag}`);
     } catch (error) {
       logger.error(`Error executing command ${interaction.commandName}: ${error}`);
