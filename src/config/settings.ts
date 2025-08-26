@@ -38,6 +38,14 @@ const envSchema = z.object({
   DEGRADED_MODE_TIMEOUT_HOURS: z.coerce.number().int().positive().default(24),
   FORCE_COLOR: z.coerce.boolean().optional(),
   NO_COLOR: z.coerce.boolean().optional(),
+  SERVER_ENABLED: z.coerce.boolean().default(false),
+  SERVER_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  SERVER_HOST: z.string().default('0.0.0.0'),
+  SERVER_REQUIRED: z.coerce.boolean().default(false),
+  API_TOKEN: z.string().optional(),
+  NODE_ENV: z.string().default('development'),
+  GUILD_ID: z.string().optional(),
+  DELAY_BETWEEN_REMINDERS: z.coerce.number().int().min(1000).default(2000),
 });
 
 type EnvConfig = z.infer<typeof envSchema>;
@@ -122,6 +130,18 @@ export class Settings {
   static readonly LOG_COLORS = envConfig.LOG_COLORS;
   static readonly FORCE_COLOR = envConfig.FORCE_COLOR;
   static readonly NO_COLOR = envConfig.NO_COLOR;
+
+  // Server Configuration
+  static readonly SERVER_ENABLED = envConfig.SERVER_ENABLED;
+  static readonly SERVER_PORT = envConfig.SERVER_PORT;
+  static readonly SERVER_HOST = envConfig.SERVER_HOST;
+  static readonly SERVER_REQUIRED = envConfig.SERVER_REQUIRED;
+  static readonly API_TOKEN = envConfig.API_TOKEN;
+  static readonly NODE_ENV = envConfig.NODE_ENV;
+  static readonly GUILD_ID = envConfig.GUILD_ID;
+
+  // Rate Limiting Configuration
+  static readonly DELAY_BETWEEN_REMINDERS = envConfig.DELAY_BETWEEN_REMINDERS;
 
   /**
    * Validate and clamp an interval value to acceptable range.
@@ -261,6 +281,13 @@ export class Settings {
 
     // Fallback to checking reminder interval for backward compatibility
     return this.REMINDER_INTERVAL_HOURS < 1;
+  }
+
+  /**
+   * Alias for isTestMode() to match Python naming convention
+   */
+  static is_test_mode(): boolean {
+    return this.isTestMode();
   }
 
   /**
