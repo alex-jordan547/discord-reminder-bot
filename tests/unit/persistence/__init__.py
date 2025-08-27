@@ -1,1 +1,0 @@
-# Tests unitaires pour les modules de persistance

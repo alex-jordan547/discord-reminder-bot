@@ -1,10 +1,278 @@
 /**
  * Discord Reminder Bot - Message Parser Utilities
- * 
+ *
  * Utilities for parsing and validating Discord message links:
  * - Parse Discord message URLs to extract guild, channel, and message IDs
  * - Validate message link format
  * - Fetch messages from Discord with error handling
  */
 
-import { Client, Message, TextChannel } from 'discord.js';\nimport { createLogger } from '@/utils/loggingConfig';\n\nconst logger = createLogger('message-parser');\n\n/**\n * Parsed Discord message link components\n */\nexport interface ParsedMessageLink {\n  guildId: string;\n  channelId: string;\n  messageId: string;\n  url: string;\n}\n\n/**\n * Regular expression for Discord message links\n */\nconst DISCORD_MESSAGE_URL_REGEX = /https:\\/\\/discord\\.com\\/channels\\/(\\d+)\\/(\\d+)\\/(\\d+)/;\nconst DISCORD_MESSAGE_URL_REGEX_STRICT = /^https:\\/\\/discord\\.com\\/channels\\/(\\d{17,20})\\/(\\d{17,20})\\/(\\d{17,20})$/;\n\n/**\n * Validate if a string is a properly formatted Discord message link\n */\nexport function validateMessageLink(link: string): boolean {\n  if (typeof link !== 'string' || !link.trim()) {\n    return false;\n  }\n\n  return DISCORD_MESSAGE_URL_REGEX_STRICT.test(link.trim());\n}\n\n/**\n * Parse a Discord message link to extract component IDs\n */\nexport function parseMessageLink(link: string): ParsedMessageLink | null {\n  if (!link || typeof link !== 'string') {\n    logger.warn('Invalid link provided to parseMessageLink');\n    return null;\n  }\n\n  const trimmedLink = link.trim();\n  const match = trimmedLink.match(DISCORD_MESSAGE_URL_REGEX);\n  \n  if (!match || match.length < 4) {\n    logger.warn(`Invalid Discord message link format: ${trimmedLink}`);\n    return null;\n  }\n\n  const [, guildId, channelId, messageId] = match;\n  \n  // Validate snowflake IDs (Discord IDs should be 17-20 characters)\n  if (!isValidSnowflake(guildId) || !isValidSnowflake(channelId) || !isValidSnowflake(messageId)) {\n    logger.warn(`Invalid Discord ID format in link: ${trimmedLink}`);\n    return null;\n  }\n\n  return {\n    guildId,\n    channelId,\n    messageId,\n    url: trimmedLink,\n  };\n}\n\n/**\n * Validate if a string is a valid Discord snowflake ID\n */\nexport function isValidSnowflake(id: string): boolean {\n  // Discord snowflakes are 17-20 character numeric strings\n  return /^\\d{17,20}$/.test(id);\n}\n\n/**\n * Fetch a Discord message using the parsed components\n */\nexport async function fetchMessage(\n  client: Client,\n  parsed: ParsedMessageLink\n): Promise<Message | null> {\n  try {\n    // Fetch the channel first\n    const channel = await client.channels.fetch(parsed.channelId);\n    \n    if (!channel) {\n      logger.warn(`Channel ${parsed.channelId} not found`);\n      return null;\n    }\n\n    if (!channel.isTextBased()) {\n      logger.warn(`Channel ${parsed.channelId} is not a text channel`);\n      return null;\n    }\n\n    const textChannel = channel as TextChannel;\n    \n    // Fetch the message\n    const message = await textChannel.messages.fetch(parsed.messageId);\n    \n    if (!message) {\n      logger.warn(`Message ${parsed.messageId} not found in channel ${parsed.channelId}`);\n      return null;\n    }\n\n    return message;\n  } catch (error) {\n    logger.error(`Error fetching message ${parsed.messageId}: ${error}`);\n    return null;\n  }\n}\n\n/**\n * Build a Discord message link from component IDs\n */\nexport function buildMessageLink(guildId: string, channelId: string, messageId: string): string {\n  return `https://discord.com/channels/${guildId}/${channelId}/${messageId}`;\n}\n\n/**\n * Extract message information for display purposes\n */\nexport async function extractMessageInfo(\n  client: Client,\n  messageLink: string\n): Promise<{\n  title: string;\n  author: string;\n  content: string;\n  timestamp: Date;\n  channelName: string;\n  guildName: string;\n} | null> {\n  try {\n    const parsed = parseMessageLink(messageLink);\n    if (!parsed) {\n      return null;\n    }\n\n    const message = await fetchMessage(client, parsed);\n    if (!message) {\n      return null;\n    }\n\n    // Get channel and guild information\n    const channel = message.channel as TextChannel;\n    const guild = message.guild;\n    \n    if (!guild) {\n      logger.warn(`Message ${parsed.messageId} is not in a guild`);\n      return null;\n    }\n\n    // Generate a title from the message content or use a default\n    let title = message.content;\n    if (!title || title.length === 0) {\n      title = 'Message with attachments/embeds';\n    } else if (title.length > 100) {\n      title = title.substring(0, 100) + '...';\n    }\n\n    return {\n      title,\n      author: message.author.tag,\n      content: message.content || '[No text content]',\n      timestamp: message.createdAt,\n      channelName: channel.name,\n      guildName: guild.name,\n    };\n  } catch (error) {\n    logger.error(`Error extracting message info: ${error}`);\n    return null;\n  }\n}\n\n/**\n * Validate that a message can be watched (check permissions, message type, etc.)\n */\nexport async function validateWatchableMessage(\n  client: Client,\n  messageLink: string\n): Promise<{\n  valid: boolean;\n  reason?: string;\n  parsed?: ParsedMessageLink;\n  message?: Message;\n}> {\n  try {\n    // Parse the link\n    const parsed = parseMessageLink(messageLink);\n    if (!parsed) {\n      return {\n        valid: false,\n        reason: 'Invalid Discord message link format',\n      };\n    }\n\n    // Fetch the message\n    const message = await fetchMessage(client, parsed);\n    if (!message) {\n      return {\n        valid: false,\n        reason: 'Message not found or not accessible',\n        parsed,\n      };\n    }\n\n    // Check if it's in a guild\n    if (!message.guild) {\n      return {\n        valid: false,\n        reason: 'Message must be in a server (not DM)',\n        parsed,\n        message,\n      };\n    }\n\n    // Check if bot has necessary permissions\n    const channel = message.channel as TextChannel;\n    const botPermissions = channel.permissionsFor(client.user!);\n    \n    if (!botPermissions) {\n      return {\n        valid: false,\n        reason: 'Cannot determine bot permissions in that channel',\n        parsed,\n        message,\n      };\n    }\n\n    const requiredPermissions = ['ViewChannel', 'SendMessages', 'EmbedLinks'];\n    const missingPermissions = requiredPermissions.filter(\n      perm => !botPermissions.has(perm as any)\n    );\n\n    if (missingPermissions.length > 0) {\n      return {\n        valid: false,\n        reason: `Bot is missing permissions: ${missingPermissions.join(', ')}`,\n        parsed,\n        message,\n      };\n    }\n\n    // Check if message is too old (optional - could be configurable)\n    const messageAge = Date.now() - message.createdTimestamp;\n    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds\n    \n    if (messageAge > maxAge) {\n      return {\n        valid: false,\n        reason: 'Message is too old (older than 30 days)',\n        parsed,\n        message,\n      };\n    }\n\n    // All checks passed\n    return {\n      valid: true,\n      parsed,\n      message,\n    };\n  } catch (error) {\n    logger.error(`Error validating watchable message: ${error}`);\n    return {\n      valid: false,\n      reason: 'Error occurred while validating message',\n    };\n  }\n}\n\n/**\n * Get all reactions from a message and return user IDs\n */\nexport async function extractReactionsFromMessage(message: Message): Promise<string[]> {\n  try {\n    const userIds = new Set<string>();\n    \n    // Iterate through all reactions on the message\n    for (const [, reaction] of message.reactions.cache) {\n      try {\n        // Fetch all users who reacted with this emoji\n        const users = await reaction.users.fetch();\n        \n        users.forEach(user => {\n          if (!user.bot) { // Exclude bot reactions\n            userIds.add(user.id);\n          }\n        });\n      } catch (error) {\n        logger.warn(`Error fetching users for reaction ${reaction.emoji}: ${error}`);\n      }\n    }\n    \n    return Array.from(userIds);\n  } catch (error) {\n    logger.error(`Error extracting reactions from message: ${error}`);\n    return [];\n  }\n}\n\n/**\n * Create a shortened version of a message link for display\n */\nexport function shortenMessageLink(link: string, maxLength: number = 50): string {\n  if (link.length <= maxLength) {\n    return link;\n  }\n  \n  const parsed = parseMessageLink(link);\n  if (parsed) {\n    return `discord.com/.../channels/${parsed.channelId}/${parsed.messageId}`;\n  }\n  \n  // Fallback to simple truncation\n  return link.substring(0, maxLength - 3) + '...';\n}
+import { Client, Message, TextChannel } from 'discord.js';
+import { createLogger } from '@/utils/loggingConfig';
+
+const logger = createLogger('message-parser');
+
+/**
+ * Parsed Discord message link components
+ */
+export interface ParsedMessageLink {
+  guildId: string;
+  channelId: string;
+  messageId: string;
+  url: string;
+}
+
+/**
+ * Regular expression for Discord message links
+ */
+const DISCORD_MESSAGE_URL_REGEX = /https:\/\/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)/;
+const DISCORD_MESSAGE_URL_REGEX_STRICT =
+  /^https:\/\/discord\.com\/channels\/(\d{17,20})\/(\d{17,20})\/(\d{17,20})$/;
+
+/**
+ * Validate if a string is a properly formatted Discord message link
+ */
+export function validateMessageLink(link: string): boolean {
+  if (typeof link !== 'string' || !link.trim()) return false;
+  return DISCORD_MESSAGE_URL_REGEX_STRICT.test(link.trim());
+}
+
+/**
+ * Parse a Discord message link to extract component IDs
+ */
+export function parseMessageLink(link: string): ParsedMessageLink | null {
+  if (!link || typeof link !== 'string') {
+    logger.warn('Invalid link provided to parseMessageLink');
+    return null;
+  }
+
+  const trimmedLink = link.trim();
+  const match = trimmedLink.match(DISCORD_MESSAGE_URL_REGEX);
+
+  if (!match || match.length < 4) {
+    logger.warn(`Invalid Discord message link format: ${trimmedLink}`);
+    return null;
+  }
+
+  const [, guildId, channelId, messageId] = match;
+
+  if (!isValidSnowflake(guildId) || !isValidSnowflake(channelId) || !isValidSnowflake(messageId)) {
+    logger.warn(`Invalid Discord ID format in link: ${trimmedLink}`);
+    return null;
+  }
+
+  return { guildId, channelId, messageId, url: trimmedLink };
+}
+
+/**
+ * Validate if a string is a valid Discord snowflake ID
+ */
+export function isValidSnowflake(id: string): boolean {
+  return /^\d{17,20}$/.test(id);
+}
+
+/**
+ * Fetch a Discord message using the parsed components
+ */
+export async function fetchMessage(
+  client: Client,
+  parsed: ParsedMessageLink,
+): Promise<Message | null> {
+  try {
+    const channel = await client.channels.fetch(parsed.channelId);
+
+    if (!channel) {
+      logger.warn(`Channel ${parsed.channelId} not found`);
+      return null;
+    }
+
+    if (!channel.isTextBased()) {
+      logger.warn(`Channel ${parsed.channelId} is not a text channel`);
+      return null;
+    }
+
+    const textChannel = channel as TextChannel;
+    const message = await textChannel.messages.fetch(parsed.messageId);
+
+    if (!message) {
+      logger.warn(`Message ${parsed.messageId} not found in channel ${parsed.channelId}`);
+      return null;
+    }
+
+    return message;
+  } catch (error) {
+    logger.error(`Error fetching message ${parsed.messageId}: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Build a Discord message link from IDs
+ */
+export function buildMessageLink(guildId: string, channelId: string, messageId: string): string {
+  return `https://discord.com/channels/${guildId}/${channelId}/${messageId}`;
+}
+
+/**
+ * Extract message info (for display)
+ */
+export async function extractMessageInfo(
+  client: Client,
+  messageLink: string,
+): Promise<{
+  title: string;
+  author: string;
+  content: string;
+  timestamp: Date;
+  channelName: string;
+  guildName: string;
+} | null> {
+  try {
+    const parsed = parseMessageLink(messageLink);
+    if (!parsed) return null;
+
+    const message = await fetchMessage(client, parsed);
+    if (!message) return null;
+
+    const channel = message.channel as TextChannel;
+    const guild = message.guild;
+    if (!guild) {
+      logger.warn(`Message ${parsed.messageId} is not in a guild`);
+      return null;
+    }
+
+    let title = message.content;
+    if (!title) {
+      title = 'Message with attachments/embeds';
+    } else if (title.length > 100) {
+      title = title.substring(0, 100) + '...';
+    }
+
+    return {
+      title,
+      author: message.author.tag,
+      content: message.content || '[No text content]',
+      timestamp: message.createdAt,
+      channelName: channel.name,
+      guildName: guild.name,
+    };
+  } catch (error) {
+    logger.error(`Error extracting message info: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Validate if a message can be "watched" (bot perms, age, etc.)
+ */
+export async function validateWatchableMessage(
+  client: Client,
+  messageLink: string,
+): Promise<{
+  valid: boolean;
+  reason?: string;
+  parsed?: ParsedMessageLink;
+  message?: Message;
+}> {
+  try {
+    const parsed = parseMessageLink(messageLink);
+    if (!parsed) {
+      return { valid: false, reason: 'Invalid Discord message link format' };
+    }
+
+    const message = await fetchMessage(client, parsed);
+    if (!message) {
+      return {
+        valid: false,
+        reason: 'Message not found or not accessible',
+        parsed,
+      };
+    }
+
+    if (!message.guild) {
+      return {
+        valid: false,
+        reason: 'Message must be in a server (not DM)',
+        parsed,
+        message,
+      };
+    }
+
+    const channel = message.channel as TextChannel;
+    const botPermissions = channel.permissionsFor(client.user!);
+    if (!botPermissions) {
+      return {
+        valid: false,
+        reason: 'Cannot determine bot permissions in that channel',
+        parsed,
+        message,
+      };
+    }
+
+    const requiredPermissions = ['ViewChannel', 'SendMessages', 'EmbedLinks'];
+    const missingPermissions = requiredPermissions.filter(perm => !botPermissions.has(perm as any));
+    if (missingPermissions.length > 0) {
+      return {
+        valid: false,
+        reason: `Bot is missing permissions: ${missingPermissions.join(', ')}`,
+        parsed,
+        message,
+      };
+    }
+
+    const messageAge = Date.now() - message.createdTimestamp;
+    const maxAge = 30 * 24 * 60 * 60 * 1000;
+    if (messageAge > maxAge) {
+      return {
+        valid: false,
+        reason: 'Message is too old (older than 30 days)',
+        parsed,
+        message,
+      };
+    }
+
+    return { valid: true, parsed, message };
+  } catch (error) {
+    logger.error(`Error validating watchable message: ${error}`);
+    return { valid: false, reason: 'Error occurred while validating message' };
+  }
+}
+
+/**
+ * Get all reactions from a message as user IDs
+ */
+export async function extractReactionsFromMessage(message: Message): Promise<string[]> {
+  try {
+    const userIds = new Set<string>();
+
+    for (const [, reaction] of message.reactions.cache) {
+      try {
+        const users = await reaction.users.fetch();
+        users.forEach(user => {
+          if (!user.bot) userIds.add(user.id);
+        });
+      } catch (error) {
+        logger.warn(`Error fetching users for reaction ${reaction.emoji}: ${error}`);
+      }
+    }
+
+    return Array.from(userIds);
+  } catch (error) {
+    logger.error(`Error extracting reactions from message: ${error}`);
+    return [];
+  }
+}
+
+/**
+ * Shorten a message link for UI display
+ */
+export function shortenMessageLink(link: string, maxLength = 50): string {
+  if (link.length <= maxLength) return link;
+
+  const parsed = parseMessageLink(link);
+  if (parsed) {
+    return `discord.com/.../channels/${parsed.channelId}/${parsed.messageId}`;
+  }
+
+  return link.substring(0, maxLength - 3) + '...';
+}
