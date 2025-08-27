@@ -46,6 +46,7 @@ const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   GUILD_ID: z.string().optional(),
   DELAY_BETWEEN_REMINDERS: z.coerce.number().int().min(1000).default(2000),
+  TIMEZONE: z.string().default('Europe/Paris'),
 });
 
 type EnvConfig = z.infer<typeof envSchema>;
@@ -156,6 +157,9 @@ export class Settings {
 
   // Rate Limiting Configuration
   static readonly DELAY_BETWEEN_REMINDERS = envConfig.DELAY_BETWEEN_REMINDERS;
+  
+  // Timezone Configuration
+  static readonly TIMEZONE = envConfig.TIMEZONE;
 
   /**
    * Validate and clamp an interval value to acceptable range.

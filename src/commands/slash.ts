@@ -70,13 +70,7 @@ const watchCommand: SlashCommand = {
 const unwatchCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('unwatch')
-    .setDescription('Stop watching a message for reactions')
-    .addStringOption(option =>
-      option
-        .setName('link')
-        .setDescription('Discord message link to stop watching')
-        .setRequired(true),
-    ),
+    .setDescription('Stop watching a message for reactions (choose from available events)'),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleUnwatchCommand } = await import('./handlers');
     await handleUnwatchCommand(interaction, client);
@@ -130,7 +124,7 @@ const helpCommand: SlashCommand = {
         },
         {
           name: '⏹️ /unwatch',
-          value: 'Stop watching a message for reactions\\n`/unwatch link:<message_link>`',
+          value: 'Stop watching a message for reactions (interactive selection)\\n`/unwatch`',
           inline: false,
         },
         {
@@ -155,7 +149,7 @@ const helpCommand: SlashCommand = {
       timestamp: new Date().toISOString(),
     };
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };
 

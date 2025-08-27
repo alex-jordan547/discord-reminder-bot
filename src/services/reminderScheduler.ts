@@ -14,6 +14,7 @@ import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from './eventManager';
 import { Event } from '@/models/Event';
 import { Settings } from '@/config/settings';
+import { formatDateForDisplay } from '@/utils/dateUtils';
 
 const logger = createLogger('reminder-scheduler');
 
@@ -415,6 +416,10 @@ export class ReminderScheduler {
         );
       }
 
+      // Get total accessible users for statistics
+      const totalAccessibleUsers = await this.getTotalAccessibleUsers(channel);
+      const reactedCount = event.getReactionCount();
+      
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
         .setDescription(
@@ -426,8 +431,8 @@ export class ReminderScheduler {
           {
             name: '📊 Statistiques',
             value:
-              `✅ Ont réagi: **${event.getReactionCount()}**\n` +
-              `🔄 En attente de réponse des autres membres`,
+              `👥 Ont réagi: **${reactedCount}/${totalAccessibleUsers}**\n` +
+              `⏳ En attente de réponse: **${Math.max(0, totalAccessibleUsers - reactedCount)}** membres`,
             inline: false,
           },
           {
@@ -437,18 +442,21 @@ export class ReminderScheduler {
           },
         );
 
-      // Handle footer text - simplified version
+      // Handle footer text with proper formatting and timezone
       if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
         const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
         let footerText = `🗑️ Ce message s'auto-détruira dans ${deleteDelayText}`;
+        
         if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          footerText += ` • ${timestamp}`;
+          const currentTime = formatDateForDisplay(new Date());
+          footerText += `\n📅 Envoyé le ${currentTime}`;
         }
         embed.setFooter({ text: footerText });
       } else if (Settings.is_test_mode()) {
-        const timestamp = new Date().toISOString();
-        embed.setFooter({ text: `Rappel automatique • ${timestamp}` });
+        const currentTime = formatDateForDisplay(new Date());
+        embed.setFooter({ text: `📅 Rappel automatique\nEnvoyé le ${currentTime}` });
+      } else {
+        embed.setFooter({ text: '📅 Rappel automatique' });
       }
 
       // Send the reminder message
@@ -559,6 +567,39 @@ export class ReminderScheduler {
 
     logger.info('Forcing immediate reminder check');
     await this.checkReminders();
+  }
+
+  /**
+   * Get total number of users who can access the channel (excluding bots)
+   */
+  private async getTotalAccessibleUsers(channel: TextChannel): Promise<number> {
+    try {
+      const guild = channel.guild;
+      if (!guild) {
+        return 0;
+      }
+
+      const members = await guild.members.fetch();
+      let accessibleCount = 0;
+      
+      for (const [, member] of members) {
+        // Skip bots
+        if (member.user.bot) {
+          continue;
+        }
+        
+        // Check if user has permission to view the channel
+        const permissions = channel.permissionsFor(member);
+        if (permissions?.has('ViewChannel')) {
+          accessibleCount++;
+        }
+      }
+      
+      return accessibleCount;
+    } catch (error) {
+      logger.error(`Error getting total accessible users for channel ${channel.id}: ${error}`);
+      return 0;
+    }
   }
 
   /**
