@@ -33,13 +33,15 @@ export interface BaseModelData {
  * Base model class that provides common functionality for all models
  * Includes automatic timestamps, validation, and serialization capabilities
  */
-export abstract class BaseModel implements SerializableModel {
+export abstract class BaseModel<T = any> implements SerializableModel {
   public readonly createdAt: Date;
   public updatedAt: Date;
+  protected data: T;
 
-  constructor(data: BaseModelData) {
+  constructor(data: T & BaseModelData) {
     this.createdAt = new Date(data.createdAt || Date.now());
     this.updatedAt = new Date(data.updatedAt || Date.now());
+    this.data = data;
   }
 
   /**

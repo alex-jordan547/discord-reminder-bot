@@ -15,6 +15,8 @@ import { EventManager } from './eventManager';
 import { Event } from '@/models/Event';
 import { Settings } from '@/config/settings';
 import { formatDateForDisplay } from '@/utils/dateUtils';
+import { GuildConfigManager } from './guildConfigManager';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
 
 const logger = createLogger('reminder-scheduler');
 
@@ -41,10 +43,15 @@ export class ReminderScheduler {
   private scheduledTimeout: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private status: SchedulerStatus;
+  private guildConfigManager: GuildConfigManager;
 
   constructor(client: Client, eventManager: EventManager) {
     this.client = client;
     this.eventManager = eventManager;
+    
+    // Initialize guild configuration manager
+    const storage = new SqliteStorage();
+    this.guildConfigManager = new GuildConfigManager(client, storage);
     this.status = {
       status: 'stopped',
       nextCheck: null,
@@ -347,6 +354,9 @@ export class ReminderScheduler {
    */
   private async sendReminder(event: Event): Promise<number> {
     try {
+      // Get guild-specific configuration
+      const guildConfig = await this.getGuildConfig(event.guildId);
+
       // Get the original event message to update reactions
       const channel = (await this.client.channels.fetch(event.channelId)) as TextChannel;
       if (!channel) {
@@ -407,8 +417,8 @@ export class ReminderScheduler {
           return 0;
         }
 
-        // Limit mentions to avoid spam
-        const maxMentions = Settings.MAX_MENTIONS_PER_REMINDER || 50;
+        // Limit mentions to avoid spam using guild-specific configuration
+        const maxMentions = guildConfig.maxMentions;
         const usersToMention = missingUsers.slice(0, maxMentions);
         mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
         mentionStrategy = 'individual';
@@ -444,9 +454,9 @@ export class ReminderScheduler {
           },
         );
 
-      // Handle footer text with proper formatting and timezone
-      if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
+      // Handle footer text with proper formatting and timezone using guild-specific configuration
+      if (guildConfig.autoDeleteEnabled && guildConfig.autoDeleteDelayHours > 0) {
+        const deleteDelayText = this.formatAutoDeleteDisplay(guildConfig.autoDeleteDelayHours);
         let footerText = `🗑️ Ce message s'auto-détruira dans ${deleteDelayText}`;
 
         if (Settings.is_test_mode()) {
@@ -473,9 +483,9 @@ export class ReminderScheduler {
         allowedMentions,
       });
 
-      // Schedule auto-deletion if enabled
-      if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelay = Settings.AUTO_DELETE_DELAY_HOURS * 60 * 60 * 1000;
+      // Schedule auto-deletion if enabled using guild-specific configuration
+      if (guildConfig.autoDeleteEnabled && guildConfig.autoDeleteDelayHours > 0) {
+        const deleteDelay = guildConfig.autoDeleteDelayHours * 60 * 60 * 1000;
         setTimeout(() => {
           sentMessage.delete().catch(error => {
             logger.debug(`Could not auto-delete reminder: ${error}`);
@@ -547,6 +557,29 @@ export class ReminderScheduler {
     } else {
       const days = Math.round(hours / 24);
       return `${days} jour${days > 1 ? 's' : ''}`;
+    }
+  }
+
+  /**
+   * Get guild-specific configuration for reminder settings
+   */
+  private async getGuildConfig(guildId: string) {
+    try {
+      const config = await this.guildConfigManager.getGuildConfig(guildId);
+      return {
+        maxMentions: config?.maxMentionsPerReminder ?? Settings.MAX_MENTIONS_PER_REMINDER,
+        autoDeleteEnabled: config?.autoDeleteEnabled ?? Settings.AUTO_DELETE_REMINDERS,
+        autoDeleteDelayHours: config?.getAutoDeleteDelayHours() ?? Settings.AUTO_DELETE_DELAY_HOURS,
+        delayBetweenRemindersMs: config?.delayBetweenRemindersMs ?? Settings.DELAY_BETWEEN_REMINDERS
+      };
+    } catch (error) {
+      logger.error(`Error getting guild config for ${guildId}, using defaults:`, error);
+      return {
+        maxMentions: Settings.MAX_MENTIONS_PER_REMINDER,
+        autoDeleteEnabled: Settings.AUTO_DELETE_REMINDERS,
+        autoDeleteDelayHours: Settings.AUTO_DELETE_DELAY_HOURS,
+        delayBetweenRemindersMs: Settings.DELAY_BETWEEN_REMINDERS
+      };
     }
   }
 

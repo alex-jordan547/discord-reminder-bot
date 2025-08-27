@@ -83,6 +83,32 @@ export class SqliteStorage {
         `,
         params: [],
       },
+      
+      // Guild configurations table
+      {
+        sql: `
+          CREATE TABLE IF NOT EXISTS guild_configs (
+            guild_id TEXT PRIMARY KEY,
+            guild_name TEXT NOT NULL,
+            reminder_channel_id TEXT,
+            reminder_channel_name TEXT DEFAULT 'Canal original',
+            admin_role_ids TEXT DEFAULT '[]',
+            admin_role_names TEXT DEFAULT '[]',
+            default_interval_minutes REAL DEFAULT 60.0,
+            auto_delete_enabled INTEGER DEFAULT 1,
+            auto_delete_delay_minutes REAL DEFAULT 60.0,
+            delay_between_reminders_ms INTEGER DEFAULT 2000,
+            max_mentions_per_reminder INTEGER DEFAULT 50,
+            use_everyone_above_limit INTEGER DEFAULT 1,
+            default_reactions TEXT DEFAULT '["✅","❌","❓"]',
+            timezone TEXT DEFAULT 'Europe/Paris',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `,
+        params: [],
+      },
     ];
 
     await this.db.executeTransaction(tableCreationSQL);
@@ -109,6 +135,12 @@ export class SqliteStorage {
       },
       {
         sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)',
+        params: [],
+      },
+      
+      // Guild config indexes
+      {
+        sql: 'CREATE INDEX IF NOT EXISTS idx_guild_configs_last_used ON guild_configs(last_used_at)',
         params: [],
       },
     ];
@@ -461,5 +493,166 @@ export class SqliteStorage {
    */
   isReady(): boolean {
     return this.isInitialized;
+  }
+
+  // ===========================
+  // Guild Configuration Methods
+  // ===========================
+
+  /**
+   * Save or update guild configuration
+   */
+  async saveGuildConfig(config: any): Promise<StorageOperationResult> {
+    try {
+      const sql = `
+        INSERT OR REPLACE INTO guild_configs (
+          guild_id, guild_name, reminder_channel_id, reminder_channel_name,
+          admin_role_ids, admin_role_names, default_interval_minutes,
+          auto_delete_enabled, auto_delete_delay_minutes, delay_between_reminders_ms,
+          max_mentions_per_reminder, use_everyone_above_limit, default_reactions,
+          timezone, created_at, updated_at, last_used_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const params = [
+        config.guildId,
+        config.guildName,
+        config.reminderChannelId,
+        config.reminderChannelName || 'Canal original',
+        JSON.stringify(Array.isArray(config.adminRoleIds) ? config.adminRoleIds : []),
+        JSON.stringify(Array.isArray(config.adminRoleNames) ? config.adminRoleNames : []),
+        config.defaultIntervalMinutes || 60,
+        config.autoDeleteEnabled ? 1 : 0,
+        config.autoDeleteDelayMinutes || 60,
+        config.delayBetweenRemindersMs || 2000,
+        config.maxMentionsPerReminder || 50,
+        config.useEveryoneAboveLimit ? 1 : 0,
+        JSON.stringify(Array.isArray(config.defaultReactions) ? config.defaultReactions : ['✅', '❌', '❓']),
+        config.timezone || 'Europe/Paris',
+        config.createdAt?.toISOString() || new Date().toISOString(),
+        config.updatedAt?.toISOString() || new Date().toISOString(),
+        config.lastUsedAt?.toISOString() || new Date().toISOString(),
+      ];
+
+      const result = await this.db.run(sql, params);
+      
+      logger.debug(`Guild config ${config.guildId} - (${config.guildName}) saved/updated successfully in DB`);
+      
+      return {
+        success: true,
+        affectedRows: result.changes,
+      };
+    } catch (error) {
+      logger.error('Error saving guild config:', error);
+      logger.error('Guild config data:', config);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get guild configuration by guild ID
+   */
+  async getGuildConfig(guildId: string): Promise<any | null> {
+    try {
+      const sql = 'SELECT * FROM guild_configs WHERE guild_id = ?';
+      const result = await this.db.get(sql, [guildId]);
+
+      if (!result) {
+        return null;
+      }
+
+      // Parse JSON fields
+      return {
+        guildId: result.guild_id,
+        guildName: result.guild_name,
+        reminderChannelId: result.reminder_channel_id,
+        reminderChannelName: result.reminder_channel_name,
+        adminRoleIds: JSON.parse(result.admin_role_ids || '[]'),
+        adminRoleNames: JSON.parse(result.admin_role_names || '[]'),
+        defaultIntervalMinutes: result.default_interval_minutes,
+        autoDeleteEnabled: Boolean(result.auto_delete_enabled),
+        autoDeleteDelayMinutes: result.auto_delete_delay_minutes,
+        delayBetweenRemindersMs: result.delay_between_reminders_ms,
+        maxMentionsPerReminder: result.max_mentions_per_reminder,
+        useEveryoneAboveLimit: Boolean(result.use_everyone_above_limit),
+        defaultReactions: JSON.parse(result.default_reactions || '[]'),
+        timezone: result.timezone,
+        createdAt: new Date(result.created_at),
+        updatedAt: new Date(result.updated_at),
+        lastUsedAt: new Date(result.last_used_at),
+      };
+    } catch (error) {
+      logger.error(`Error getting guild config for ${guildId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete guild configuration
+   */
+  async deleteGuildConfig(guildId: string): Promise<StorageOperationResult> {
+    try {
+      const sql = 'DELETE FROM guild_configs WHERE guild_id = ?';
+      const result = await this.db.run(sql, [guildId]);
+
+      return {
+        success: true,
+        affectedRows: result.changes,
+      };
+    } catch (error) {
+      logger.error(`Error deleting guild config for ${guildId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get all guild configurations (for management purposes)
+   */
+  async getAllGuildConfigs(): Promise<any[]> {
+    try {
+      const sql = 'SELECT * FROM guild_configs ORDER BY last_used_at DESC';
+      const results = await this.db.all(sql);
+
+      return results.map(result => ({
+        guildId: result.guild_id,
+        guildName: result.guild_name,
+        reminderChannelId: result.reminder_channel_id,
+        reminderChannelName: result.reminder_channel_name,
+        adminRoleIds: JSON.parse(result.admin_role_ids || '[]'),
+        adminRoleNames: JSON.parse(result.admin_role_names || '[]'),
+        defaultIntervalMinutes: result.default_interval_minutes,
+        autoDeleteEnabled: Boolean(result.auto_delete_enabled),
+        autoDeleteDelayMinutes: result.auto_delete_delay_minutes,
+        delayBetweenRemindersMs: result.delay_between_reminders_ms,
+        maxMentionsPerReminder: result.max_mentions_per_reminder,
+        useEveryoneAboveLimit: Boolean(result.use_everyone_above_limit),
+        defaultReactions: JSON.parse(result.default_reactions || '[]'),
+        timezone: result.timezone,
+        createdAt: new Date(result.created_at),
+        updatedAt: new Date(result.updated_at),
+        lastUsedAt: new Date(result.last_used_at),
+      }));
+    } catch (error) {
+      logger.error('Error getting all guild configs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update guild config last used timestamp
+   */
+  async touchGuildConfig(guildId: string): Promise<void> {
+    try {
+      const sql = 'UPDATE guild_configs SET last_used_at = ? WHERE guild_id = ?';
+      await this.db.run(sql, [new Date().toISOString(), guildId]);
+    } catch (error) {
+      logger.error(`Error touching guild config ${guildId}:`, error);
+    }
   }
 }

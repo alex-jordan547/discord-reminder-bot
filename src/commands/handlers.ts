@@ -23,9 +23,11 @@ import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from '@/services/eventManager';
 import { ReminderScheduler } from '@/services/reminderScheduler';
 import { parseMessageLink, validateMessageLink } from '@/utils/messageParser';
-import { validatePermissions, hasAdminRole } from '@/utils/permissions';
+import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '@/utils/permissions';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Event as EventModel } from '@/models/Event';
+import { GuildConfigManager } from '@/services/guildConfigManager';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
 
 const logger = createLogger('handlers');
 
@@ -45,8 +47,6 @@ export async function handleWatchCommand(
   client: Client,
 ): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
-  const intervalMinutes =
-    (interaction.options.get('interval')?.value as number) || Settings.REMINDER_INTERVAL_HOURS * 60;
 
   try {
     // Validate permissions
@@ -58,8 +58,17 @@ export async function handleWatchCommand(
       return;
     }
 
+    // Get guild-specific configuration
+    const storage = new SqliteStorage();
+    const guildConfigManager = new GuildConfigManager(client, storage);
+    const guildConfig = await guildConfigManager.getGuildConfig(interaction.guild.id);
+    
+    const intervalMinutes =
+      (interaction.options.get('interval')?.value as number) || 
+      (guildConfig ? guildConfig.defaultIntervalMinutes : Settings.REMINDER_INTERVAL_HOURS * 60);
+
     const member = interaction.member as GuildMember;
-    if (!hasAdminRole(member)) {
+    if (!hasGuildAdminRole(member, guildConfig?.adminRoleNames)) {
       await interaction.reply({
         content: '❌ You need administrator permissions to use this command.',
         flags: MessageFlags.Ephemeral,

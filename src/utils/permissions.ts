@@ -341,6 +341,34 @@ export function hasAdminRole(member: GuildMember): boolean {
 }
 
 /**
+ * Check if a guild member has admin role based on guild-specific admin roles
+ */
+export function hasGuildAdminRole(member: GuildMember, guildAdminRoles?: string[]): boolean {
+  try {
+    // If no guild-specific roles provided, use global settings
+    const adminRoles = guildAdminRoles && guildAdminRoles.length > 0 ? guildAdminRoles : Settings.ADMIN_ROLES;
+
+    if (!adminRoles || adminRoles.length === 0) {
+      // If no admin roles configured, check for Administrator permission
+      return member.permissions.has(PermissionFlagsBits.Administrator);
+    }
+
+    // Check if user has any of the configured admin roles
+    const hasRole = member.roles.cache.some(role => adminRoles.includes(role.name));
+
+    if (hasRole) {
+      return true;
+    }
+
+    // Fallback to checking Administrator permission
+    return member.permissions.has(PermissionFlagsBits.Administrator);
+  } catch (error) {
+    logger.error(`Error checking guild admin role for ${member.user.tag}: ${error}`);
+    return false;
+  }
+}
+
+/**
  * Check if a user has permission to use a specific command
  */
 export function canUseCommand(member: GuildMember, command: string): boolean {

@@ -120,33 +120,33 @@ const helpCommand: SlashCommand = {
         {
           name: '📝 /watch',
           value:
-            'Watch a message for reactions and send automatic reminders\\n`/watch link:<message_link> [interval:<minutes>]`',
+            'Watch a message for reactions and send automatic reminders\n`/watch link:<message_link> [interval:<minutes>]`',
           inline: false,
         },
         {
           name: '⏹️ /unwatch',
-          value: 'Stop watching a message for reactions (interactive selection)\\n`/unwatch`',
+          value: 'Stop watching a message for reactions (interactive selection)\n`/unwatch`',
           inline: false,
         },
         {
           name: '📋 /list',
-          value: 'List all watched events in this server\\n`/list`',
+          value: 'List all watched events in this server\n`/list`',
           inline: false,
         },
         {
           name: '⚡ /remind_now',
           value:
-            'Send an immediate reminder for a watched event (interactive selection)\\n`/remind_now`',
+            'Send an immediate reminder for a watched event (interactive selection)\n`/remind_now`',
           inline: false,
         },
         {
           name: '📊 /status',
-          value: 'Show bot status and statistics\\n`/status`',
+          value: 'Show bot status and statistics\n`/status`',
           inline: false,
         },
         {
           name: '❓ /help',
-          value: 'Show this help message\\n`/help`',
+          value: 'Show this help message\n`/help`',
           inline: false,
         },
       ],
@@ -175,12 +175,50 @@ const remindNowCommand: SlashCommand = {
   },
 };
 
+/**
+ * Config command - Manage server-specific bot configuration
+ */
+const configCommand: SlashCommand = {
+  data: new SlashCommandBuilder()
+    .setName('config')
+    .setDescription('Manage server-specific bot configuration')
+    .addSubcommand(subcommand =>
+      subcommand.setName('show').setDescription('Show current server configuration'),
+    )
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('set')
+        .setDescription('Configure server settings')
+        .addStringOption(option =>
+          option
+            .setName('option')
+            .setDescription('Configuration option to change')
+            .setRequired(true)
+            .addChoices(
+              { name: '📢 Canal de rappel', value: 'reminder_channel' },
+              { name: '👑 Rôles administrateurs', value: 'admin_roles' },
+              { name: '⏰ Intervalle par défaut', value: 'default_interval' },
+              { name: '🗑️ Suppression automatique', value: 'auto_delete' },
+              { name: '⏳ Délai suppression auto', value: 'auto_delete_delay' },
+              { name: '📊 Limite de mentions', value: 'max_mentions' },
+              { name: '🎭 Réactions par défaut', value: 'default_reactions' },
+              { name: '🌍 Fuseau horaire', value: 'timezone' },
+            ),
+        ),
+    ),
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+    const { handleConfigCommand } = await import('./configHandler');
+    await handleConfigCommand(interaction, client);
+  },
+};
+
 // Add commands to collection
 commands.set(watchCommand.data.name, watchCommand);
 commands.set(unwatchCommand.data.name, unwatchCommand);
 commands.set(listCommand.data.name, listCommand);
 commands.set(statusCommand.data.name, statusCommand);
 commands.set(remindNowCommand.data.name, remindNowCommand);
+commands.set(configCommand.data.name, configCommand);
 commands.set(helpCommand.data.name, helpCommand);
 
 /**
@@ -190,31 +228,52 @@ export function setupSlashCommands(client: Client): void {
   // Store commands collection on client for access in interaction handler
   (client as any).commands = commands;
 
-  // Handle slash command interactions
+  // Handle all interactions (slash commands and button interactions)
   client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const command = commands.get(interaction.commandName);
-    if (!command) {
-      logger.warn(`Unknown command: ${interaction.commandName}`);
-      return;
-    }
-
-    try {
-      await command.execute(interaction, client);
-      logger.info(`Command ${interaction.commandName} executed by ${interaction.user.tag}`);
-    } catch (error) {
-      logger.error(`Error executing command ${interaction.commandName}: ${error}`);
+    // Handle slash commands
+    if (interaction.isChatInputCommand()) {
+      const command = commands.get(interaction.commandName);
+      if (!command) {
+        logger.warn(`Unknown command: ${interaction.commandName}`);
+        return;
+      }
 
       try {
-        const errorMessage = 'There was an error while executing this command!';
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
-        } else {
-          await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+        await command.execute(interaction, client);
+        logger.info(`Command ${interaction.commandName} executed by ${interaction.user.tag}`);
+      } catch (error) {
+        logger.error(`Error executing command ${interaction.commandName}: ${error}`);
+
+        try {
+          const errorMessage = 'There was an error while executing this command!';
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+          } else {
+            await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+          }
+        } catch (replyError) {
+          logger.error(`Could not send error message: ${replyError}`);
         }
-      } catch (replyError) {
-        logger.error(`Could not send error message: ${replyError}`);
+      }
+    }
+    // Handle button interactions for config commands
+    else if (interaction.isButton()) {
+      try {
+        const { handleConfigButtonInteraction } = await import('./configHandler');
+        await handleConfigButtonInteraction(interaction, client);
+      } catch (error) {
+        logger.error(`Error handling button interaction: ${error}`);
+
+        try {
+          const errorMessage = "❌ Une erreur s'est produite lors du traitement de l'interaction.";
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+          } else {
+            await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+          }
+        } catch (replyError) {
+          logger.error(`Could not send button error message: ${replyError}`);
+        }
       }
     }
   });
