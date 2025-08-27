@@ -27,7 +27,7 @@ import { EventManager } from '@/services/eventManager';
 import { ReminderScheduler } from '@/services/reminderScheduler';
 import { ReactionTracker } from '@/services/reactionTracker';
 
-const logger = createLogger('bot');
+const logger = createLogger('bot.ts');
 
 /**
  * Create and configure Discord client with all necessary intents and event handlers
@@ -78,12 +78,12 @@ export async function createDiscordClient(): Promise<Client> {
     // Setup command handlers
     setupEventHandlers(readyClient);
 
-    // Load events from storage
+    // Initialize event manager (creates tables and loads events)
     try {
-      const loadedEvents = await eventManager.loadFromStorage();
-      logger.info(`📥 Loaded ${loadedEvents.length} events from storage`);
+      await eventManager.initialize();
+      logger.info('📥 Event manager initialized successfully');
     } catch (error) {
-      logger.error(`Failed to load events from storage: ${error}`);
+      logger.error(`Failed to initialize event manager: ${error}`);
     }
 
     // Initialize reminder scheduler

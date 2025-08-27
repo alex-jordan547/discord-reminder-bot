@@ -58,6 +58,7 @@ export function parseMessageLink(link: string): ParsedMessageLink | null {
 
   if (!isValidSnowflake(guildId) || !isValidSnowflake(channelId) || !isValidSnowflake(messageId)) {
     logger.warn(`Invalid Discord ID format in link: ${trimmedLink}`);
+    logger.warn(`IDs found - Guild: ${guildId} (${guildId.length}), Channel: ${channelId} (${channelId.length}), Message: ${messageId} (${messageId.length})`);
     return null;
   }
 

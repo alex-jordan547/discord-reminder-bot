@@ -173,6 +173,7 @@ export function setupLogging(options: {
   const pinoLevel = LOG_LEVEL_MAP[logLevel] || 'info';
 
   const pinoOptions: LoggerOptions = {
+    base: null,
     level: pinoLevel,
     name: 'discord-reminder-bot',
   };

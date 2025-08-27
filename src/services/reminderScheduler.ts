@@ -9,7 +9,7 @@
  * - Complete 1:1 migration from Python implementation
  */
 
-import { Client, TextChannel, EmbedBuilder, User } from 'discord.js';
+import { Client, TextChannel, EmbedBuilder } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from './eventManager';
 import { Event } from '@/models/Event';
@@ -197,8 +197,7 @@ export class ReminderScheduler {
 
       // No overdue reminders, schedule for next future reminder
       if (futureReminderTimes.length === 0) {
-        logger.debug('All reminders are paused - entering sleep mode');
-        console.log('😴 Mode veille: Tous les rappels sont en pause');
+        logger.debug('😴 All reminders are paused - entering sleep mode');
         this.enterSleepMode();
         return;
       }
@@ -220,10 +219,6 @@ export class ReminderScheduler {
       logger.debug(
         `Next reminder due at ${nextReminder.toISOString().substr(11, 8)}, ` +
           `waiting ${(timeUntilNext / 1000).toFixed(0)} seconds`,
-      );
-      console.log(
-        `🕰️ Prochain rappel programmé à ${nextReminder.toISOString().substr(11, 8)} ` +
-          `(dans ${(timeUntilNext / 1000).toFixed(0)}s)`,
       );
 
       this.scheduledTimeout = setTimeout(() => {
@@ -250,8 +245,7 @@ export class ReminderScheduler {
     this.status.nextCheck = null;
     this.status.activeEvents = 0;
 
-    logger.debug('No watched reminders - entering sleep mode (no periodic checks)');
-    console.log('😴 Mode veille: Aucun rappel surveillé, arrêt des vérifications périodiques');
+    logger.debug('😴No watched reminders - entering sleep mode (no periodic checks)');
   }
 
   /**
@@ -267,8 +261,7 @@ export class ReminderScheduler {
       if (eventsNeedingReminders.length === 0) {
         const activeEvents = await this.eventManager.getActiveEvents();
         if (activeEvents.length === 0) {
-          logger.debug('No reminders to check - entering sleep mode');
-          console.log('😴 Aucun rappel à vérifier - entrée en mode veille');
+          logger.debug('😴No reminders to check - entering sleep mode');
           return;
         } else {
           logger.debug(`No reminders due yet. Checked ${activeEvents.length} reminders.`);
@@ -300,8 +293,7 @@ export class ReminderScheduler {
       }
 
       if (totalReminded > 0) {
-        logger.info(`Dynamic reminders sent: ${totalReminded} people notified`);
-        console.log(`✅ Rappels automatiques envoyés: ${totalReminded} personnes notifiées`);
+        logger.info(`✅ Dynamic reminders sent: ${totalReminded} people notified`);
         this.status.lastReminderSent = new Date();
       }
 
@@ -384,10 +376,7 @@ export class ReminderScheduler {
         const success = await this.eventManager.removeEvent(event.messageId, event.guildId);
         if (success) {
           logger.info(
-            `Successfully removed deleted message ${event.messageId} from reminder surveillance`,
-          );
-          console.log(
-            `🗑️ Rappel supprimé automatiquement - message ${event.messageId} introuvable`,
+            `🗑️ Successfully removed deleted message ${event.messageId} from reminder surveillance`,
           );
         }
         return 0;
@@ -396,24 +385,35 @@ export class ReminderScheduler {
       // Update the list of users who have reacted
       await this.updateEventReactions(event, originalMessage);
 
-      // Update the event's accessible users to reflect current server state
-      await event.updateAccessibleUsersFromBot(this.client);
+      // Determine mention strategy based on reactions
+      let mentions = '';
+      let mentionStrategy = '';
+      let missingUsers: string[] = [];
 
-      // Identify missing users (only from those who can access the channel)
-      const missingUsers = event.getMissingUsers();
+      if (event.usersWhoReacted.length === 0) {
+        // Nobody has reacted yet - use @everyone to wake everyone up
+        mentions = '@everyone';
+        mentionStrategy = 'everyone';
+        logger.debug(`No users have reacted for event ${event.messageId} - using @everyone`);
+      } else {
+        // At least someone has reacted - mention only those who haven't reacted yet
+        missingUsers = await this.getMissingUsersInChannel(channel, event.usersWhoReacted);
+        
+        if (missingUsers.length === 0) {
+          logger.info(`All accessible users have reacted to event ${event.messageId} - skipping reminder`);
+          return 0;
+        }
 
-      if (missingUsers.length === 0) {
-        logger.debug(`No missing users for event ${event.messageId}`);
-        return 0;
+        // Limit mentions to avoid spam
+        const maxMentions = Settings.MAX_MENTIONS_PER_REMINDER || 50;
+        const usersToMention = missingUsers.slice(0, maxMentions);
+        mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
+        mentionStrategy = 'individual';
+        
+        logger.info(
+          `Event ${event.messageId}: ${event.usersWhoReacted.length} users reacted - mentioning ${usersToMention.length} missing users`,
+        );
       }
-
-      // Limit mentions to avoid spam
-      const maxMentions = Settings.MAX_MENTIONS_PER_REMINDER || 50;
-      const usersToMention = missingUsers.slice(0, maxMentions);
-      const remaining = missingUsers.length - usersToMention.length;
-
-      // Build the reminder message - exactly as in Python
-      const mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
 
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
@@ -426,9 +426,8 @@ export class ReminderScheduler {
           {
             name: '📊 Statistiques',
             value:
-              `✅ Ont répondu: **${event.getReactionCount()}**\n` +
-              `❌ Manquants: **${event.getMissingUsersCount()}**\n` +
-              `👥 Total joueurs: **${event.getTotalUsersCount()}**`,
+              `✅ Ont réagi: **${event.getReactionCount()}**\n` +
+              `🔄 En attente de réponse des autres membres`,
             inline: false,
           },
           {
@@ -438,16 +437,8 @@ export class ReminderScheduler {
           },
         );
 
-      // Handle footer text like in Python
-      if (remaining > 0) {
-        const footerText = `${remaining} personne(s) supplémentaire(s) doive(nt) également répondre (limite de mentions atteinte)`;
-        if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          embed.setFooter({ text: `${footerText} • ${timestamp}` });
-        } else {
-          embed.setFooter({ text: footerText });
-        }
-      } else if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
+      // Handle footer text - simplified version
+      if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
         const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
         let footerText = `🗑️ Ce message s'auto-détruira dans ${deleteDelayText}`;
         if (Settings.is_test_mode()) {
@@ -455,27 +446,20 @@ export class ReminderScheduler {
           footerText += ` • ${timestamp}`;
         }
         embed.setFooter({ text: footerText });
-      }
-
-      // Combined footer for both remaining mentions and auto-deletion
-      if (remaining > 0 && Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
-        let combinedText = `${remaining} personne(s) supplémentaire(s) doive(nt) également répondre (limite de mentions atteinte) • 🗑️ Auto-destruction dans ${deleteDelayText}`;
-        if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          combinedText += ` • ${timestamp}`;
-        }
-        embed.setFooter({ text: combinedText });
+      } else if (Settings.is_test_mode()) {
+        const timestamp = new Date().toISOString();
+        embed.setFooter({ text: `Rappel automatique • ${timestamp}` });
       }
 
       // Send the reminder message
+      const allowedMentions = mentionStrategy === 'everyone'
+        ? { parse: ['everyone' as const], repliedUser: false }
+        : { users: missingUsers, repliedUser: false };
+
       const sentMessage = await channel.send({
         content: mentions,
         embeds: [embed],
-        allowedMentions: {
-          users: usersToMention,
-          repliedUser: false,
-        },
+        allowedMentions,
       });
 
       // Schedule auto-deletion if enabled
@@ -488,8 +472,12 @@ export class ReminderScheduler {
         }, deleteDelay);
       }
 
-      logger.info(`Sent reminder for event ${event.messageId} to ${usersToMention.length} users`);
-      return usersToMention.length;
+      if (mentionStrategy === 'everyone') {
+        logger.info(`Sent reminder for event ${event.messageId} using @everyone (no reactions yet)`);
+      } else {
+        logger.info(`Sent reminder for event ${event.messageId} mentioning ${missingUsers.length} users individually`);
+      }
+      return 1; // Return 1 to indicate reminder was sent
     } catch (error) {
       logger.error(`Unexpected error in send_reminder for event ${event.messageId}: ${error}`);
       return 0;
@@ -501,19 +489,31 @@ export class ReminderScheduler {
    */
   private async updateEventReactions(event: Event, message: any): Promise<void> {
     try {
-      // Clear existing reactions
-      event.setUsersWhoReacted([]);
+      // Collect users who have reacted with standard emojis
+      const reactedUsers: string[] = [];
+      const standardEmojis = ['✅', '❌', '❓'];
 
-      // Update with current reactions
       for (const reaction of message.reactions.cache.values()) {
-        if (event.requiredReactions.includes(reaction.emoji.name || reaction.emoji.toString())) {
+        const emojiName = reaction.emoji.name || reaction.emoji.toString();
+        if (standardEmojis.includes(emojiName)) {
           const users = await reaction.users.fetch();
           for (const user of users.values()) {
-            if (!user.bot) {
-              event.addUserReaction(user.id);
+            if (!user.bot && !reactedUsers.includes(user.id)) {
+              reactedUsers.push(user.id);
             }
           }
         }
+      }
+
+      // Update event with fresh data and save to database
+      const success = await this.eventManager.updateUserReactions(event.messageId, reactedUsers);
+      if (success) {
+        event.usersWhoReacted = reactedUsers; // Update local object too
+        logger.debug(
+          `Updated reactions for event ${event.messageId}: ${reactedUsers.length} users reacted`,
+        );
+      } else {
+        logger.error(`Failed to save updated reactions for event ${event.messageId}`);
       }
     } catch (error) {
       logger.error(`Error updating reactions for event ${event.messageId}: ${error}`);
@@ -559,6 +559,52 @@ export class ReminderScheduler {
 
     logger.info('Forcing immediate reminder check');
     await this.checkReminders();
+  }
+
+  /**
+   * Get users who have access to the channel but haven't reacted yet
+   */
+  private async getMissingUsersInChannel(channel: TextChannel, usersWhoReacted: string[]): Promise<string[]> {
+    try {
+      const guild = channel.guild;
+      if (!guild) {
+        logger.warn('Channel has no guild, cannot get missing users');
+        return [];
+      }
+
+      // Get all members who can view this channel
+      const missingUsers: string[] = [];
+      
+      // Fetch all guild members (this might be cached)
+      const members = await guild.members.fetch();
+      
+      for (const [userId, member] of members) {
+        // Skip bots
+        if (member.user.bot) {
+          continue;
+        }
+        
+        // Skip users who have already reacted
+        if (usersWhoReacted.includes(userId)) {
+          continue;
+        }
+        
+        // Check if user has permission to view the channel
+        const permissions = channel.permissionsFor(member);
+        if (permissions?.has('ViewChannel')) {
+          missingUsers.push(userId);
+        }
+      }
+      
+      logger.debug(
+        `Found ${missingUsers.length} users who can view channel but haven't reacted yet (out of ${members.size} guild members)`
+      );
+      
+      return missingUsers;
+    } catch (error) {
+      logger.error(`Error getting missing users for channel ${channel.id}: ${error}`);
+      return [];
+    }
   }
 
   /**

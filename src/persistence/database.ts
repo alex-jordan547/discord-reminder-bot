@@ -8,6 +8,9 @@
 import sqlite3 from 'sqlite3';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createLogger } from '@/utils/loggingConfig';
+
+const logger = createLogger('database.ts');
 
 // Enable verbose mode in development for better debugging
 if (process.env.NODE_ENV === 'development') {
@@ -126,7 +129,7 @@ export class DatabaseManager {
             this.db = database;
             this.isInitialized = true;
 
-            console.log(`Database connected: ${this.config.path}`);
+            logger.info(`Database connected: ${this.config.path}`);
             resolve(database);
           } catch (configError) {
             database.close();
@@ -266,7 +269,7 @@ export class DatabaseManager {
           if (completedCount === statements.length) {
             if (errorOccurred) {
               db.run('ROLLBACK', err => {
-                if (err) console.error('Rollback failed:', err);
+                if (err) logger.error('Rollback failed:', err);
                 reject(new Error('Transaction rolled back due to error'));
               });
             } else {
@@ -284,7 +287,7 @@ export class DatabaseManager {
         for (const statement of statements) {
           db.run(statement.sql, statement.params || [], function (err) {
             if (err) {
-              console.error('Transaction statement failed:', err);
+              logger.error('Transaction statement failed:', err);
               errorOccurred = true;
             }
             handleCompletion();
@@ -302,7 +305,7 @@ export class DatabaseManager {
       await this.get('SELECT 1 as test');
       return true;
     } catch (error) {
-      console.warn('Database not available:', error);
+      logger.warn('Database not available:', error);
       return false;
     }
   }
@@ -327,7 +330,7 @@ export class DatabaseManager {
         info.databaseSizeBytes = stats.size;
         info.databaseSizeMB = Math.round((stats.size / (1024 * 1024)) * 100) / 100;
       } catch (error) {
-        console.warn('Could not get database file info:', error);
+        logger.warn('Could not get database file info:', error);
       }
     }
 
@@ -347,7 +350,7 @@ export class DatabaseManager {
             this.db = null;
             this.isInitialized = false;
             this.connectionPromise = null;
-            console.log('Database connection closed');
+            logger.info('Database connection closed');
             resolve();
           }
         });
@@ -359,12 +362,12 @@ export class DatabaseManager {
    * Optimize database by running VACUUM and ANALYZE
    */
   async optimize(): Promise<void> {
-    console.log('Optimizing database...');
+    logger.info('Optimizing database...');
 
     await this.run('VACUUM');
     await this.run('ANALYZE');
 
-    console.log('Database optimization complete');
+    logger.info('Database optimization complete');
   }
 
   /**
@@ -461,7 +464,7 @@ export class DatabaseConfig {
 
     if (this.isTestMode()) {
       config = this.getTestConfig();
-      console.log('Using in-memory database for testing');
+      logger.info('Using in-memory database for testing');
     } else if (process.env.NODE_ENV === 'production') {
       config = this.getProductionConfig();
     } else {

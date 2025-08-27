@@ -45,6 +45,9 @@ const watchCommand: SlashCommand = {
         .setDescription('Reminder interval in minutes')
         .setRequired(false)
         .addChoices(
+          { name: '1 minutes', value: 1 },
+          { name: '2 minutes', value: 2 },
+          { name: '3 minutes', value: 3 },
           { name: '5 minutes', value: 5 },
           { name: '15 minutes', value: 15 },
           { name: '30 minutes', value: 30 },

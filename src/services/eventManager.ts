@@ -58,6 +58,7 @@ export class EventManager {
 
   /** Create a new event and persist it to storage */
   async createEvent(params: CreateEventParams): Promise<Event> {
+    logger.debug('Creating event with params:', params);
     try {
       const event = new Event(
         params.messageId,
@@ -103,7 +104,7 @@ export class EventManager {
   /** Get all events for a guild */
   async getEventsByGuild(guildId: string): Promise<Event[]> {
     try {
-      const events = await this.storage.getDueEvents(guildId);
+      const events = await this.storage.getEvents({ guildId });
       events.forEach(e => this.events.set(e.messageId, e));
       return events;
     } catch (error) {
@@ -191,7 +192,12 @@ export class EventManager {
   /** Mark an event as reminded */
   async markEventReminded(messageId: string): Promise<boolean> {
     try {
-      return (await this.updateEvent(messageId, { lastRemindedAt: new Date() })) !== null;
+      const now = new Date();
+      logger.debug(`Marking event ${messageId} as reminded at ${now.toISOString()}`);
+      const result = await this.updateEvent(messageId, { lastRemindedAt: now });
+      const success = result !== null;
+      logger.debug(`Event ${messageId} marked as reminded: ${success ? 'SUCCESS' : 'FAILED'}`);
+      return success;
     } catch (error) {
       logger.error(`Failed to mark event ${messageId} as reminded: ${error}`);
       return false;
