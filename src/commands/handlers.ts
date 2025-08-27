@@ -11,12 +11,10 @@
 import {
   Client,
   CommandInteraction,
-  MessageReaction,
-  User,
+  ChatInputCommandInteraction,
   GuildMember,
   TextChannel,
   EmbedBuilder,
-  PermissionFlagsBits,
 } from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
@@ -41,7 +39,7 @@ export function setupEventHandlers(client: Client): void {
     const watchCommand = commands.get('watch');
     if (watchCommand) {
       watchCommand.execute = async (interaction: CommandInteraction) => {
-        await handleWatchCommand(interaction, client);
+        await handleWatchCommand(interaction as ChatInputCommandInteraction, client);
       };
     }
 
@@ -49,7 +47,7 @@ export function setupEventHandlers(client: Client): void {
     const unwatchCommand = commands.get('unwatch');
     if (unwatchCommand) {
       unwatchCommand.execute = async (interaction: CommandInteraction) => {
-        await handleUnwatchCommand(interaction, client);
+        await handleUnwatchCommand(interaction as ChatInputCommandInteraction, client);
       };
     }
 
@@ -57,7 +55,7 @@ export function setupEventHandlers(client: Client): void {
     const listCommand = commands.get('list');
     if (listCommand) {
       listCommand.execute = async (interaction: CommandInteraction) => {
-        await handleListCommand(interaction, client);
+        await handleListCommand(interaction as ChatInputCommandInteraction, client);
       };
     }
 
@@ -65,7 +63,7 @@ export function setupEventHandlers(client: Client): void {
     const statusCommand = commands.get('status');
     if (statusCommand) {
       statusCommand.execute = async (interaction: CommandInteraction) => {
-        await handleStatusCommand(interaction, client);
+        await handleStatusCommand(interaction as ChatInputCommandInteraction, client);
       };
     }
   }
@@ -76,9 +74,9 @@ export function setupEventHandlers(client: Client): void {
 /**
  * Handle the /watch command
  */
-export async function handleWatchCommand(interaction: CommandInteraction, client: Client): Promise<void> {
+export async function handleWatchCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
-  const intervalMinutes = interaction.options.get('interval')?.value as number || Settings.REMINDER_INTERVAL_HOURS * 60;
+  const intervalMinutes = (interaction.options.get('interval')?.value as number) || Settings.REMINDER_INTERVAL_HOURS * 60;
 
   try {
     // Validate permissions
@@ -184,7 +182,7 @@ export async function handleWatchCommand(interaction: CommandInteraction, client
 /**
  * Handle the /unwatch command
  */
-export async function handleUnwatchCommand(interaction: CommandInteraction, client: Client): Promise<void> {
+export async function handleUnwatchCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
 
   try {
@@ -240,7 +238,7 @@ export async function handleUnwatchCommand(interaction: CommandInteraction, clie
 /**
  * Handle the /list command
  */
-export async function handleListCommand(interaction: CommandInteraction, client: Client): Promise<void> {
+export async function handleListCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   try {
     if (!interaction.guildId) {
       await interaction.reply('❌ This command can only be used in servers.');
@@ -300,7 +298,7 @@ export async function handleListCommand(interaction: CommandInteraction, client:
 /**
  * Handle the /status command
  */
-export async function handleStatusCommand(interaction: CommandInteraction, client: Client): Promise<void> {
+export async function handleStatusCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
   try {
     const eventManager = (client as any).eventManager as EventManager;
     const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;

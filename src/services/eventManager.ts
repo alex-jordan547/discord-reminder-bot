@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Event Manager Service
- * 
+ *
  * Manages Discord event tracking including:
  * - Creating and storing events
  * - Loading events from persistent storage
@@ -8,4 +8,288 @@
  * - Guild-based event filtering
  */
 
-import { createLogger } from '@/utils/loggingConfig';\nimport { SqliteStorage } from '@/persistence/sqliteStorage';\nimport { Event } from '@/models/Event';\n\nconst logger = createLogger('event-manager');\n\n/**\n * Event creation parameters\n */\nexport interface CreateEventParams {\n  messageId: string;\n  channelId: string;\n  guildId: string;\n  title: string;\n  intervalMinutes: number;\n  lastRemindedAt: Date | null;\n  isPaused: boolean;\n  usersWhoReacted: string[];\n  createdAt: Date;\n  updatedAt: Date;\n}\n\n/**\n * Event Manager Service Class\n * \n * Provides a high-level interface for event management operations\n * while abstracting the underlying storage implementation.\n */\nexport class EventManager {\n  private storage: SqliteStorage;\n  private events: Map<string, Event> = new Map();\n\n  constructor() {\n    this.storage = new SqliteStorage();\n  }\n\n  /**\n   * Initialize the event manager and load existing events\n   */\n  async initialize(): Promise<void> {\n    try {\n      await this.storage.initialize();\n      await this.loadFromStorage();\n      logger.info('Event manager initialized successfully');\n    } catch (error) {\n      logger.error(`Failed to initialize event manager: ${error}`);\n      throw error;\n    }\n  }\n\n  /**\n   * Create a new event and persist it to storage\n   */\n  async createEvent(params: CreateEventParams): Promise<Event> {\n    try {\n      // Create event instance\n      const event = new Event(\n        params.messageId,\n        params.channelId,\n        params.guildId,\n        params.title,\n        params.intervalMinutes,\n        params.lastRemindedAt,\n        params.isPaused,\n        params.usersWhoReacted,\n        params.createdAt,\n        params.updatedAt\n      );\n\n      // Validate event data\n      if (!event.isValid()) {\n        throw new Error('Invalid event data');\n      }\n\n      // Save to storage\n      await this.storage.saveEvent(event);\n      \n      // Cache in memory\n      this.events.set(event.messageId, event);\n      \n      logger.info(`Created event for message ${event.messageId} in guild ${event.guildId}`);\n      return event;\n    } catch (error) {\n      logger.error(`Failed to create event: ${error}`);\n      throw error;\n    }\n  }\n\n  /**\n   * Get an event by message ID\n   */\n  async getEvent(messageId: string): Promise<Event | null> {\n    // Check cache first\n    const cachedEvent = this.events.get(messageId);\n    if (cachedEvent) {\n      return cachedEvent;\n    }\n\n    // Load from storage\n    try {\n      const event = await this.storage.getEvent(messageId);\n      if (event) {\n        this.events.set(messageId, event);\n      }\n      return event;\n    } catch (error) {\n      logger.error(`Failed to get event ${messageId}: ${error}`);\n      return null;\n    }\n  }\n\n  /**\n   * Get all events for a specific guild\n   */\n  async getEventsByGuild(guildId: string): Promise<Event[]> {\n    try {\n      const events = await this.storage.getEventsByGuild(guildId);\n      \n      // Update cache\n      events.forEach(event => {\n        this.events.set(event.messageId, event);\n      });\n      \n      return events;\n    } catch (error) {\n      logger.error(`Failed to get events for guild ${guildId}: ${error}`);\n      return [];\n    }\n  }\n\n  /**\n   * Get all active events (not paused)\n   */\n  async getActiveEvents(): Promise<Event[]> {\n    try {\n      const events = await this.storage.getAllEvents();\n      const activeEvents = events.filter(event => !event.isPaused);\n      \n      // Update cache\n      events.forEach(event => {\n        this.events.set(event.messageId, event);\n      });\n      \n      return activeEvents;\n    } catch (error) {\n      logger.error(`Failed to get active events: ${error}`);\n      return [];\n    }\n  }\n\n  /**\n   * Update an event's data\n   */\n  async updateEvent(messageId: string, updates: Partial<Event>): Promise<Event | null> {\n    try {\n      const event = await this.getEvent(messageId);\n      if (!event) {\n        return null;\n      }\n\n      // Apply updates\n      Object.assign(event, updates);\n      event.updatedAt = new Date();\n\n      // Validate updated event\n      if (!event.isValid()) {\n        throw new Error('Updated event data is invalid');\n      }\n\n      // Save to storage\n      await this.storage.saveEvent(event);\n      \n      // Update cache\n      this.events.set(messageId, event);\n      \n      logger.info(`Updated event ${messageId}`);\n      return event;\n    } catch (error) {\n      logger.error(`Failed to update event ${messageId}: ${error}`);\n      throw error;\n    }\n  }\n\n  /**\n   * Remove an event\n   */\n  async removeEvent(messageId: string, guildId?: string): Promise<boolean> {\n    try {\n      const event = await this.getEvent(messageId);\n      if (!event) {\n        return false;\n      }\n\n      // Validate guild ownership if provided\n      if (guildId && event.guildId !== guildId) {\n        logger.warn(`Attempted to remove event ${messageId} from wrong guild`);\n        return false;\n      }\n\n      // Remove from storage\n      await this.storage.deleteEvent(messageId);\n      \n      // Remove from cache\n      this.events.delete(messageId);\n      \n      logger.info(`Removed event ${messageId}`);\n      return true;\n    } catch (error) {\n      logger.error(`Failed to remove event ${messageId}: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Update user reactions for an event\n   */\n  async updateUserReactions(messageId: string, usersWhoReacted: string[]): Promise<boolean> {\n    try {\n      const event = await this.getEvent(messageId);\n      if (!event) {\n        return false;\n      }\n\n      event.usersWhoReacted = usersWhoReacted;\n      event.updatedAt = new Date();\n\n      await this.storage.saveEvent(event);\n      this.events.set(messageId, event);\n      \n      logger.debug(`Updated reactions for event ${messageId}: ${usersWhoReacted.length} users`);\n      return true;\n    } catch (error) {\n      logger.error(`Failed to update reactions for event ${messageId}: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Mark an event as reminded (update lastRemindedAt)\n   */\n  async markEventReminded(messageId: string): Promise<boolean> {\n    try {\n      return await this.updateEvent(messageId, {\n        lastRemindedAt: new Date()\n      }) !== null;\n    } catch (error) {\n      logger.error(`Failed to mark event ${messageId} as reminded: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Get total number of events across all guilds\n   */\n  async getTotalEventCount(): Promise<number> {\n    try {\n      const events = await this.storage.getAllEvents();\n      return events.length;\n    } catch (error) {\n      logger.error(`Failed to get total event count: ${error}`);\n      return 0;\n    }\n  }\n\n  /**\n   * Load all events from storage into memory cache\n   */\n  async loadFromStorage(): Promise<Event[]> {\n    try {\n      const events = await this.storage.getAllEvents();\n      \n      // Clear existing cache\n      this.events.clear();\n      \n      // Load into cache\n      events.forEach(event => {\n        this.events.set(event.messageId, event);\n      });\n      \n      logger.info(`Loaded ${events.length} events from storage`);\n      return events;\n    } catch (error) {\n      logger.error(`Failed to load events from storage: ${error}`);\n      return [];\n    }\n  }\n\n  /**\n   * Get events that need reminders (due for next reminder)\n   */\n  async getEventsNeedingReminders(): Promise<Event[]> {\n    try {\n      const activeEvents = await this.getActiveEvents();\n      const now = new Date();\n      \n      return activeEvents.filter(event => {\n        if (event.isPaused) return false;\n        \n        if (!event.lastRemindedAt) {\n          // Never reminded before, use creation time\n          const nextReminderTime = new Date(event.createdAt.getTime() + event.intervalMinutes * 60 * 1000);\n          return now >= nextReminderTime;\n        } else {\n          // Calculate next reminder based on last reminder\n          const nextReminderTime = new Date(event.lastRemindedAt.getTime() + event.intervalMinutes * 60 * 1000);\n          return now >= nextReminderTime;\n        }\n      });\n    } catch (error) {\n      logger.error(`Failed to get events needing reminders: ${error}`);\n      return [];\n    }\n  }\n\n  /**\n   * Get the next reminder time across all events\n   */\n  async getNextReminderTime(): Promise<Date | null> {\n    try {\n      const activeEvents = await this.getActiveEvents();\n      \n      if (activeEvents.length === 0) {\n        return null;\n      }\n\n      const nextTimes = activeEvents.map(event => {\n        if (!event.lastRemindedAt) {\n          return new Date(event.createdAt.getTime() + event.intervalMinutes * 60 * 1000);\n        } else {\n          return new Date(event.lastRemindedAt.getTime() + event.intervalMinutes * 60 * 1000);\n        }\n      });\n\n      return new Date(Math.min(...nextTimes.map(time => time.getTime())));\n    } catch (error) {\n      logger.error(`Failed to get next reminder time: ${error}`);\n      return null;\n    }\n  }\n\n  /**\n   * Pause or unpause an event\n   */\n  async pauseEvent(messageId: string, paused: boolean = true): Promise<boolean> {\n    try {\n      return await this.updateEvent(messageId, { isPaused: paused }) !== null;\n    } catch (error) {\n      logger.error(`Failed to ${paused ? 'pause' : 'unpause'} event ${messageId}: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Clean up old events (optional maintenance function)\n   */\n  async cleanupOldEvents(maxAgeHours: number = 24 * 30): Promise<number> {\n    try {\n      const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);\n      const allEvents = await this.storage.getAllEvents();\n      \n      let cleanedCount = 0;\n      for (const event of allEvents) {\n        const lastActivity = event.lastRemindedAt || event.createdAt;\n        if (lastActivity < cutoffTime) {\n          await this.removeEvent(event.messageId);\n          cleanedCount++;\n        }\n      }\n      \n      if (cleanedCount > 0) {\n        logger.info(`Cleaned up ${cleanedCount} old events`);\n      }\n      \n      return cleanedCount;\n    } catch (error) {\n      logger.error(`Failed to cleanup old events: ${error}`);\n      return 0;\n    }\n  }\n}
+import { createLogger } from '@/utils/loggingConfig';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
+import { Event } from '@/models/Event';
+
+const logger = createLogger('event-manager');
+
+/**
+ * Event creation parameters
+ */
+export interface CreateEventParams {
+  messageId: string;
+  channelId: string;
+  guildId: string;
+  title: string;
+  intervalMinutes: number;
+  lastRemindedAt: Date | null;
+  isPaused: boolean;
+  usersWhoReacted: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Event Manager Service Class
+ *
+ * Provides a high-level interface for event management operations
+ * while abstracting the underlying storage implementation.
+ */
+export class EventManager {
+  private storage: SqliteStorage;
+  private events: Map<string, Event> = new Map();
+
+  constructor() {
+    this.storage = new SqliteStorage();
+  }
+
+  /** Initialize the event manager and load existing events */
+  async initialize(): Promise<void> {
+    try {
+      await this.storage.initialize();
+      await this.loadFromStorage();
+      logger.info('Event manager initialized successfully');
+    } catch (error) {
+      logger.error(`Failed to initialize event manager: ${error}`);
+      throw error;
+    }
+  }
+
+  /** Create a new event and persist it to storage */
+  async createEvent(params: CreateEventParams): Promise<Event> {
+    try {
+      const event = new Event(
+        params.messageId,
+        params.channelId,
+        params.guildId,
+        params.title,
+        params.intervalMinutes,
+        params.lastRemindedAt,
+        params.isPaused,
+        params.usersWhoReacted,
+        params.createdAt,
+        params.updatedAt,
+      );
+
+      if (!event.isValid()) throw new Error('Invalid event data');
+
+      await this.storage.saveEvent(event);
+      this.events.set(event.messageId, event);
+
+      logger.info(`Created event for message ${event.messageId} in guild ${event.guildId}`);
+      return event;
+    } catch (error) {
+      logger.error(`Failed to create event: ${error}`);
+      throw error;
+    }
+  }
+
+  /** Get an event by message ID */
+  async getEvent(messageId: string): Promise<Event | null> {
+    const cached = this.events.get(messageId);
+    if (cached) return cached;
+
+    try {
+      const event = await this.storage.getEvent(messageId);
+      if (event) this.events.set(messageId, event);
+      return event;
+    } catch (error) {
+      logger.error(`Failed to get event ${messageId}: ${error}`);
+      return null;
+    }
+  }
+
+  /** Get all events for a guild */
+  async getEventsByGuild(guildId: string): Promise<Event[]> {
+    try {
+      const events = await this.storage.getEventsByGuild(guildId);
+      events.forEach(e => this.events.set(e.messageId, e));
+      return events;
+    } catch (error) {
+      logger.error(`Failed to get events for guild ${guildId}: ${error}`);
+      return [];
+    }
+  }
+
+  /** Get all active events (not paused) */
+  async getActiveEvents(): Promise<Event[]> {
+    try {
+      const events = await this.storage.getAllEvents();
+      events.forEach(e => this.events.set(e.messageId, e));
+      return events.filter(e => !e.isPaused);
+    } catch (error) {
+      logger.error(`Failed to get active events: ${error}`);
+      return [];
+    }
+  }
+
+  /** Update an event's data */
+  async updateEvent(messageId: string, updates: Partial<Event>): Promise<Event | null> {
+    try {
+      const event = await this.getEvent(messageId);
+      if (!event) return null;
+
+      Object.assign(event, updates);
+      event.updatedAt = new Date();
+
+      if (!event.isValid()) throw new Error('Updated event data is invalid');
+
+      await this.storage.saveEvent(event);
+      this.events.set(messageId, event);
+
+      logger.info(`Updated event ${messageId}`);
+      return event;
+    } catch (error) {
+      logger.error(`Failed to update event ${messageId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /** Remove an event */
+  async removeEvent(messageId: string, guildId?: string): Promise<boolean> {
+    try {
+      const event = await this.getEvent(messageId);
+      if (!event) return false;
+
+      if (guildId && event.guildId !== guildId) {
+        logger.warn(`Attempted to remove event ${messageId} from wrong guild`);
+        return false;
+      }
+
+      await this.storage.deleteEvent(messageId);
+      this.events.delete(messageId);
+
+      logger.info(`Removed event ${messageId}`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to remove event ${messageId}: ${error}`);
+      return false;
+    }
+  }
+
+  /** Update user reactions for an event */
+  async updateUserReactions(messageId: string, usersWhoReacted: string[]): Promise<boolean> {
+    try {
+      const event = await this.getEvent(messageId);
+      if (!event) return false;
+
+      event.usersWhoReacted = usersWhoReacted;
+      event.updatedAt = new Date();
+
+      await this.storage.saveEvent(event);
+      this.events.set(messageId, event);
+
+      logger.debug(`Updated reactions for event ${messageId}: ${usersWhoReacted.length} users`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to update reactions for event ${messageId}: ${error}`);
+      return false;
+    }
+  }
+
+  /** Mark an event as reminded */
+  async markEventReminded(messageId: string): Promise<boolean> {
+    try {
+      return (await this.updateEvent(messageId, { lastRemindedAt: new Date() })) !== null;
+    } catch (error) {
+      logger.error(`Failed to mark event ${messageId} as reminded: ${error}`);
+      return false;
+    }
+  }
+
+  /** Get total number of events */
+  async getTotalEventCount(): Promise<number> {
+    try {
+      const events = await this.storage.getAllEvents();
+      return events.length;
+    } catch (error) {
+      logger.error(`Failed to get total event count: ${error}`);
+      return 0;
+    }
+  }
+
+  /** Load events from storage into cache */
+  async loadFromStorage(): Promise<Event[]> {
+    try {
+      const events = await this.storage.getAllEvents();
+      this.events.clear();
+      events.forEach(e => this.events.set(e.messageId, e));
+      logger.info(`Loaded ${events.length} events from storage`);
+      return events;
+    } catch (error) {
+      logger.error(`Failed to load events from storage: ${error}`);
+      return [];
+    }
+  }
+
+  /** Get events needing reminders */
+  async getEventsNeedingReminders(): Promise<Event[]> {
+    try {
+      const active = await this.getActiveEvents();
+      const now = new Date();
+
+      return active.filter(e => {
+        if (e.isPaused) return false;
+
+        const base = e.lastRemindedAt || e.createdAt;
+        const next = new Date(base.getTime() + e.intervalMinutes * 60000);
+        return now >= next;
+      });
+    } catch (error) {
+      logger.error(`Failed to get events needing reminders: ${error}`);
+      return [];
+    }
+  }
+
+  /** Get the next global reminder time */
+  async getNextReminderTime(): Promise<Date | null> {
+    try {
+      const active = await this.getActiveEvents();
+      if (active.length === 0) return null;
+
+      const times = active.map(e => {
+        const base = e.lastRemindedAt || e.createdAt;
+        return new Date(base.getTime() + e.intervalMinutes * 60000);
+      });
+
+      return new Date(Math.min(...times.map(t => t.getTime())));
+    } catch (error) {
+      logger.error(`Failed to get next reminder time: ${error}`);
+      return null;
+    }
+  }
+
+  /** Pause or unpause an event */
+  async pauseEvent(messageId: string, paused = true): Promise<boolean> {
+    try {
+      return (await this.updateEvent(messageId, { isPaused: paused })) !== null;
+    } catch (error) {
+      logger.error(`Failed to ${paused ? 'pause' : 'unpause'} event ${messageId}: ${error}`);
+      return false;
+    }
+  }
+
+  /** Clean up old events */
+  async cleanupOldEvents(maxAgeHours: number = 24 * 30): Promise<number> {
+    try {
+      const cutoff = new Date(Date.now() - maxAgeHours * 3600000);
+      const all = await this.storage.getAllEvents();
+
+      let cleaned = 0;
+      for (const e of all) {
+        const lastActivity = e.lastRemindedAt || e.createdAt;
+        if (lastActivity < cutoff) {
+          await this.removeEvent(e.messageId);
+          cleaned++;
+        }
+      }
+
+      if (cleaned > 0) logger.info(`Cleaned up ${cleaned} old events`);
+      return cleaned;
+    } catch (error) {
+      logger.error(`Failed to cleanup old events: ${error}`);
+      return 0;
+    }
+  }
+}

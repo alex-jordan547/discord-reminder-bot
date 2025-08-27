@@ -7,7 +7,6 @@
  * Migration from Python bot.py to TypeScript with enhanced features.
  */
 
-import { Client } from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger, setupLogging } from '@/utils/loggingConfig';
 import { createDiscordClient } from './bot';

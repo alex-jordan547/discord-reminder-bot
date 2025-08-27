@@ -19,7 +19,6 @@ import {
   PartialUser,
   ActivityType
 } from 'discord.js';
-import { Settings } from '@/config/settings';
 import { featureFlagManager } from '@/config/featureFlags';
 import { createLogger } from '@/utils/loggingConfig';
 import { setupSlashCommands, syncSlashCommands } from '@/commands/slash';
@@ -183,8 +182,3 @@ export async function createDiscordClient(): Promise<Client> {
   return client;
 }
 
-/**
- * Helper function to create a fully configured Discord client
- * This is used by the main application entry point
- */
-export { createDiscordClient };

@@ -12,7 +12,7 @@ import {
   SlashCommandBuilder,
   Client,
   Collection,
-  CommandInteraction,
+  ChatInputCommandInteraction,
   REST,
   Routes,
 } from 'discord.js';
@@ -22,8 +22,8 @@ import { createLogger } from '@/utils/loggingConfig';
 const logger = createLogger('slash-commands');
 
 export interface SlashCommand {
-  data: SlashCommandBuilder;
-  execute: (interaction: CommandInteraction, client?: Client) => Promise<void>;
+  data: any; // SlashCommandBuilder or SlashCommandSubcommandsOnlyBuilder
+  execute: (interaction: ChatInputCommandInteraction, client: Client) => Promise<void>;
 }
 
 // Collection to store all slash commands
@@ -58,7 +58,7 @@ const watchCommand: SlashCommand = {
           { name: '24 hours', value: 1440 }
         )
     ),
-  execute: async (interaction: CommandInteraction, client: Client) => {
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleWatchCommand } = await import('./handlers');
     await handleWatchCommand(interaction, client);
   },
@@ -77,7 +77,7 @@ const unwatchCommand: SlashCommand = {
         .setDescription('Discord message link to stop watching')
         .setRequired(true)
     ),
-  execute: async (interaction: CommandInteraction, client: Client) => {
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleUnwatchCommand } = await import('./handlers');
     await handleUnwatchCommand(interaction, client);
   },
@@ -90,7 +90,7 @@ const listCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('list')
     .setDescription('List all watched events in this server'),
-  execute: async (interaction: CommandInteraction, client: Client) => {
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleListCommand } = await import('./handlers');
     await handleListCommand(interaction, client);
   },
@@ -103,7 +103,7 @@ const statusCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('status')
     .setDescription('Show bot status and statistics'),
-  execute: async (interaction: CommandInteraction, client: Client) => {
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleStatusCommand } = await import('./handlers');
     await handleStatusCommand(interaction, client);
   },
@@ -116,7 +116,7 @@ const helpCommand: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Show available commands and how to use them'),
-  execute: async (interaction: CommandInteraction) => {
+  execute: async (interaction: ChatInputCommandInteraction) => {
     const embed = {
       title: '🤖 Discord Reminder Bot - Help',
       description: 'Available commands and their usage',

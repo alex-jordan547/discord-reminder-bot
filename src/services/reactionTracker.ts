@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Reaction Tracker Service
- * 
+ *
  * Handles Discord reaction events and updates event data accordingly:
  * - Tracks when users react to watched messages
  * - Updates user reaction lists in real-time
@@ -8,4 +8,206 @@
  * - Maintains data consistency with the event manager
  */
 
-import { MessageReaction, User } from 'discord.js';\nimport { createLogger } from '@/utils/loggingConfig';\nimport { EventManager } from './eventManager';\n\nconst logger = createLogger('reaction-tracker');\n\n/**\n * Reaction Tracker Service Class\n * \n * Monitors Discord message reactions for tracked events and maintains\n * an up-to-date list of users who have responded to each event.\n */\nexport class ReactionTracker {\n  private eventManager: EventManager;\n\n  constructor(eventManager: EventManager) {\n    this.eventManager = eventManager;\n  }\n\n  /**\n   * Handle when a user adds a reaction to a message\n   */\n  async handleReactionAdd(reaction: MessageReaction, user: User): Promise<void> {\n    try {\n      const messageId = reaction.message.id;\n      \n      // Check if this message is being tracked\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        // Not a tracked message, ignore\n        return;\n      }\n\n      // Skip if user is already in the list\n      if (event.usersWhoReacted.includes(user.id)) {\n        logger.debug(`User ${user.tag} already marked as reacted to event ${messageId}`);\n        return;\n      }\n\n      // Add user to the reaction list\n      const updatedUsers = [...event.usersWhoReacted, user.id];\n      \n      const success = await this.eventManager.updateUserReactions(messageId, updatedUsers);\n      if (success) {\n        logger.info(`User ${user.tag} reacted to event ${messageId} (${updatedUsers.length} total reactions)`);\n      } else {\n        logger.error(`Failed to update reactions for event ${messageId}`);\n      }\n\n    } catch (error) {\n      logger.error(`Error handling reaction add: ${error}`);\n    }\n  }\n\n  /**\n   * Handle when a user removes a reaction from a message\n   */\n  async handleReactionRemove(reaction: MessageReaction, user: User): Promise<void> {\n    try {\n      const messageId = reaction.message.id;\n      \n      // Check if this message is being tracked\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        // Not a tracked message, ignore\n        return;\n      }\n\n      // Skip if user is not in the list\n      if (!event.usersWhoReacted.includes(user.id)) {\n        logger.debug(`User ${user.tag} was not marked as reacted to event ${messageId}`);\n        return;\n      }\n\n      // Remove user from the reaction list\n      const updatedUsers = event.usersWhoReacted.filter(userId => userId !== user.id);\n      \n      const success = await this.eventManager.updateUserReactions(messageId, updatedUsers);\n      if (success) {\n        logger.info(`User ${user.tag} removed reaction from event ${messageId} (${updatedUsers.length} total reactions)`);\n      } else {\n        logger.error(`Failed to update reactions for event ${messageId}`);\n      }\n\n    } catch (error) {\n      logger.error(`Error handling reaction remove: ${error}`);\n    }\n  }\n\n  /**\n   * Sync all reactions for a specific message (useful for initialization)\n   * This fetches all current reactions and updates the event accordingly\n   */\n  async syncReactions(messageId: string): Promise<boolean> {\n    try {\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        logger.warn(`Attempted to sync reactions for unknown event ${messageId}`);\n        return false;\n      }\n\n      // This would need to be called with the actual Discord message object\n      // For now, we'll just log that sync was requested\n      logger.info(`Reaction sync requested for event ${messageId}`);\n      \n      // TODO: Implement full reaction sync by fetching the Discord message\n      // and iterating through all reactions to build the complete user list\n      \n      return true;\n    } catch (error) {\n      logger.error(`Error syncing reactions for event ${messageId}: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Get reaction statistics for an event\n   */\n  async getReactionStats(messageId: string): Promise<{\n    totalReactions: number;\n    uniqueUsers: number;\n    lastUpdated: Date;\n  } | null> {\n    try {\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        return null;\n      }\n\n      return {\n        totalReactions: event.usersWhoReacted.length,\n        uniqueUsers: new Set(event.usersWhoReacted).size, // In case of duplicates\n        lastUpdated: event.updatedAt,\n      };\n    } catch (error) {\n      logger.error(`Error getting reaction stats for event ${messageId}: ${error}`);\n      return null;\n    }\n  }\n\n  /**\n   * Check if a specific user has reacted to an event\n   */\n  async hasUserReacted(messageId: string, userId: string): Promise<boolean | null> {\n    try {\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        return null;\n      }\n\n      return event.usersWhoReacted.includes(userId);\n    } catch (error) {\n      logger.error(`Error checking if user ${userId} reacted to event ${messageId}: ${error}`);\n      return null;\n    }\n  }\n\n  /**\n   * Get all users who have reacted to an event\n   */\n  async getReactedUsers(messageId: string): Promise<string[] | null> {\n    try {\n      const event = await this.eventManager.getEvent(messageId);\n      if (!event) {\n        return null;\n      }\n\n      return [...event.usersWhoReacted]; // Return a copy\n    } catch (error) {\n      logger.error(`Error getting reacted users for event ${messageId}: ${error}`);\n      return null;\n    }\n  }\n\n  /**\n   * Clear all reactions for an event (useful for resetting)\n   */\n  async clearReactions(messageId: string): Promise<boolean> {\n    try {\n      const success = await this.eventManager.updateUserReactions(messageId, []);\n      if (success) {\n        logger.info(`Cleared all reactions for event ${messageId}`);\n      }\n      return success;\n    } catch (error) {\n      logger.error(`Error clearing reactions for event ${messageId}: ${error}`);\n      return false;\n    }\n  }\n\n  /**\n   * Bulk update reactions (useful for data migration or sync operations)\n   */\n  async bulkUpdateReactions(updates: { messageId: string; userIds: string[] }[]): Promise<number> {\n    let successCount = 0;\n    \n    for (const update of updates) {\n      try {\n        const success = await this.eventManager.updateUserReactions(update.messageId, update.userIds);\n        if (success) {\n          successCount++;\n        }\n      } catch (error) {\n        logger.error(`Error in bulk update for event ${update.messageId}: ${error}`);\n      }\n    }\n    \n    logger.info(`Bulk updated reactions for ${successCount}/${updates.length} events`);\n    return successCount;\n  }\n\n  /**\n   * Get reaction activity statistics across all events\n   */\n  async getGlobalReactionStats(): Promise<{\n    totalEvents: number;\n    eventsWithReactions: number;\n    totalReactions: number;\n    averageReactionsPerEvent: number;\n  }> {\n    try {\n      const totalEvents = await this.eventManager.getTotalEventCount();\n      \n      // This is a simplified version - in a real implementation,\n      // we would fetch all events and calculate these stats\n      const stats = {\n        totalEvents,\n        eventsWithReactions: 0,\n        totalReactions: 0,\n        averageReactionsPerEvent: 0,\n      };\n\n      // TODO: Implement full statistics calculation\n      logger.debug('Global reaction stats requested');\n      \n      return stats;\n    } catch (error) {\n      logger.error(`Error getting global reaction stats: ${error}`);\n      return {\n        totalEvents: 0,\n        eventsWithReactions: 0,\n        totalReactions: 0,\n        averageReactionsPerEvent: 0,\n      };\n    }\n  }\n}
+import { MessageReaction, User } from 'discord.js';
+import { createLogger } from '@/utils/loggingConfig';
+import { EventManager } from './eventManager';
+
+const logger = createLogger('reaction-tracker');
+
+/**
+ * Reaction Tracker Service Class
+ *
+ * Monitors Discord message reactions for tracked events and maintains
+ * an up-to-date list of users who have responded to each event.
+ */
+export class ReactionTracker {
+  private eventManager: EventManager;
+
+  constructor(eventManager: EventManager) {
+    this.eventManager = eventManager;
+  }
+
+  /** Handle when a user adds a reaction to a message */
+  async handleReactionAdd(reaction: MessageReaction, user: User): Promise<void> {
+    try {
+      const messageId = reaction.message.id;
+
+      // Vérifier si le message est suivi
+      const event = await this.eventManager.getEvent(messageId);
+      if (!event) return;
+
+      // Déjà dans la liste
+      if (event.usersWhoReacted.includes(user.id)) {
+        logger.debug(`User ${user.tag} already marked as reacted to event ${messageId}`);
+        return;
+      }
+
+      // Ajouter le user
+      const updatedUsers = [...event.usersWhoReacted, user.id];
+      const success = await this.eventManager.updateUserReactions(messageId, updatedUsers);
+
+      if (success) {
+        logger.info(
+          `User ${user.tag} reacted to event ${messageId} (${updatedUsers.length} total reactions)`,
+        );
+      } else {
+        logger.error(`Failed to update reactions for event ${messageId}`);
+      }
+    } catch (error) {
+      logger.error(`Error handling reaction add: ${error}`);
+    }
+  }
+
+  /** Handle when a user removes a reaction from a message */
+  async handleReactionRemove(reaction: MessageReaction, user: User): Promise<void> {
+    try {
+      const messageId = reaction.message.id;
+
+      const event = await this.eventManager.getEvent(messageId);
+      if (!event) return;
+
+      if (!event.usersWhoReacted.includes(user.id)) {
+        logger.debug(`User ${user.tag} was not marked as reacted to event ${messageId}`);
+        return;
+      }
+
+      const updatedUsers = event.usersWhoReacted.filter(uid => uid !== user.id);
+      const success = await this.eventManager.updateUserReactions(messageId, updatedUsers);
+
+      if (success) {
+        logger.info(
+          `User ${user.tag} removed reaction from event ${messageId} (${updatedUsers.length} total reactions)`,
+        );
+      } else {
+        logger.error(`Failed to update reactions for event ${messageId}`);
+      }
+    } catch (error) {
+      logger.error(`Error handling reaction remove: ${error}`);
+    }
+  }
+
+  /**
+   * Sync all reactions for a specific message (useful for initialization)
+   */
+  async syncReactions(messageId: string): Promise<boolean> {
+    try {
+      const event = await this.eventManager.getEvent(messageId);
+      if (!event) {
+        logger.warn(`Attempted to sync reactions for unknown event ${messageId}`);
+        return false;
+      }
+
+      logger.info(`Reaction sync requested for event ${messageId}`);
+      // TODO: implémenter le fetch complet avec le Message Discord et reconstruire la liste
+
+      return true;
+    } catch (error) {
+      logger.error(`Error syncing reactions for event ${messageId}: ${error}`);
+      return false;
+    }
+  }
+
+  /** Get stats for an event */
+  async getReactionStats(
+    messageId: string,
+  ): Promise<{ totalReactions: number; uniqueUsers: number; lastUpdated: Date } | null> {
+    try {
+      const event = await this.eventManager.getEvent(messageId);
+      if (!event) return null;
+
+      return {
+        totalReactions: event.usersWhoReacted.length,
+        uniqueUsers: new Set(event.usersWhoReacted).size,
+        lastUpdated: event.updatedAt,
+      };
+    } catch (error) {
+      logger.error(`Error getting reaction stats for event ${messageId}: ${error}`);
+      return null;
+    }
+  }
+
+  /** Has user reacted? */
+  async hasUserReacted(messageId: string, userId: string): Promise<boolean | null> {
+    try {
+      const event = await this.eventManager.getEvent(messageId);
+      return event ? event.usersWhoReacted.includes(userId) : null;
+    } catch (error) {
+      logger.error(`Error checking if user ${userId} reacted to event ${messageId}: ${error}`);
+      return null;
+    }
+  }
+
+  /** Get all reacted users */
+  async getReactedUsers(messageId: string): Promise<string[] | null> {
+    try {
+      const event = await this.eventManager.getEvent(messageId);
+      return event ? [...event.usersWhoReacted] : null;
+    } catch (error) {
+      logger.error(`Error getting reacted users for event ${messageId}: ${error}`);
+      return null;
+    }
+  }
+
+  /** Clear all reactions for an event */
+  async clearReactions(messageId: string): Promise<boolean> {
+    try {
+      const success = await this.eventManager.updateUserReactions(messageId, []);
+      if (success) logger.info(`Cleared all reactions for event ${messageId}`);
+      return success;
+    } catch (error) {
+      logger.error(`Error clearing reactions for event ${messageId}: ${error}`);
+      return false;
+    }
+  }
+
+  /** Bulk update reactions across many events */
+  async bulkUpdateReactions(updates: { messageId: string; userIds: string[] }[]): Promise<number> {
+    let successCount = 0;
+
+    for (const update of updates) {
+      try {
+        const success = await this.eventManager.updateUserReactions(
+          update.messageId,
+          update.userIds,
+        );
+        if (success) successCount++;
+      } catch (error) {
+        logger.error(`Error in bulk update for event ${update.messageId}: ${error}`);
+      }
+    }
+
+    logger.info(`Bulk updated reactions for ${successCount}/${updates.length} events`);
+    return successCount;
+  }
+
+  /** Global stats (simplified) */
+  async getGlobalReactionStats(): Promise<{
+    totalEvents: number;
+    eventsWithReactions: number;
+    totalReactions: number;
+    averageReactionsPerEvent: number;
+  }> {
+    try {
+      const totalEvents = await this.eventManager.getTotalEventCount();
+
+      // TODO: fetch all events for full calculation
+      const stats = {
+        totalEvents,
+        eventsWithReactions: 0,
+        totalReactions: 0,
+        averageReactionsPerEvent: 0,
+      };
+
+      logger.debug('Global reaction stats requested');
+      return stats;
+    } catch (error) {
+      logger.error(`Error getting global reaction stats: ${error}`);
+      return {
+        totalEvents: 0,
+        eventsWithReactions: 0,
+        totalReactions: 0,
+        averageReactionsPerEvent: 0,
+      };
+    }
+  }
+}
