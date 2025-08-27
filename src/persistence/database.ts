@@ -238,7 +238,7 @@ export class DatabaseManager {
   /**
    * Execute multiple SQL statements in a transaction
    */
-  async executeTransaction(statements: Array<{sql: string, params?: any[]}]): Promise<void> {
+  async executeTransaction(statements: Array<{sql: string, params?: any[]}>): Promise<void> {
     const db = await this.connect();
     
     return new Promise((resolve, reject) => {

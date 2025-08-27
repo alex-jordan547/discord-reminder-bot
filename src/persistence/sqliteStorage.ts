@@ -5,9 +5,9 @@
  * for all model types with connection pooling and transaction support.
  */
 
-import { DatabaseManager, getDatabase } from './database.js';
-import { Event, Guild, User, Reaction, ReminderLog } from '../models/index.js';
-import type { EventData, GuildData, UserData, ReactionData, ReminderLogData, ReminderStatus } from '../models/index.js';
+import { DatabaseManager, getDatabase } from './database';
+import { Event } from '../models/index';
+import type { EventData } from '../models/Event';
 
 export interface StorageOperationResult {
   success: boolean;
