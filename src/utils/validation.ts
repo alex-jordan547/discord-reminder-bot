@@ -17,10 +17,7 @@ const logger = createLogger('validation');
  * Validation error class
  */
 export class ValidationError extends Error {
-  constructor(
-    message: string,
-    public field?: string,
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = 'ValidationError';
   }
@@ -109,9 +106,13 @@ function isValidDiscordToken(token: string): boolean {
   if (token.length < 50) return false;
 
   const parts = token.split('.');
-  if (parts.length < 3) return false;
+  if (parts.length !== 3) return false;
 
-  return /^\d+$/.test(parts[0]);
+  // First part should be base64-encoded user ID
+  // Second part should be base64-encoded timestamp
+  // Third part should be base64-encoded HMAC
+  const base64Pattern = /^[A-Za-z0-9+/]+=*$/;
+  return parts.every(part => base64Pattern.test(part));
 }
 /**
  * Validate file path safety
@@ -311,6 +312,7 @@ export function validateEventData(eventData: any): {
 /**
  * Sanitize arbitrary string input
  */
+/*
 export function sanitizeString(input: string, maxLength = 1000): string {
   if (typeof input !== 'string') return '';
 
@@ -322,6 +324,7 @@ export function sanitizeString(input: string, maxLength = 1000): string {
     .replace(/javascript:/gi, '') // javascript urls
     .replace(/on\w+\s*=/gi, ''); // inline event handlers
 }
+*/
 
 /**
  * Generate validation report

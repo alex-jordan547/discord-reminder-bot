@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Reminder Scheduler Service
- * 
+ *
  * Advanced scheduling system that provides:
  * - Dynamic scheduling based on next reminder time
  * - Smart sleep mode when no events are active
@@ -29,7 +29,7 @@ export interface SchedulerStatus {
 
 /**
  * Reminder Scheduler Service Class
- * 
+ *
  * Manages the intelligent scheduling of reminder checks and sending.
  * Uses dynamic timing to minimize resource usage while maintaining precision.
  * Migrated 1:1 from Python implementation with exact same behavior.
@@ -59,13 +59,13 @@ export class ReminderScheduler {
   async initialize(): Promise<void> {
     try {
       logger.info('🎯 Système de planification dynamique des rappels activé (thread-safe)');
-      
+
       this.isRunning = true;
       this.status.status = 'active';
-      
+
       // Schedule the first check
       await this.scheduleNextCheck();
-      
+
       logger.info('Reminder scheduler initialized and running');
     } catch (error) {
       logger.error(`Failed to initialize reminder scheduler: ${error}`);
@@ -79,16 +79,16 @@ export class ReminderScheduler {
    */
   stop(): void {
     logger.info('Stopping reminder scheduler...');
-    
+
     this.isRunning = false;
     this.status.status = 'stopped';
     this.status.nextCheck = null;
-    
+
     if (this.scheduledTimeout) {
       clearTimeout(this.scheduledTimeout);
       this.scheduledTimeout = null;
     }
-    
+
     logger.info('Reminder scheduler stopped');
   }
 
@@ -98,7 +98,7 @@ export class ReminderScheduler {
   async scheduleEvent(event: Event): Promise<void> {
     try {
       logger.info(`Scheduling reminders for event ${event.messageId}`);
-      
+
       // If scheduler is not running, start it
       if (!this.isRunning) {
         await this.initialize();
@@ -117,7 +117,7 @@ export class ReminderScheduler {
   async unscheduleEvent(messageId: string): Promise<void> {
     try {
       logger.info(`Unscheduling event ${messageId}`);
-      
+
       // Reschedule to account for removed event
       await this.scheduleNextCheck();
     } catch (error) {
@@ -143,7 +143,7 @@ export class ReminderScheduler {
 
       // Get all active events
       const activeEvents = await this.eventManager.getActiveEvents();
-      
+
       if (activeEvents.length === 0) {
         // No events to watch, enter sleep mode
         this.enterSleepMode();
@@ -161,7 +161,7 @@ export class ReminderScheduler {
 
         logger.debug(
           `Reminder ${event.messageId}: next_time=${nextTime.toISOString().substr(11, 8)}, ` +
-          `current=${currentTime.toISOString().substr(11, 8)}, diff=${(timeDiff / 1000).toFixed(1)}s`
+            `current=${currentTime.toISOString().substr(11, 8)}, diff=${(timeDiff / 1000).toFixed(1)}s`,
         );
 
         if (nextTime <= currentTime) {
@@ -169,14 +169,14 @@ export class ReminderScheduler {
           overdueEvents.push(event);
           logger.debug(
             `Added reminder ${event.messageId} to overdue list ` +
-            `(overdue by ${(-timeDiff / 1000).toFixed(1)}s)`
+              `(overdue by ${(-timeDiff / 1000).toFixed(1)}s)`,
           );
         } else {
           // Future reminder
           futureReminderTimes.push(nextTime);
           logger.debug(
             `Added reminder ${event.messageId} to future list ` +
-            `(due in ${(timeDiff / 1000).toFixed(1)}s)`
+              `(due in ${(timeDiff / 1000).toFixed(1)}s)`,
           );
         }
       }
@@ -184,12 +184,12 @@ export class ReminderScheduler {
       // Handle overdue reminders immediately
       if (overdueEvents.length > 0) {
         logger.info(
-          `🚨 ${overdueEvents.length} rappel(s) en retard détecté(s), traitement immédiat...`
+          `🚨 ${overdueEvents.length} rappel(s) en retard détecté(s), traitement immédiat...`,
         );
 
         // Process overdue reminders immediately
         await this.checkRemindersImmediate(overdueEvents);
-        
+
         // After processing overdue reminders, reschedule normally
         await this.scheduleNextCheck();
         return;
@@ -219,13 +219,13 @@ export class ReminderScheduler {
 
       logger.debug(
         `Next reminder due at ${nextReminder.toISOString().substr(11, 8)}, ` +
-        `waiting ${(timeUntilNext / 1000).toFixed(0)} seconds`
+          `waiting ${(timeUntilNext / 1000).toFixed(0)} seconds`,
       );
       console.log(
         `🕰️ Prochain rappel programmé à ${nextReminder.toISOString().substr(11, 8)} ` +
-        `(dans ${(timeUntilNext / 1000).toFixed(0)}s)`
+          `(dans ${(timeUntilNext / 1000).toFixed(0)}s)`,
       );
-      
+
       this.scheduledTimeout = setTimeout(() => {
         this.checkReminders().catch(error => {
           logger.error(`Error in scheduled reminder check: ${error}`);
@@ -233,11 +233,10 @@ export class ReminderScheduler {
           setTimeout(() => this.scheduleNextCheck(), 30000);
         });
       }, timeUntilNext);
-      
     } catch (error) {
       logger.error(`Failed to schedule next check: ${error}`);
       this.status.status = 'error';
-      
+
       // Try to recover by scheduling a check in 1 minute
       setTimeout(() => this.scheduleNextCheck(), 60000);
     }
@@ -250,7 +249,7 @@ export class ReminderScheduler {
     this.status.status = 'sleeping';
     this.status.nextCheck = null;
     this.status.activeEvents = 0;
-    
+
     logger.debug('No watched reminders - entering sleep mode (no periodic checks)');
     console.log('😴 Mode veille: Aucun rappel surveillé, arrêt des vérifications périodiques');
   }
@@ -262,9 +261,9 @@ export class ReminderScheduler {
   private async checkReminders(): Promise<void> {
     try {
       logger.debug('Dynamic reminder check triggered...');
-      
+
       const eventsNeedingReminders = await this.eventManager.getEventsNeedingReminders();
-      
+
       if (eventsNeedingReminders.length === 0) {
         const activeEvents = await this.eventManager.getActiveEvents();
         if (activeEvents.length === 0) {
@@ -281,16 +280,16 @@ export class ReminderScheduler {
       for (const event of eventsNeedingReminders) {
         logger.info(
           `Reminder due for message ${event.messageId} ` +
-          `(interval: ${event.intervalMinutes}min)`
+            `(interval: ${event.intervalMinutes}min)`,
         );
 
         try {
           const count = await this.sendReminder(event);
           totalReminded += count;
-          
+
           // Mark event as reminded
           await this.eventManager.markEventReminded(event.messageId);
-          
+
           // Add delay between reminders to respect rate limits
           if (eventsNeedingReminders.length > 1) {
             await this.sleep(Settings.DELAY_BETWEEN_REMINDERS || 2000);
@@ -305,18 +304,17 @@ export class ReminderScheduler {
         console.log(`✅ Rappels automatiques envoyés: ${totalReminded} personnes notifiées`);
         this.status.lastReminderSent = new Date();
       }
-      
+
       // Update active events count
       const activeEvents = await this.eventManager.getActiveEvents();
       this.status.activeEvents = activeEvents.length;
-      
+
       // Schedule next check
       await this.scheduleNextCheck();
-      
     } catch (error) {
       logger.error(`Error during reminder check: ${error}`);
       this.status.status = 'error';
-      
+
       // Try to recover
       setTimeout(() => this.scheduleNextCheck(), 30000);
     }
@@ -332,10 +330,10 @@ export class ReminderScheduler {
       try {
         const count = await this.sendReminder(event);
         totalReminded += count;
-        
+
         // Mark event as reminded
         await this.eventManager.markEventReminded(event.messageId);
-        
+
         // Add delay between reminders to respect rate limits
         if (overdueEvents.length > 1) {
           await this.sleep(Settings.DELAY_BETWEEN_REMINDERS || 2000);
@@ -357,7 +355,7 @@ export class ReminderScheduler {
   private async sendReminder(event: Event): Promise<number> {
     try {
       // Get the original event message to update reactions
-      const channel = await this.client.channels.fetch(event.channelId) as TextChannel;
+      const channel = (await this.client.channels.fetch(event.channelId)) as TextChannel;
       if (!channel) {
         logger.error(`Could not find channel ${event.channelId} for event ${event.messageId}`);
         return 0;
@@ -375,14 +373,22 @@ export class ReminderScheduler {
       try {
         originalMessage = await channel.messages.fetch(event.messageId);
       } catch (error) {
-        logger.error(`Could not fetch message ${event.messageId} from channel ${event.channelId}: ${error}`);
-        
+        logger.error(
+          `Could not fetch message ${event.messageId} from channel ${event.channelId}: ${error}`,
+        );
+
         // Message deleted - remove reminder automatically
-        logger.warn(`Message ${event.messageId} appears to have been deleted, removing reminder from watch list`);
+        logger.warn(
+          `Message ${event.messageId} appears to have been deleted, removing reminder from watch list`,
+        );
         const success = await this.eventManager.removeEvent(event.messageId, event.guildId);
         if (success) {
-          logger.info(`Successfully removed deleted message ${event.messageId} from reminder surveillance`);
-          console.log(`🗑️ Rappel supprimé automatiquement - message ${event.messageId} introuvable`);
+          logger.info(
+            `Successfully removed deleted message ${event.messageId} from reminder surveillance`,
+          );
+          console.log(
+            `🗑️ Rappel supprimé automatiquement - message ${event.messageId} introuvable`,
+          );
         }
         return 0;
       }
@@ -412,24 +418,24 @@ export class ReminderScheduler {
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
         .setDescription(
-          '**Merci de mettre votre disponibilité pour l\'évènement!**\n' +
-          'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)'
+          "**Merci de mettre votre disponibilité pour l'évènement!**\n" +
+            'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)',
         )
-        .setColor(0xFFA500) // Orange color like in Python
+        .setColor(0xffa500) // Orange color like in Python
         .addFields(
           {
             name: '📊 Statistiques',
-            value: 
+            value:
               `✅ Ont répondu: **${event.getReactionCount()}**\n` +
               `❌ Manquants: **${event.getMissingUsersCount()}**\n` +
               `👥 Total joueurs: **${event.getTotalUsersCount()}**`,
             inline: false,
           },
           {
-            name: '🔗 Lien vers l\'évènement',
+            name: "🔗 Lien vers l'évènement",
             value: `[**Cliquez ici pour voir le message**](https://discord.com/channels/${event.guildId}/${event.channelId}/${event.messageId})`,
             inline: false,
-          }
+          },
         );
 
       // Handle footer text like in Python
@@ -484,7 +490,6 @@ export class ReminderScheduler {
 
       logger.info(`Sent reminder for event ${event.messageId} to ${usersToMention.length} users`);
       return usersToMention.length;
-
     } catch (error) {
       logger.error(`Unexpected error in send_reminder for event ${event.messageId}: ${error}`);
       return 0;
@@ -498,7 +503,7 @@ export class ReminderScheduler {
     try {
       // Clear existing reactions
       event.setUsersWhoReacted([]);
-      
+
       // Update with current reactions
       for (const reaction of message.reactions.cache.values()) {
         if (event.requiredReactions.includes(reaction.emoji.name || reaction.emoji.toString())) {
@@ -551,7 +556,7 @@ export class ReminderScheduler {
     if (!this.isRunning) {
       throw new Error('Scheduler is not running');
     }
-    
+
     logger.info('Forcing immediate reminder check');
     await this.checkReminders();
   }
@@ -570,11 +575,9 @@ export class ReminderScheduler {
       const totalEvents = await this.eventManager.getTotalEventCount();
       const activeEvents = await this.eventManager.getActiveEvents();
       const nextReminderTime = await this.eventManager.getNextReminderTime();
-      
-      const nextReminderIn = nextReminderTime 
-        ? nextReminderTime.getTime() - Date.now()
-        : null;
-      
+
+      const nextReminderIn = nextReminderTime ? nextReminderTime.getTime() - Date.now() : null;
+
       return {
         totalEvents,
         activeEvents: activeEvents.length,

@@ -4,9 +4,9 @@
  * This file validates the configuration system and colorized logging
  */
 
-import {Settings} from '@/config/settings';
-import {FeatureFlag, featureFlagManager} from '@/config/featureFlags';
-import {createLogger, setupLogging} from '@/utils/loggingConfig';
+import { Settings } from '@/config/settings';
+import { FeatureFlag, featureFlagManager } from '@/config/featureFlags';
+import { createLogger, setupLogging } from '@/utils/loggingConfig';
 
 /**
  * Test the configuration system
@@ -29,7 +29,7 @@ function testConfiguration(): void {
   });
 
   // Test auto-delete formatting
-  const testDelays = [1/60, 1, 24, 168];
+  const testDelays = [1 / 60, 1, 24, 168];
   testDelays.forEach(delay => {
     const formatted = Settings.formatAutoDeleteDisplay(delay);
     logger.info(`Delay ${delay}h = ${formatted}`);
@@ -88,8 +88,8 @@ function testLogging(): void {
   // Test all log levels with emojis and French messages
   logger.debug('🔧 DEBUG - Test du système de logs colorisés TypeScript');
   logger.info('ℹ️ INFO - Configuration chargée avec succès');
-  logger.warn('⚠️ WARNING - Exemple d\'avertissement système');
-  logger.error('❌ ERROR - Simulation d\'erreur pour test');
+  logger.warn("⚠️ WARNING - Exemple d'avertissement système");
+  logger.error("❌ ERROR - Simulation d'erreur pour test");
   logger.fatal('🚨 CRITICAL - Test du niveau critique');
 
   // Test with additional metadata

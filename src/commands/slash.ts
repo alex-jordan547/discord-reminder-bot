@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Slash Commands Setup
- * 
+ *
  * Defines and manages all slash commands for the bot including:
  * - /watch - Watch a message for reactions and send reminders
  * - /unwatch - Stop watching a message
@@ -37,10 +37,7 @@ const watchCommand: SlashCommand = {
     .setName('watch')
     .setDescription('Watch a message for reactions and send reminders')
     .addStringOption(option =>
-      option
-        .setName('link')
-        .setDescription('Discord message link to watch')
-        .setRequired(true)
+      option.setName('link').setDescription('Discord message link to watch').setRequired(true),
     )
     .addIntegerOption(option =>
       option
@@ -55,8 +52,8 @@ const watchCommand: SlashCommand = {
           { name: '2 hours', value: 120 },
           { name: '6 hours', value: 360 },
           { name: '12 hours', value: 720 },
-          { name: '24 hours', value: 1440 }
-        )
+          { name: '24 hours', value: 1440 },
+        ),
     ),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleWatchCommand } = await import('./handlers');
@@ -75,7 +72,7 @@ const unwatchCommand: SlashCommand = {
       option
         .setName('link')
         .setDescription('Discord message link to stop watching')
-        .setRequired(true)
+        .setRequired(true),
     ),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleUnwatchCommand } = await import('./handlers');
@@ -120,11 +117,12 @@ const helpCommand: SlashCommand = {
     const embed = {
       title: '🤖 Discord Reminder Bot - Help',
       description: 'Available commands and their usage',
-      color: 0x00AE86,
+      color: 0x00ae86,
       fields: [
         {
           name: '📝 /watch',
-          value: 'Watch a message for reactions and send automatic reminders\\n`/watch link:<message_link> [interval:<minutes>]`',
+          value:
+            'Watch a message for reactions and send automatic reminders\\n`/watch link:<message_link> [interval:<minutes>]`',
           inline: false,
         },
         {
@@ -173,7 +171,7 @@ export function setupSlashCommands(client: Client): void {
   (client as any).commands = commands;
 
   // Handle slash command interactions
-  client.on('interactionCreate', async (interaction) => {
+  client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const command = commands.get(interaction.commandName);
@@ -187,7 +185,7 @@ export function setupSlashCommands(client: Client): void {
       logger.info(`Command ${interaction.commandName} executed by ${interaction.user.tag}`);
     } catch (error) {
       logger.error(`Error executing command ${interaction.commandName}: ${error}`);
-      
+
       const errorMessage = 'There was an error while executing this command!';
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: errorMessage, ephemeral: true });
@@ -213,17 +211,13 @@ export async function syncSlashCommands(client: Client): Promise<any[]> {
     let synced;
     if (Settings.NODE_ENV === 'development' && Settings.GUILD_ID) {
       // Register commands to specific guild for development (faster)
-      synced = await rest.put(
-        Routes.applicationGuildCommands(client.user!.id, Settings.GUILD_ID),
-        { body: commandsData }
-      );
+      synced = await rest.put(Routes.applicationGuildCommands(client.user!.id, Settings.GUILD_ID), {
+        body: commandsData,
+      });
       logger.info(`Successfully registered guild-specific commands for development`);
     } else {
       // Register commands globally for production
-      synced = await rest.put(
-        Routes.applicationCommands(client.user!.id),
-        { body: commandsData }
-      );
+      synced = await rest.put(Routes.applicationCommands(client.user!.id), { body: commandsData });
       logger.info(`Successfully registered global commands`);
     }
 

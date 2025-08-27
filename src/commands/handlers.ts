@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Event Handlers
- * 
+ *
  * Comprehensive event handling system that manages:
  * - Command processing and validation
  * - Event creation and management
@@ -33,13 +33,13 @@ export function setupEventHandlers(client: Client): void {
 
   // Update slash command implementations with actual handlers
   const commands = (client as any).commands;
-  
+
   if (commands) {
     // Watch command handler
     const watchCommand = commands.get('watch');
     if (watchCommand) {
       watchCommand.execute = async (interaction: CommandInteraction) => {
-        await handleWatchCommand(interaction as ChatInputCommandInteraction, client);
+        return await handleWatchCommand(interaction as ChatInputCommandInteraction, client);
       };
     }
 
@@ -74,9 +74,13 @@ export function setupEventHandlers(client: Client): void {
 /**
  * Handle the /watch command
  */
-export async function handleWatchCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+export async function handleWatchCommand(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
-  const intervalMinutes = (interaction.options.get('interval')?.value as number) || Settings.REMINDER_INTERVAL_HOURS * 60;
+  const intervalMinutes =
+    (interaction.options.get('interval')?.value as number) || Settings.REMINDER_INTERVAL_HOURS * 60;
 
   try {
     // Validate permissions
@@ -107,15 +111,17 @@ export async function handleWatchCommand(interaction: ChatInputCommandInteractio
     // Validate interval
     const minInterval = Settings.is_test_mode() ? 1 : 5;
     const maxInterval = Settings.is_test_mode() ? 10080 : 1440;
-    
+
     if (intervalMinutes < minInterval || intervalMinutes > maxInterval) {
-      await interaction.reply(`❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`);
+      await interaction.reply(
+        `❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`,
+      );
       return;
     }
 
     // Fetch the message to validate it exists
     try {
-      const channel = await client.channels.fetch(parsed.channelId) as TextChannel;
+      const channel = (await client.channels.fetch(parsed.channelId)) as TextChannel;
       if (!channel) {
         await interaction.reply('❌ Could not find the specified channel.');
         return;
@@ -129,7 +135,9 @@ export async function handleWatchCommand(interaction: ChatInputCommandInteractio
 
       // Check bot permissions
       if (!validatePermissions(channel, client.user!)) {
-        await interaction.reply('❌ I do not have permission to read/send messages in that channel.');
+        await interaction.reply(
+          '❌ I do not have permission to read/send messages in that channel.',
+        );
         return;
       }
 
@@ -154,25 +162,29 @@ export async function handleWatchCommand(interaction: ChatInputCommandInteractio
 
       // Create success embed
       const embed = new EmbedBuilder()
-        .setColor(0x00AE86)
+        .setColor(0x00ae86)
         .setTitle('✅ Event Watch Started')
         .setDescription(`Now watching the message for reactions!`)
         .addFields(
           { name: '📝 Message', value: `[Jump to message](${messageLink})`, inline: false },
           { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
-          { name: '🔔 Next Reminder', value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`, inline: true }
+          {
+            name: '🔔 Next Reminder',
+            value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`,
+            inline: true,
+          },
         )
         .setFooter({ text: 'Users who react to the message will be tracked automatically' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
       logger.info(`Event watch started for message ${parsed.messageId} by ${interaction.user.tag}`);
-
     } catch (error) {
       logger.error(`Error fetching message: ${error}`);
-      await interaction.reply('❌ Could not access the specified message. Check the link and my permissions.');
+      await interaction.reply(
+        '❌ Could not access the specified message. Check the link and my permissions.',
+      );
     }
-
   } catch (error) {
     logger.error(`Error in watch command: ${error}`);
     await interaction.reply('❌ An error occurred while setting up the watch. Please try again.');
@@ -182,7 +194,10 @@ export async function handleWatchCommand(interaction: ChatInputCommandInteractio
 /**
  * Handle the /unwatch command
  */
-export async function handleUnwatchCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+export async function handleUnwatchCommand(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
 
   try {
@@ -215,12 +230,14 @@ export async function handleUnwatchCommand(interaction: ChatInputCommandInteract
       await reminderScheduler.unscheduleEvent(parsed.messageId);
 
       const embed = new EmbedBuilder()
-        .setColor(0xFF6B6B)
+        .setColor(0xff6b6b)
         .setTitle('⏹️ Event Watch Stopped')
         .setDescription('No longer watching the message for reactions.')
-        .addFields(
-          { name: '📝 Message', value: `[Jump to message](${messageLink})`, inline: false }
-        )
+        .addFields({
+          name: '📝 Message',
+          value: `[Jump to message](${messageLink})`,
+          inline: false,
+        })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
@@ -228,7 +245,6 @@ export async function handleUnwatchCommand(interaction: ChatInputCommandInteract
     } else {
       await interaction.reply('❌ This message is not currently being watched.');
     }
-
   } catch (error) {
     logger.error(`Error in unwatch command: ${error}`);
     await interaction.reply('❌ An error occurred while stopping the watch. Please try again.');
@@ -238,7 +254,10 @@ export async function handleUnwatchCommand(interaction: ChatInputCommandInteract
 /**
  * Handle the /list command
  */
-export async function handleListCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+export async function handleListCommand(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+): Promise<void> {
   try {
     if (!interaction.guildId) {
       await interaction.reply('❌ This command can only be used in servers.');
@@ -250,7 +269,7 @@ export async function handleListCommand(interaction: ChatInputCommandInteraction
 
     if (events.length === 0) {
       const embed = new EmbedBuilder()
-        .setColor(0xFFA500)
+        .setColor(0xffa500)
         .setTitle('📋 Watched Events')
         .setDescription('No events are currently being watched in this server.')
         .setFooter({ text: 'Use /watch to start monitoring messages!' })
@@ -262,7 +281,7 @@ export async function handleListCommand(interaction: ChatInputCommandInteraction
 
     // Create embed with event list
     const embed = new EmbedBuilder()
-      .setColor(0x00AE86)
+      .setColor(0x00ae86)
       .setTitle('📋 Watched Events')
       .setDescription(`Currently watching ${events.length} event(s) in this server:`)
       .setTimestamp();
@@ -271,14 +290,14 @@ export async function handleListCommand(interaction: ChatInputCommandInteraction
     const maxFields = Math.min(events.length, 25);
     for (let i = 0; i < maxFields; i++) {
       const event = events[i];
-      const nextReminder = event.lastRemindedAt 
+      const nextReminder = event.lastRemindedAt
         ? new Date(event.lastRemindedAt.getTime() + event.intervalMinutes * 60 * 1000)
         : new Date(Date.now() + event.intervalMinutes * 60 * 1000);
-      
+
       embed.addFields({
         name: `${i + 1}. ${event.title}`,
         value: `Channel: <#${event.channelId}>\nInterval: ${event.intervalMinutes}min\nNext: <t:${Math.floor(nextReminder.getTime() / 1000)}:R>\nReactions: ${event.usersWhoReacted.length}`,
-        inline: true
+        inline: true,
       });
     }
 
@@ -288,44 +307,70 @@ export async function handleListCommand(interaction: ChatInputCommandInteraction
 
     await interaction.reply({ embeds: [embed] });
     logger.info(`List command executed by ${interaction.user.tag} - ${events.length} events`);
-
   } catch (error) {
     logger.error(`Error in list command: ${error}`);
-    await interaction.reply('❌ An error occurred while fetching the event list. Please try again.');
+    await interaction.reply(
+      '❌ An error occurred while fetching the event list. Please try again.',
+    );
   }
 }
 
 /**
  * Handle the /status command
  */
-export async function handleStatusCommand(interaction: ChatInputCommandInteraction, client: Client): Promise<void> {
+export async function handleStatusCommand(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+): Promise<void> {
   try {
     const eventManager = (client as any).eventManager as EventManager;
     const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
-    
+
     // Gather statistics
     const totalEvents = await eventManager.getTotalEventCount();
-    const guildEvents = interaction.guildId ? await eventManager.getEventsByGuild(interaction.guildId) : [];
+    const guildEvents = interaction.guildId
+      ? await eventManager.getEventsByGuild(interaction.guildId)
+      : [];
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
-    
+
     // Format uptime
     const uptimeString = formatUptime(uptime);
-    
+
     // Get scheduler status
     const schedulerStatus = reminderScheduler.getStatus();
-    
+
     const embed = new EmbedBuilder()
-      .setColor(0x00AE86)
+      .setColor(0x00ae86)
       .setTitle('📊 Bot Status')
       .setDescription('Current bot status and statistics')
       .addFields(
-        { name: '🤖 Bot Info', value: `Servers: ${client.guilds.cache.size}\nUptime: ${uptimeString}`, inline: true },
-        { name: '📊 Events', value: `Total: ${totalEvents}\nThis Server: ${guildEvents.length}`, inline: true },
-        { name: '⏰ Scheduler', value: `Status: ${schedulerStatus.status}\nNext Check: ${schedulerStatus.nextCheck ? `<t:${Math.floor(schedulerStatus.nextCheck.getTime() / 1000)}:R>` : 'None'}`, inline: true },
-        { name: '💾 Memory Usage', value: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`, inline: true },
+        {
+          name: '🤖 Bot Info',
+          value: `Servers: ${client.guilds.cache.size}\nUptime: ${uptimeString}`,
+          inline: true,
+        },
+        {
+          name: '📊 Events',
+          value: `Total: ${totalEvents}\nThis Server: ${guildEvents.length}`,
+          inline: true,
+        },
+        {
+          name: '⏰ Scheduler',
+          value: `Status: ${schedulerStatus.status}\nNext Check: ${schedulerStatus.nextCheck ? `<t:${Math.floor(schedulerStatus.nextCheck.getTime() / 1000)}:R>` : 'None'}`,
+          inline: true,
+        },
+        {
+          name: '💾 Memory Usage',
+          value: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+          inline: true,
+        },
         { name: '🏗️ Version', value: 'TypeScript Edition v2.0.0', inline: true },
-        { name: '⚙️ Mode', value: Settings.is_test_mode() ? 'Test Mode' : 'Production', inline: true }
+        {
+          name: '⚙️ Mode',
+          value: Settings.is_test_mode() ? 'Test Mode' : 'Production',
+          inline: true,
+        },
       )
       .setThumbnail(client.user?.displayAvatarURL() ?? null)
       .setFooter({ text: 'Discord Reminder Bot • TypeScript Edition' })
@@ -333,7 +378,6 @@ export async function handleStatusCommand(interaction: ChatInputCommandInteracti
 
     await interaction.reply({ embeds: [embed] });
     logger.info(`Status command executed by ${interaction.user.tag}`);
-
   } catch (error) {
     logger.error(`Error in status command: ${error}`);
     await interaction.reply('❌ An error occurred while fetching bot status. Please try again.');
@@ -347,11 +391,11 @@ function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / (24 * 60 * 60));
   const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
   const minutes = Math.floor((seconds % (60 * 60)) / 60);
-  
+
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  
+
   return parts.join(' ') || '<1m';
 }

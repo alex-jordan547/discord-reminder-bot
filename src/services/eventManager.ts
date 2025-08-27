@@ -103,7 +103,7 @@ export class EventManager {
   /** Get all events for a guild */
   async getEventsByGuild(guildId: string): Promise<Event[]> {
     try {
-      const events = await this.storage.getEventsByGuild(guildId);
+      const events = await this.storage.getDueEvents(guildId);
       events.forEach(e => this.events.set(e.messageId, e));
       return events;
     } catch (error) {
@@ -115,7 +115,7 @@ export class EventManager {
   /** Get all active events (not paused) */
   async getActiveEvents(): Promise<Event[]> {
     try {
-      const events = await this.storage.getAllEvents();
+      const events = await this.storage.getEvents();
       events.forEach(e => this.events.set(e.messageId, e));
       return events.filter(e => !e.isPaused);
     } catch (error) {
@@ -201,7 +201,7 @@ export class EventManager {
   /** Get total number of events */
   async getTotalEventCount(): Promise<number> {
     try {
-      const events = await this.storage.getAllEvents();
+      const events = await this.storage.getEvents();
       return events.length;
     } catch (error) {
       logger.error(`Failed to get total event count: ${error}`);
@@ -212,7 +212,7 @@ export class EventManager {
   /** Load events from storage into cache */
   async loadFromStorage(): Promise<Event[]> {
     try {
-      const events = await this.storage.getAllEvents();
+      const events = await this.storage.getEvents();
       this.events.clear();
       events.forEach(e => this.events.set(e.messageId, e));
       logger.info(`Loaded ${events.length} events from storage`);
@@ -274,7 +274,7 @@ export class EventManager {
   async cleanupOldEvents(maxAgeHours: number = 24 * 30): Promise<number> {
     try {
       const cutoff = new Date(Date.now() - maxAgeHours * 3600000);
-      const all = await this.storage.getAllEvents();
+      const all = await this.storage.getEvents();
 
       let cleaned = 0;
       for (const e of all) {

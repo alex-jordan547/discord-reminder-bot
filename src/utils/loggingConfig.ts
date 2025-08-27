@@ -5,8 +5,8 @@
  * with full ANSI color support matching the Python implementation.
  */
 
-import pino, {Logger, LoggerOptions} from 'pino';
-import {Settings} from '@/config/settings';
+import pino, { Logger, LoggerOptions } from 'pino';
+import { Settings } from '@/config/settings';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
@@ -150,6 +150,9 @@ function createColoredFormatter(useColors: boolean): (obj: Record<string, unknow
   };
 }
 
+// Global reference to file destination for proper cleanup
+let fileDestination: pino.DestinationStream | null = null;
+
 /**
  * Setup logging configuration
  */
@@ -208,14 +211,29 @@ export function setupLogging(options: {
       console.warn(`Warning: Could not create logs directory: ${err}`);
     }
 
-    streams.push({
-      level: pinoLevel as pino.Level,
-      stream: pino.destination({
+    // Create file destination with proper error handling
+    try {
+      fileDestination = pino.destination({
         dest: filePath,
         sync: false,
         mkdir: true,
-      }),
-    });
+        // Add these options to prevent sonic-boom issues
+        append: true,
+        minLength: 0, // Flush immediately
+      });
+
+      // Handle destination errors
+      fileDestination.on('error', err => {
+        console.warn('File logging error:', err.message);
+      });
+
+      streams.push({
+        level: pinoLevel as pino.Level,
+        stream: fileDestination,
+      });
+    } catch (err) {
+      console.warn(`Warning: Could not create file destination: ${err}`);
+    }
   }
 
   // Create the logger with multiple streams
@@ -238,6 +256,23 @@ export function setupLogging(options: {
   logger.info('=' + '='.repeat(48) + '=');
 
   return logger;
+}
+
+/**
+ * Gracefully close logging resources
+ */
+export function closeLogging(): Promise<void> {
+  return new Promise(resolve => {
+    if (fileDestination) {
+      // Close the file destination properly
+      fileDestination.end(() => {
+        fileDestination = null;
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
 /**

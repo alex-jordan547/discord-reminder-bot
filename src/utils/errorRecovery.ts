@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Advanced Error Recovery System
- * 
+ *
  * Comprehensive error recovery with:
  * - Exponential backoff retry mechanisms
  * - Circuit breaker pattern for API failures
@@ -10,12 +10,7 @@
  */
 
 import { createLogger } from '@/utils/loggingConfig';
-import { 
-  DiscordAPIError, 
-  HTTPError, 
-  RateLimitError,
-  WebSocketShardEvents 
-} from 'discord.js';
+import { DiscordAPIError, HTTPError, RateLimitError, WebSocketShardEvents } from 'discord.js';
 
 const logger = createLogger('error-recovery');
 
@@ -23,11 +18,11 @@ const logger = createLogger('error-recovery');
  * Error severity classification for recovery strategies
  */
 export enum ErrorSeverity {
-  TRANSIENT = 'transient',        // Retry immediately
-  RATE_LIMITED = 'rate_limited',  // Wait and respect rate limits
-  PERMANENT = 'permanent',        // Don't retry (404, 403, etc.)
-  API_UNAVAILABLE = 'api_down',   // Discord API unavailable, queue for later
-  CRITICAL = 'critical',          // System-level errors requiring intervention
+  TRANSIENT = 'transient', // Retry immediately
+  RATE_LIMITED = 'rate_limited', // Wait and respect rate limits
+  PERMANENT = 'permanent', // Don't retry (404, 403, etc.)
+  API_UNAVAILABLE = 'api_down', // Discord API unavailable, queue for later
+  CRITICAL = 'critical', // System-level errors requiring intervention
 }
 
 /**
@@ -35,19 +30,19 @@ export enum ErrorSeverity {
  */
 export interface RetryConfig {
   maxAttempts: number;
-  baseDelay: number;      // milliseconds
-  maxDelay: number;       // milliseconds
-  backoffFactor: number;  // exponential multiplier
-  jitterFactor: number;   // random variation (0-1)
-  timeoutMs?: number;     // operation timeout
+  baseDelay: number; // milliseconds
+  maxDelay: number; // milliseconds
+  backoffFactor: number; // exponential multiplier
+  jitterFactor: number; // random variation (0-1)
+  timeoutMs?: number; // operation timeout
 }
 
 /**
  * Circuit breaker states
  */
 export enum CircuitBreakerState {
-  CLOSED = 'closed',     // Normal operation
-  OPEN = 'open',         // Blocking requests
+  CLOSED = 'closed', // Normal operation
+  OPEN = 'open', // Blocking requests
   HALF_OPEN = 'half_open', // Testing recovery
 }
 
@@ -55,10 +50,10 @@ export enum CircuitBreakerState {
  * Circuit breaker configuration
  */
 export interface CircuitBreakerConfig {
-  failureThreshold: number;    // failures before opening
-  successThreshold: number;    // successes before closing from half-open
-  timeout: number;             // milliseconds to wait before half-open
-  monitorWindow: number;       // milliseconds to track failures
+  failureThreshold: number; // failures before opening
+  successThreshold: number; // successes before closing from half-open
+  timeout: number; // milliseconds to wait before half-open
+  monitorWindow: number; // milliseconds to track failures
 }
 
 /**
@@ -131,13 +126,16 @@ export function classifyError(error: Error): ErrorSeverity {
     const status = error.status;
 
     // Permanent errors (don't retry)
-    if (status === 404 || code === 10008 || code === 10003) { // Not found, unknown message/channel
+    if (status === 404 || code === 10008 || code === 10003) {
+      // Not found, unknown message/channel
       return ErrorSeverity.PERMANENT;
     }
-    if (status === 403 || code === 50013 || code === 50001) { // Forbidden, missing permissions
+    if (status === 403 || code === 50013 || code === 50001) {
+      // Forbidden, missing permissions
       return ErrorSeverity.PERMANENT;
     }
-    if (status === 400 && code !== 50035) { // Bad request (except invalid form body)
+    if (status === 400 && code !== 50035) {
+      // Bad request (except invalid form body)
       return ErrorSeverity.PERMANENT;
     }
 
@@ -167,8 +165,12 @@ export function classifyError(error: Error): ErrorSeverity {
   // Network/connection errors
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
-    if (message.includes('timeout') || message.includes('econnreset') || 
-        message.includes('enotfound') || message.includes('econnrefused')) {
+    if (
+      message.includes('timeout') ||
+      message.includes('econnreset') ||
+      message.includes('enotfound') ||
+      message.includes('econnrefused')
+    ) {
       return ErrorSeverity.API_UNAVAILABLE;
     }
     if (message.includes('session closed') || message.includes('websocket')) {
@@ -200,11 +202,7 @@ export function isRetryableError(error: Error): boolean {
 /**
  * Calculate retry delay with exponential backoff and jitter
  */
-export function calculateRetryDelay(
-  error: Error,
-  attempt: number,
-  config: RetryConfig
-): number {
+export function calculateRetryDelay(error: Error, attempt: number, config: RetryConfig): number {
   const severity = classifyError(error);
 
   // For rate limiting, use the retry_after value if available
@@ -221,7 +219,7 @@ export function calculateRetryDelay(
 
   // Add jitter to prevent thundering herd
   const jitter = delay * config.jitterFactor * Math.random();
-  
+
   return Math.floor(delay + jitter);
 }
 
@@ -237,7 +235,7 @@ export class CircuitBreaker {
 
   constructor(
     private name: string,
-    private config: CircuitBreakerConfig
+    private config: CircuitBreakerConfig,
   ) {}
 
   /**
@@ -304,7 +302,9 @@ export class CircuitBreaker {
       if (this.failures.length >= this.config.failureThreshold) {
         this.state = CircuitBreakerState.OPEN;
         this.nextAttempt = new Date(now.getTime() + this.config.timeout);
-        logger.error(`🚨 Circuit breaker ${this.name} OPEN due to ${this.failures.length} failures`);
+        logger.error(
+          `🚨 Circuit breaker ${this.name} OPEN due to ${this.failures.length} failures`,
+        );
       }
     }
   }
@@ -355,7 +355,7 @@ class ErrorStatsCollector {
     success: boolean,
     errorType?: string,
     retries: number = 0,
-    recovered: boolean = false
+    recovered: boolean = false,
   ): void {
     this.stats.totalCalls++;
     this.stats.uptime = Date.now() - this.stats.lastReset.getTime();
@@ -436,12 +436,12 @@ function getCircuitBreaker(name: string): CircuitBreaker {
  */
 export function withRetry<T extends any[], R>(
   configName: string = 'api_call',
-  customConfig?: Partial<RetryConfig>
+  customConfig?: Partial<RetryConfig>,
 ) {
   return function (
     target: any,
     propertyKey: string,
-    descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
+    descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>,
   ) {
     const originalMethod = descriptor.value!;
     const config = { ...RETRY_CONFIGS[configName], ...customConfig };
@@ -462,16 +462,17 @@ export function withRetry<T extends any[], R>(
           logger.debug(`🔄 Attempting ${methodName} (${attempt + 1}/${config.maxAttempts})`);
 
           // Create promise with timeout
-          const timeoutPromise = config.timeoutMs ? 
-            new Promise<R>((_, reject) => 
-              setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs)
-            ) : null;
+          const timeoutPromise = config.timeoutMs
+            ? new Promise<R>((_, reject) =>
+                setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs),
+              )
+            : null;
 
           const operationPromise = originalMethod.apply(this, args);
-          
-          const result = timeoutPromise ?
-            await Promise.race([operationPromise, timeoutPromise]) :
-            await operationPromise;
+
+          const result = timeoutPromise
+            ? await Promise.race([operationPromise, timeoutPromise])
+            : await operationPromise;
 
           // Success
           circuitBreaker.onSuccess();
@@ -482,12 +483,13 @@ export function withRetry<T extends any[], R>(
           }
 
           return result;
-
         } catch (error) {
           lastError = error as Error;
           const severity = classifyError(lastError);
 
-          logger.warn(`❌ ${methodName} failed (${attempt + 1}/${config.maxAttempts}): ${lastError.message} (${severity})`);
+          logger.warn(
+            `❌ ${methodName} failed (${attempt + 1}/${config.maxAttempts}): ${lastError.message} (${severity})`,
+          );
 
           // Record failure in circuit breaker
           circuitBreaker.onFailure();
@@ -534,7 +536,7 @@ export function withRetry<T extends any[], R>(
 export async function executeWithRetry<T>(
   operation: () => Promise<T>,
   configName: string = 'api_call',
-  customConfig?: Partial<RetryConfig>
+  customConfig?: Partial<RetryConfig>,
 ): Promise<T> {
   const config = { ...RETRY_CONFIGS[configName], ...customConfig };
   const circuitBreaker = getCircuitBreaker(configName);
@@ -552,7 +554,7 @@ export async function executeWithRetry<T>(
       const executeOperation = async (): Promise<T> => {
         if (config.timeoutMs) {
           const timeoutPromise = new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs)
+            setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs),
           );
           return await Promise.race([operation(), timeoutPromise]);
         } else {
@@ -561,19 +563,20 @@ export async function executeWithRetry<T>(
       };
 
       const result = await executeOperation();
-      
+
       // Success
       circuitBreaker.onSuccess();
       errorStats.recordCall(true, undefined, attempt, attempt > 0);
-      
-      return result;
 
+      return result;
     } catch (error) {
       lastError = error as Error;
       const severity = classifyError(lastError);
 
-      logger.warn(`❌ Operation failed (${attempt + 1}/${config.maxAttempts}): ${lastError.message}`);
-      
+      logger.warn(
+        `❌ Operation failed (${attempt + 1}/${config.maxAttempts}): ${lastError.message}`,
+      );
+
       // Record failure
       circuitBreaker.onFailure();
 
@@ -644,7 +647,7 @@ export function getErrorRecoveryHealth(): {
 
   // Check for open circuit breakers
   const openCircuitBreakers = circuitBreakerStatuses.filter(
-    cb => cb.state === CircuitBreakerState.OPEN
+    cb => cb.state === CircuitBreakerState.OPEN,
   );
   if (openCircuitBreakers.length > 0) {
     issues.push(`Open circuit breakers: ${openCircuitBreakers.map(cb => cb.name).join(', ')}`);
@@ -670,7 +673,7 @@ export function getErrorRecoveryHealth(): {
 export function generateErrorReport(): string {
   const health = getErrorRecoveryHealth();
   const stats = health.stats;
-  
+
   const report = [
     '=== Error Recovery System Report ===',
     `Status: ${health.healthy ? '✅ HEALTHY' : '⚠️  ISSUES DETECTED'}`,
@@ -696,18 +699,22 @@ export function generateErrorReport(): string {
     const sortedErrors = Object.entries(stats.errorCounts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
-    sortedErrors.forEach(([error, count]) => 
-      report.push(`  - ${error}: ${count}`)
-    );
+    sortedErrors.forEach(([error, count]) => report.push(`  - ${error}: ${count}`));
     report.push('');
   }
 
   if (health.circuitBreakers.length > 0) {
     report.push('🔌 Circuit Breakers:');
     health.circuitBreakers.forEach(cb => {
-      const statusEmoji = cb.state === CircuitBreakerState.CLOSED ? '✅' : 
-                         cb.state === CircuitBreakerState.OPEN ? '🔴' : '🟡';
-      report.push(`  ${statusEmoji} ${cb.name}: ${cb.state.toUpperCase()} (${cb.failures} failures, ${cb.successes} successes)`);
+      const statusEmoji =
+        cb.state === CircuitBreakerState.CLOSED
+          ? '✅'
+          : cb.state === CircuitBreakerState.OPEN
+            ? '🔴'
+            : '🟡';
+      report.push(
+        `  ${statusEmoji} ${cb.name}: ${cb.state.toUpperCase()} (${cb.failures} failures, ${cb.successes} successes)`,
+      );
     });
   }
 

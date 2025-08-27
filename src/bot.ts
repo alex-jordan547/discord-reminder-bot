@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Discord Client Setup and Event Handlers
- * 
+ *
  * Comprehensive Discord client setup with event handlers for:
  * - Bot ready event with slash command synchronization
  * - Message events for command parsing
@@ -17,7 +17,7 @@ import {
   User,
   PartialMessageReaction,
   PartialUser,
-  ActivityType
+  ActivityType,
 } from 'discord.js';
 import { featureFlagManager } from '@/config/featureFlags';
 import { createLogger } from '@/utils/loggingConfig';
@@ -54,7 +54,7 @@ export async function createDiscordClient(): Promise<Client> {
   (client as any).reactionTracker = reactionTracker;
 
   // Bot ready event - called when bot is fully connected
-  client.once(Events.ClientReady, async (readyClient) => {
+  client.once(Events.ClientReady, async readyClient => {
     logger.info(`✅ Bot connected as ${readyClient.user.tag}`);
     logger.info(`📊 Present on ${readyClient.guilds.cache.size} server(s)`);
 
@@ -107,62 +107,62 @@ export async function createDiscordClient(): Promise<Client> {
   // Message events for legacy command support
   client.on(Events.MessageCreate, async (message: Message) => {
     if (message.author.bot) return;
-    
+
     // Handle legacy text commands if needed
     // This can be removed once full migration to slash commands is complete
   });
 
   // Reaction events for tracking user responses
-  client.on(Events.MessageReactionAdd, async (
-    reaction: MessageReaction | PartialMessageReaction,
-    user: User | PartialUser
-  ) => {
-    try {
-      // Fetch partial data
-      if (reaction.partial) {
-        await reaction.fetch();
+  client.on(
+    Events.MessageReactionAdd,
+    async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+      try {
+        // Fetch partial data
+        if (reaction.partial) {
+          await reaction.fetch();
+        }
+        if (user.partial) {
+          await user.fetch();
+        }
+
+        // Skip bot reactions
+        if (user.bot) return;
+
+        await reactionTracker.handleReactionAdd(reaction as MessageReaction, user as User);
+      } catch (error) {
+        logger.error(`Error handling reaction add: ${error}`);
       }
-      if (user.partial) {
-        await user.fetch();
+    },
+  );
+
+  client.on(
+    Events.MessageReactionRemove,
+    async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+      try {
+        // Fetch partial data
+        if (reaction.partial) {
+          await reaction.fetch();
+        }
+        if (user.partial) {
+          await user.fetch();
+        }
+
+        // Skip bot reactions
+        if (user.bot) return;
+
+        await reactionTracker.handleReactionRemove(reaction as MessageReaction, user as User);
+      } catch (error) {
+        logger.error(`Error handling reaction remove: ${error}`);
       }
-
-      // Skip bot reactions
-      if (user.bot) return;
-
-      await reactionTracker.handleReactionAdd(reaction as MessageReaction, user as User);
-    } catch (error) {
-      logger.error(`Error handling reaction add: ${error}`);
-    }
-  });
-
-  client.on(Events.MessageReactionRemove, async (
-    reaction: MessageReaction | PartialMessageReaction,
-    user: User | PartialUser
-  ) => {
-    try {
-      // Fetch partial data
-      if (reaction.partial) {
-        await reaction.fetch();
-      }
-      if (user.partial) {
-        await user.fetch();
-      }
-
-      // Skip bot reactions
-      if (user.bot) return;
-
-      await reactionTracker.handleReactionRemove(reaction as MessageReaction, user as User);
-    } catch (error) {
-      logger.error(`Error handling reaction remove: ${error}`);
-    }
-  });
+    },
+  );
 
   // Error handling
-  client.on(Events.Error, (error) => {
+  client.on(Events.Error, error => {
     logger.error(`Discord client error: ${error.message}`);
   });
 
-  client.on(Events.Warn, (warning) => {
+  client.on(Events.Warn, warning => {
     logger.warn(`Discord client warning: ${warning}`);
   });
 
@@ -171,7 +171,7 @@ export async function createDiscordClient(): Promise<Client> {
     logger.warn(`Shard ${id} disconnected: ${closeEvent.code} ${closeEvent.reason}`);
   });
 
-  client.on(Events.ShardReconnecting, (id) => {
+  client.on(Events.ShardReconnecting, id => {
     logger.info(`Shard ${id} reconnecting...`);
   });
 
@@ -181,4 +181,3 @@ export async function createDiscordClient(): Promise<Client> {
 
   return client;
 }
-

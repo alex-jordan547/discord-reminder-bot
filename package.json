@@ -4,12 +4,15 @@
   "description": "Discord bot for event reminder management with reaction tracking",
   "main": "dist/src/bot.js",
   "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
   },
   "scripts": {
-    "dev": "nodemon --exec tsx src/bot.ts",
+    "dev": "nodemon --exec tsx src/index.ts",
     "start": "node dist/src/bot.js",
     "build": "tsc",
     "build:watch": "tsc --watch",
@@ -19,9 +22,9 @@
     "test:coverage": "vitest --coverage",
     "test:performance": "vitest --run tests/**/*performance*",
     "test:regression": "vitest --run tests/**/*regression*",
-    "lint": "eslint src tests --ext .ts,.js",
-    "lint:fix": "eslint src tests --ext .ts,.js --fix",
-    "lint:strict": "eslint src tests --ext .ts,.js --max-warnings 0",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "lint:strict": "eslint src --max-warnings 0",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "type-check": "tsc --noEmit",
@@ -29,7 +32,6 @@
     "quality:all": "npm run lint:strict && npm run format:check && npm run type-check:strict && npm run test:coverage",
     "security:audit": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
-    "prepare": "npm run build",
     "docker:build": "docker build -t discord-reminder-bot .",
     "docker:run": "docker-compose up",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up"
@@ -65,20 +67,22 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/eslint": "^9.6.1",
     "@types/node": "^20.8.10",
     "@types/sqlite3": "^3.1.9",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@vitest/coverage-v8": "^0.34.6",
-    "eslint": "^8.52.0",
-    "eslint-plugin-import": "^2.29.0",
-    "eslint-plugin-security": "^2.1.0",
-    "eslint-plugin-promise": "^6.1.0",
-    "eslint-plugin-unicorn": "^50.0.0",
+    "eslint": "^9.34.0",
+    "globals": "^16.3.0",
+    "jiti": "^2.5.1",
     "nodemon": "^3.0.1",
     "prettier": "^3.0.3",
     "tsx": "^4.20.5",
-    "typescript": "^5.2.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0",
     "vitest": "^0.34.6"
-  }
+  },
+  "packageManager": "yarn@1.22.22"
 }

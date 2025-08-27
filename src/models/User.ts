@@ -1,10 +1,16 @@
 /**
  * User model for Discord Reminder Bot
- * 
+ *
  * Represents a Discord user within a guild context
  */
 
-import { BaseModel, type BaseModelData, type ModelValidationError, validateDiscordId, validateNonEmptyString } from './BaseModel.js';
+import {
+  BaseModel,
+  type BaseModelData,
+  type ModelValidationError,
+  validateDiscordId,
+  validateNonEmptyString,
+} from './BaseModel.js';
 
 export interface UserData extends BaseModelData {
   userId: string;
@@ -40,7 +46,7 @@ export class User extends BaseModel {
   static fromDict(data: Record<string, any>): User {
     return new User({
       userId: String(data.user_id || data.userId),
-      guildId: String(data.guild_id || data.guildId || (data.guild?.guild_id) || (data.guild?.guildId)),
+      guildId: String(data.guild_id || data.guildId || data.guild?.guild_id || data.guild?.guildId),
       username: String(data.username),
       isBot: Boolean(data.is_bot || data.isBot || false),
       lastSeen: new Date(data.last_seen || data.lastSeen || Date.now()),
@@ -101,7 +107,7 @@ export class User extends BaseModel {
    * Check if this user has been seen recently (within specified hours)
    */
   isRecentlyActive(hoursThreshold: number = 24): boolean {
-    const hoursAgo = Date.now() - (hoursThreshold * 60 * 60 * 1000);
+    const hoursAgo = Date.now() - hoursThreshold * 60 * 60 * 1000;
     return this.lastSeen.getTime() > hoursAgo;
   }
 
@@ -114,7 +120,7 @@ export class User extends BaseModel {
     // Validate user ID
     errors.push(...validateDiscordId(this.userId, 'userId'));
 
-    // Validate guild ID  
+    // Validate guild ID
     errors.push(...validateDiscordId(this.guildId, 'guildId'));
 
     // Validate username
@@ -124,7 +130,7 @@ export class User extends BaseModel {
     if (isNaN(this.lastSeen.getTime())) {
       errors.push({
         field: 'lastSeen',
-        message: 'Last seen must be a valid date'
+        message: 'Last seen must be a valid date',
       });
     }
 

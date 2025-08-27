@@ -1,6 +1,6 @@
 /**
  * Database configuration and connection management for Discord Reminder Bot
- * 
+ *
  * TypeScript equivalent of the Python database module with SQLite connection
  * pooling, optimized settings, and proper error handling.
  */
@@ -113,7 +113,7 @@ export class DatabaseManager {
       const database = new sqlite3.Database(
         this.config.path,
         sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
-        async (err) => {
+        async err => {
           if (err) {
             reject(new Error(`Failed to connect to database: ${err.message}`));
             return;
@@ -122,17 +122,17 @@ export class DatabaseManager {
           try {
             // Apply optimized SQLite settings
             await this.configurePragmas(database);
-            
+
             this.db = database;
             this.isInitialized = true;
-            
+
             console.log(`Database connected: ${this.config.path}`);
             resolve(database);
           } catch (configError) {
             database.close();
             reject(configError);
           }
-        }
+        },
       );
     });
   }
@@ -159,11 +159,15 @@ export class DatabaseManager {
   /**
    * Execute a SQL statement (wrapper for better error handling)
    */
-  async run(sql: string, params: any[] = [], database?: sqlite3.Database): Promise<sqlite3.RunResult> {
-    const db = database || await this.connect();
-    
+  async run(
+    sql: string,
+    params: any[] = [],
+    database?: sqlite3.Database,
+  ): Promise<sqlite3.RunResult> {
+    const db = database || (await this.connect());
+
     return new Promise((resolve, reject) => {
-      db.run(sql, params, function(err) {
+      db.run(sql, params, function (err) {
         if (err) {
           reject(new Error(`SQL execution failed: ${err.message}\nSQL: ${sql}`));
         } else {
@@ -177,8 +181,8 @@ export class DatabaseManager {
    * Execute a SQL query and return all results
    */
   async all<T = any>(sql: string, params: any[] = [], database?: sqlite3.Database): Promise<T[]> {
-    const db = database || await this.connect();
-    
+    const db = database || (await this.connect());
+
     return new Promise((resolve, reject) => {
       db.all(sql, params, (err, rows) => {
         if (err) {
@@ -193,9 +197,13 @@ export class DatabaseManager {
   /**
    * Execute a SQL query and return the first result
    */
-  async get<T = any>(sql: string, params: any[] = [], database?: sqlite3.Database): Promise<T | undefined> {
-    const db = database || await this.connect();
-    
+  async get<T = any>(
+    sql: string,
+    params: any[] = [],
+    database?: sqlite3.Database,
+  ): Promise<T | undefined> {
+    const db = database || (await this.connect());
+
     return new Promise((resolve, reject) => {
       db.get(sql, params, (err, row) => {
         if (err) {
@@ -211,53 +219,58 @@ export class DatabaseManager {
    * Execute a SQL query and return each result via callback
    */
   async each<T = any>(
-    sql: string, 
-    params: any[] = [], 
+    sql: string,
+    params: any[] = [],
     callback: (row: T) => void,
-    database?: sqlite3.Database
+    database?: sqlite3.Database,
   ): Promise<number> {
-    const db = database || await this.connect();
-    
+    const db = database || (await this.connect());
+
     return new Promise((resolve, reject) => {
-      db.each(sql, params, (err, row) => {
-        if (err) {
-          reject(new Error(`SQL query failed: ${err.message}\nSQL: ${sql}`));
-        } else {
-          callback(row as T);
-        }
-      }, (err, count) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(count);
-        }
-      });
+      db.each(
+        sql,
+        params,
+        (err, row) => {
+          if (err) {
+            reject(new Error(`SQL query failed: ${err.message}\nSQL: ${sql}`));
+          } else {
+            callback(row as T);
+          }
+        },
+        (err, count) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(count);
+          }
+        },
+      );
     });
   }
 
   /**
    * Execute multiple SQL statements in a transaction
    */
-  async executeTransaction(statements: Array<{sql: string, params?: any[]}>): Promise<void> {
+  async executeTransaction(statements: Array<{ sql: string; params?: any[] }>): Promise<void> {
     const db = await this.connect();
-    
+
     return new Promise((resolve, reject) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
-        
+
         let errorOccurred = false;
         let completedCount = 0;
-        
+
         const handleCompletion = () => {
           completedCount++;
           if (completedCount === statements.length) {
             if (errorOccurred) {
-              db.run('ROLLBACK', (err) => {
+              db.run('ROLLBACK', err => {
                 if (err) console.error('Rollback failed:', err);
                 reject(new Error('Transaction rolled back due to error'));
               });
             } else {
-              db.run('COMMIT', (err) => {
+              db.run('COMMIT', err => {
                 if (err) {
                   reject(new Error(`Commit failed: ${err.message}`));
                 } else {
@@ -269,7 +282,7 @@ export class DatabaseManager {
         };
 
         for (const statement of statements) {
-          db.run(statement.sql, statement.params || [], function(err) {
+          db.run(statement.sql, statement.params || [], function (err) {
             if (err) {
               console.error('Transaction statement failed:', err);
               errorOccurred = true;
@@ -299,7 +312,7 @@ export class DatabaseManager {
    */
   async getDatabaseInfo(): Promise<DatabaseInfo> {
     const dbExists = require('fs').existsSync(this.config.path);
-    
+
     const info: DatabaseInfo = {
       databasePath: this.config.path,
       databaseExists: dbExists,
@@ -312,7 +325,7 @@ export class DatabaseManager {
       try {
         const stats = await fs.stat(this.config.path);
         info.databaseSizeBytes = stats.size;
-        info.databaseSizeMB = Math.round(stats.size / (1024 * 1024) * 100) / 100;
+        info.databaseSizeMB = Math.round((stats.size / (1024 * 1024)) * 100) / 100;
       } catch (error) {
         console.warn('Could not get database file info:', error);
       }
@@ -327,7 +340,7 @@ export class DatabaseManager {
   async close(): Promise<void> {
     if (this.db) {
       return new Promise((resolve, reject) => {
-        this.db!.close((err) => {
+        this.db!.close(err => {
           if (err) {
             reject(new Error(`Failed to close database: ${err.message}`));
           } else {
@@ -347,10 +360,10 @@ export class DatabaseManager {
    */
   async optimize(): Promise<void> {
     console.log('Optimizing database...');
-    
+
     await this.run('VACUUM');
     await this.run('ANALYZE');
-    
+
     console.log('Database optimization complete');
   }
 
@@ -364,28 +377,28 @@ export class DatabaseManager {
   /**
    * Test database connection with comprehensive diagnostics
    */
-  async testConnection(): Promise<{success: boolean, diagnostics: Record<string, any>}> {
+  async testConnection(): Promise<{ success: boolean; diagnostics: Record<string, any> }> {
     const diagnostics: Record<string, any> = {};
-    
+
     try {
       // Basic connection test
       const testResult = await this.get('SELECT 1 as test');
       diagnostics.basicQuery = testResult?.test === 1;
-      
+
       // Check pragmas
       const journalMode = await this.get('PRAGMA journal_mode');
       diagnostics.journalMode = journalMode;
-      
+
       const foreignKeys = await this.get('PRAGMA foreign_keys');
       diagnostics.foreignKeys = foreignKeys;
-      
+
       const cacheSize = await this.get('PRAGMA cache_size');
       diagnostics.cacheSize = cacheSize;
-      
+
       // Database info
       const dbInfo = await this.getDatabaseInfo();
       diagnostics.databaseInfo = dbInfo;
-      
+
       return { success: true, diagnostics };
     } catch (error) {
       diagnostics.error = error instanceof Error ? error.message : String(error);
@@ -402,8 +415,7 @@ export class DatabaseConfig {
    * Check if we're running in test mode
    */
   static isTestMode(): boolean {
-    return process.env.TEST_MODE?.toLowerCase() === 'true' || 
-           process.env.NODE_ENV === 'test';
+    return process.env.TEST_MODE?.toLowerCase() === 'true' || process.env.NODE_ENV === 'test';
   }
 
   /**

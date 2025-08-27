@@ -1,6 +1,6 @@
 /**
  * Event model for Discord Reminder Bot
- * 
+ *
  * TypeScript equivalent of the Python Event model with complete business logic,
  * serialization, validation, and timezone handling capabilities.
  */
@@ -58,11 +58,11 @@ export class Event {
   public updatedAt: Date;
 
   // Legacy compatibility
-  public get lastReminder(): Date { 
-    return this.lastRemindedAt || this.createdAt; 
+  public get lastReminder(): Date {
+    return this.lastRemindedAt || this.createdAt;
   }
-  public set lastReminder(value: Date) { 
-    this.lastRemindedAt = value; 
+  public set lastReminder(value: Date) {
+    this.lastRemindedAt = value;
   }
 
   // Overloaded constructors for compatibility
@@ -77,7 +77,7 @@ export class Event {
     isPaused: boolean,
     usersWhoReacted: string[],
     createdAt: Date,
-    updatedAt: Date
+    updatedAt: Date,
   );
   constructor(
     messageIdOrData: string | EventData,
@@ -89,7 +89,7 @@ export class Event {
     isPaused?: boolean,
     usersWhoReacted?: string[],
     createdAt?: Date,
-    updatedAt?: Date
+    updatedAt?: Date,
   ) {
     if (typeof messageIdOrData === 'object') {
       // EventData constructor
@@ -163,9 +163,11 @@ export class Event {
       intervalMinutes: Number(data.interval_minutes || data.intervalMinutes || 60),
       isPaused: Boolean(data.is_paused || data.isPaused || false),
       lastReminder: new Date(data.last_reminder || data.lastReminder || Date.now()),
-      usersWhoReacted: Array.isArray(data.users_who_reacted) 
-        ? data.users_who_reacted 
-        : (Array.isArray(data.usersWhoReacted) ? data.usersWhoReacted : []),
+      usersWhoReacted: Array.isArray(data.users_who_reacted)
+        ? data.users_who_reacted
+        : Array.isArray(data.usersWhoReacted)
+          ? data.usersWhoReacted
+          : [],
       createdAt: new Date(data.created_at || data.createdAt || Date.now()),
       updatedAt: new Date(data.updated_at || data.updatedAt || Date.now()),
     });
@@ -220,7 +222,7 @@ export class Event {
     const lastActivity = this.lastRemindedAt || this.createdAt;
     const timeSinceLast = now - lastActivity.getTime();
     const intervalMs = this.intervalMinutes * 60 * 1000;
-    
+
     return timeSinceLast >= intervalMs;
   }
 

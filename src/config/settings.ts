@@ -5,7 +5,7 @@
  * a clean interface for configuration management with TypeScript validation.
  */
 
-import {z} from 'zod';
+import { z } from 'zod';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -91,7 +91,21 @@ export class Settings {
   static readonly MIN_AUTO_DELETE_HOURS = 1 / 60; // 1 minute
   static readonly MAX_AUTO_DELETE_HOURS = 168; // 7 days
   static readonly AUTO_DELETE_CHOICES = [
-    1 / 60, 2 / 60, 0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168,
+    1 / 60,
+    2 / 60,
+    0.05,
+    0.08,
+    0.17,
+    0.25,
+    0.5,
+    1,
+    2,
+    6,
+    12,
+    24,
+    48,
+    72,
+    168,
   ] as const;
 
   // Slash Command Configuration
@@ -360,9 +374,7 @@ export class Settings {
     if (this.ENABLE_FEATURE_FLAGS) {
       logger.info('Feature flags: Enabled');
       logger.info(`Auto-fallback: ${this.ENABLE_AUTO_FALLBACK ? 'Enabled' : 'Disabled'}`);
-      logger.info(
-        `Health monitoring: ${this.ENABLE_HEALTH_MONITORING ? 'Enabled' : 'Disabled'}`,
-      );
+      logger.info(`Health monitoring: ${this.ENABLE_HEALTH_MONITORING ? 'Enabled' : 'Disabled'}`);
     } else {
       logger.info('Feature flags: Disabled');
     }

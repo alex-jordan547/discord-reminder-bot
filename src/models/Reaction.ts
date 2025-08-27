@@ -1,10 +1,16 @@
 /**
  * Reaction model for Discord Reminder Bot
- * 
+ *
  * Represents a user's reaction to an event
  */
 
-import { BaseModel, type BaseModelData, type ModelValidationError, validateDiscordId, validateEmoji } from './BaseModel.js';
+import {
+  BaseModel,
+  type BaseModelData,
+  type ModelValidationError,
+  validateDiscordId,
+  validateEmoji,
+} from './BaseModel.js';
 
 export interface ReactionData extends BaseModelData {
   eventMessageId: string;
@@ -36,7 +42,12 @@ export class Reaction extends BaseModel {
    */
   static fromDict(data: Record<string, any>): Reaction {
     return new Reaction({
-      eventMessageId: String(data.event_message_id || data.eventMessageId || (data.event?.message_id) || (data.event?.messageId)),
+      eventMessageId: String(
+        data.event_message_id ||
+          data.eventMessageId ||
+          data.event?.message_id ||
+          data.event?.messageId,
+      ),
       userId: String(data.user_id || data.userId),
       emoji: String(data.emoji),
       reactedAt: new Date(data.reacted_at || data.reactedAt || Date.now()),
@@ -88,7 +99,7 @@ export class Reaction extends BaseModel {
    * Check if this reaction was made recently (within specified hours)
    */
   isRecent(hoursThreshold: number = 24): boolean {
-    const hoursAgo = Date.now() - (hoursThreshold * 60 * 60 * 1000);
+    const hoursAgo = Date.now() - hoursThreshold * 60 * 60 * 1000;
     return this.reactedAt.getTime() > hoursAgo;
   }
 
@@ -111,7 +122,7 @@ export class Reaction extends BaseModel {
     if (isNaN(this.reactedAt.getTime())) {
       errors.push({
         field: 'reactedAt',
-        message: 'Reacted at must be a valid date'
+        message: 'Reacted at must be a valid date',
       });
     }
 
