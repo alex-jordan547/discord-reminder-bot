@@ -17,6 +17,7 @@ import {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  MessageFlags,
 } from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
@@ -91,7 +92,7 @@ export async function handleWatchCommand(
     if (!interaction.guild || !interaction.member) {
       await interaction.reply({
         content: '❌ This command can only be used in servers.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -100,7 +101,7 @@ export async function handleWatchCommand(
     if (!hasAdminRole(member)) {
       await interaction.reply({
         content: '❌ You need administrator permissions to use this command.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -109,7 +110,7 @@ export async function handleWatchCommand(
     if (!validateMessageLink(messageLink)) {
       await interaction.reply({
         content: '❌ Invalid Discord message link format.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -128,7 +129,7 @@ export async function handleWatchCommand(
     if (intervalMinutes < minInterval || intervalMinutes > maxInterval) {
       await interaction.reply({
         content: `❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -139,7 +140,7 @@ export async function handleWatchCommand(
       if (!channel) {
         await interaction.reply({
           content: '❌ Could not find the specified channel.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -148,7 +149,7 @@ export async function handleWatchCommand(
       if (!message) {
         await interaction.reply({
           content: '❌ Could not find the specified message.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -157,7 +158,7 @@ export async function handleWatchCommand(
       if (!validatePermissions(channel, client.user!)) {
         await interaction.reply({
           content: '❌ I do not have permission to read/send messages in that channel.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -250,14 +251,14 @@ export async function handleWatchCommand(
       logger.error(`Error fetching message: ${error}`);
       await interaction.reply({
         content: '❌ Could not access the specified message. Check the link and my permissions.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   } catch (error) {
     logger.error(`Error in watch command: ${error}`);
     await interaction.reply({
       content: '❌ An error occurred while setting up the watch. Please try again.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
@@ -274,7 +275,7 @@ export async function handleUnwatchCommand(
     if (!interaction.guild || !interaction.member) {
       await interaction.reply({
         content: '❌ This command can only be used in servers.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -283,7 +284,7 @@ export async function handleUnwatchCommand(
     if (!hasAdminRole(member)) {
       await interaction.reply({
         content: '❌ You need administrator permissions to use this command.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -353,7 +354,7 @@ export async function handleUnwatchCommand(
     await interaction.reply({
       embeds: [embed],
       components: [row],
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     // Handle the select menu interaction
@@ -363,7 +364,7 @@ export async function handleUnwatchCommand(
       const selectInteraction = await interaction
         .followUp({
           content: '⏰ Waiting for your selection...',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
           fetchReply: true,
         })
         .then(() =>
@@ -475,7 +476,7 @@ export async function handleListCommand(
     if (!interaction.guildId) {
       await interaction.reply({
         content: '❌ This command can only be used in servers.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -527,7 +528,7 @@ export async function handleListCommand(
     logger.error(`Error in list command: ${error}`);
     await interaction.reply({
       content: '❌ An error occurred while fetching the event list. Please try again.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
@@ -599,7 +600,7 @@ export async function handleStatusCommand(
     logger.error(`Error in status command: ${error}`);
     await interaction.reply({
       content: '❌ An error occurred while fetching bot status. Please try again.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
