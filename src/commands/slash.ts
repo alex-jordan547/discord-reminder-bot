@@ -15,6 +15,7 @@ import {
   ChatInputCommandInteraction,
   REST,
   Routes,
+  MessageFlags,
 } from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
@@ -133,6 +134,12 @@ const helpCommand: SlashCommand = {
           inline: false,
         },
         {
+          name: '⚡ /remind_now',
+          value:
+            'Send an immediate reminder for a watched event (interactive selection)\\n`/remind_now`',
+          inline: false,
+        },
+        {
           name: '📊 /status',
           value: 'Show bot status and statistics\\n`/status`',
           inline: false,
@@ -149,7 +156,22 @@ const helpCommand: SlashCommand = {
       timestamp: new Date().toISOString(),
     };
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  },
+};
+
+/**
+ * Remind Now command - Send immediate reminder for a watched event
+ */
+const remindNowCommand: SlashCommand = {
+  data: new SlashCommandBuilder()
+    .setName('remind_now')
+    .setDescription(
+      'Send an immediate reminder for a watched event (choose from available events)',
+    ),
+  execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
+    const { handleRemindNowCommand } = await import('./handlers');
+    await handleRemindNowCommand(interaction, client);
   },
 };
 
@@ -158,6 +180,7 @@ commands.set(watchCommand.data.name, watchCommand);
 commands.set(unwatchCommand.data.name, unwatchCommand);
 commands.set(listCommand.data.name, listCommand);
 commands.set(statusCommand.data.name, statusCommand);
+commands.set(remindNowCommand.data.name, remindNowCommand);
 commands.set(helpCommand.data.name, helpCommand);
 
 /**
@@ -183,11 +206,15 @@ export function setupSlashCommands(client: Client): void {
     } catch (error) {
       logger.error(`Error executing command ${interaction.commandName}: ${error}`);
 
-      const errorMessage = 'There was an error while executing this command!';
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: errorMessage, ephemeral: true });
-      } else {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
+      try {
+        const errorMessage = 'There was an error while executing this command!';
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+        } else {
+          await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
+        }
+      } catch (replyError) {
+        logger.error(`Could not send error message: ${replyError}`);
       }
     }
   });

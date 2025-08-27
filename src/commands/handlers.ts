@@ -10,7 +10,6 @@
 
 import {
   Client,
-  CommandInteraction,
   ChatInputCommandInteraction,
   GuildMember,
   TextChannel,
@@ -32,48 +31,10 @@ const logger = createLogger('handlers');
 
 /**
  * Setup all event handlers for the bot
+ * Note: Slash commands are handled directly in slash.ts, this function is for future expansion
  */
-export function setupEventHandlers(client: Client): void {
-  logger.info('Setting up event handlers...');
-
-  // Update slash command implementations with actual handlers
-  const commands = (client as any).commands;
-
-  if (commands) {
-    // Watch command handler
-    const watchCommand = commands.get('watch');
-    if (watchCommand) {
-      watchCommand.execute = async (interaction: CommandInteraction) => {
-        return await handleWatchCommand(interaction as ChatInputCommandInteraction, client);
-      };
-    }
-
-    // Unwatch command handler
-    const unwatchCommand = commands.get('unwatch');
-    if (unwatchCommand) {
-      unwatchCommand.execute = async (interaction: CommandInteraction) => {
-        await handleUnwatchCommand(interaction as ChatInputCommandInteraction, client);
-      };
-    }
-
-    // List command handler
-    const listCommand = commands.get('list');
-    if (listCommand) {
-      listCommand.execute = async (interaction: CommandInteraction) => {
-        await handleListCommand(interaction as ChatInputCommandInteraction, client);
-      };
-    }
-
-    // Status command handler
-    const statusCommand = commands.get('status');
-    if (statusCommand) {
-      statusCommand.execute = async (interaction: CommandInteraction) => {
-        await handleStatusCommand(interaction as ChatInputCommandInteraction, client);
-      };
-    }
-  }
-
-  logger.info('Event handlers setup complete');
+export function setupEventHandlers(_client: Client): void {
+  logger.info('Event handlers setup complete - slash commands handled in slash.ts');
 }
 
 /**
@@ -118,7 +79,10 @@ export async function handleWatchCommand(
     // Parse message link
     const parsed = parseMessageLink(messageLink);
     if (!parsed) {
-      await interaction.reply({ content: '❌ Could not parse the message link.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Could not parse the message link.',
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -243,7 +207,7 @@ export async function handleWatchCommand(
         .setFooter({ text: 'Users who react to the message will be tracked automatically' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       logger.info(
         `Event watch ${isUpdate ? 'updated' : 'started'} for message ${parsed.messageId} by ${interaction.user.tag}`,
       );
@@ -305,7 +269,7 @@ export async function handleUnwatchCommand(
         })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -458,9 +422,9 @@ export async function handleUnwatchCommand(
       '❌ An error occurred while processing the unwatch command. Please try again.';
 
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: errorMessage, ephemeral: true });
+      await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
     } else {
-      await interaction.reply({ content: errorMessage, ephemeral: true });
+      await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
     }
   }
 }
@@ -492,7 +456,7 @@ export async function handleListCommand(
         .setFooter({ text: 'Use /watch to start monitoring messages!' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -522,7 +486,7 @@ export async function handleListCommand(
       embed.setFooter({ text: `Showing first 25 of ${events.length} events` });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     logger.info(`List command executed by ${interaction.user.tag} - ${events.length} events`);
   } catch (error) {
     logger.error(`Error in list command: ${error}`);
@@ -541,6 +505,9 @@ export async function handleStatusCommand(
   client: Client,
 ): Promise<void> {
   try {
+    // Defer reply immediately to prevent timeout
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
     const eventManager = (client as any).eventManager as EventManager;
     const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
 
@@ -594,14 +561,30 @@ export async function handleStatusCommand(
       .setFooter({ text: 'Discord Reminder Bot • TypeScript Edition' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.editReply({ embeds: [embed] });
     logger.info(`Status command executed by ${interaction.user.tag}`);
   } catch (error) {
     logger.error(`Error in status command: ${error}`);
-    await interaction.reply({
-      content: '❌ An error occurred while fetching bot status. Please try again.',
-      flags: MessageFlags.Ephemeral,
-    });
+    
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply({
+          content: '❌ An error occurred while fetching bot status. Please try again.',
+        });
+      } else if (!interaction.replied) {
+        await interaction.reply({
+          content: '❌ An error occurred while fetching bot status. Please try again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.followUp({
+          content: '❌ An error occurred while fetching bot status. Please try again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (replyError) {
+      logger.error(`Could not send error message for status command: ${replyError}`);
+    }
   }
 }
 
@@ -619,4 +602,231 @@ function formatUptime(seconds: number): string {
   if (minutes > 0) parts.push(`${minutes}m`);
 
   return parts.join(' ') || '<1m';
+}
+
+/**
+ * Handle the /remind_now command
+ */
+export async function handleRemindNowCommand(
+  interaction: ChatInputCommandInteraction,
+  client: Client,
+): Promise<void> {
+  try {
+    // Validate permissions
+    if (!interaction.guild || !interaction.member) {
+      await interaction.reply({
+        content: '❌ This command can only be used in servers.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const member = interaction.member as GuildMember;
+    if (!hasAdminRole(member)) {
+      await interaction.reply({
+        content: '❌ You need administrator permissions to use this command.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Get all events for this guild
+    const eventManager = (client as any).eventManager as EventManager;
+    const events = await eventManager.getEventsByGuild(interaction.guildId!);
+
+    if (events.length === 0) {
+      const embed = new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle('📭 No Events Available')
+        .setDescription('There are no events currently being watched in this server.')
+        .addFields({
+          name: '💡 Tip',
+          value: 'Use `/watch` to start watching a message for reactions.',
+          inline: false,
+        })
+        .setFooter({ text: 'Discord Reminder Bot • TypeScript Edition' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    // Create select menu options for events
+    const options = events.slice(0, 25).map((event, index) => {
+      const reactionCount = event.usersWhoReacted ? event.usersWhoReacted.length : 0;
+      const lastReminded = event.lastRemindedAt
+        ? `${Math.floor((Date.now() - new Date(event.lastRemindedAt).getTime()) / (1000 * 60 * 60))}h ago`
+        : 'Never';
+
+      return {
+        label: `Event ${index + 1} - ${reactionCount} reactions`,
+        description: `Last reminded: ${lastReminded} | Interval: ${event.intervalMinutes}min`,
+        value: event.messageId,
+        emoji: '⚡',
+      };
+    });
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`remind_now_select_${interaction.user.id}`)
+      .setPlaceholder('Choose an event to send a reminder for...')
+      .addOptions(options);
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x00ae86)
+      .setTitle('⚡ Send Immediate Reminder')
+      .setDescription(
+        `Select an event from the list below to send an immediate reminder.\n\n**Found ${events.length} watched event${events.length === 1 ? '' : 's'} in this server.**`,
+      )
+      .addFields({
+        name: '📋 How it works',
+        value:
+          '• Select an event from the dropdown menu\n' +
+          '• A reminder will be sent immediately to the appropriate users\n' +
+          '• Regular scheduled reminders will continue as normal',
+        inline: false,
+      })
+      .setFooter({ text: 'Select an event to proceed • This menu expires in 5 minutes' })
+      .setTimestamp();
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      flags: MessageFlags.Ephemeral,
+    });
+
+    // Set up a collector to handle the select menu interaction - simplified approach
+    const filter = (selectInteraction: any) =>
+      selectInteraction.customId.startsWith('remind_now_select_') &&
+      selectInteraction.user.id === interaction.user.id;
+
+    const collector = interaction.channel?.createMessageComponentCollector({
+      filter,
+      time: 300000, // 5 minutes
+      max: 1, // Only collect one interaction
+    });
+
+    if (collector) {
+      collector.on('collect', async selectInteraction => {
+        try {
+          await selectInteraction.deferReply({ flags: MessageFlags.Ephemeral });
+
+          const selectedMessageId = selectInteraction.values[0];
+          const selectedEvent = events.find(event => event.messageId === selectedMessageId);
+
+          if (!selectedEvent) {
+            await selectInteraction.editReply({
+              content: '❌ Selected event not found. It may have been removed.',
+            });
+            return;
+          }
+
+          // Get the reminder scheduler and send the reminder
+          const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
+
+          // Use the public sendManualReminder method
+          const count = await reminderScheduler.sendManualReminder(selectedEvent);
+
+          if (count === 0) {
+            await selectInteraction.editReply({
+              content:
+                '⚠️ No reminder was sent. This could be due to:\n' +
+                '• The message was deleted\n' +
+                '• Missing permissions in the target channel\n' +
+                '• All users have already reacted',
+            });
+            return;
+          }
+
+          // Event is automatically marked as reminded by sendManualReminder
+
+          const successEmbed = new EmbedBuilder()
+            .setColor(0x00ae86)
+            .setTitle('✅ Reminder Sent Successfully')
+            .setDescription('The immediate reminder has been sent!')
+            .addFields(
+              {
+                name: '📝 Event Details',
+                value: `[Jump to message](https://discord.com/channels/${selectedEvent.guildId}/${selectedEvent.channelId}/${selectedEvent.messageId})`,
+                inline: false,
+              },
+              {
+                name: '👥 Users Notified',
+                value: `${count} user${count === 1 ? '' : 's'} received the reminder`,
+                inline: true,
+              },
+              {
+                name: '⏰ Next Scheduled Reminder',
+                value: `<t:${Math.floor((Date.now() + selectedEvent.intervalMinutes * 60 * 1000) / 1000)}:R>`,
+                inline: true,
+              },
+            )
+            .setFooter({ text: 'Regular scheduled reminders will continue as normal' })
+            .setTimestamp();
+
+          await selectInteraction.editReply({ embeds: [successEmbed] });
+          logger.info(
+            `Immediate reminder sent for event ${selectedEvent.messageId} by ${interaction.user.tag} - notified ${count} users`,
+          );
+
+          // Disable the select menu in the original message
+          const disabledRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            selectMenu.setDisabled(true).setPlaceholder('Reminder sent successfully!'),
+          );
+
+          try {
+            await interaction.editReply({
+              components: [disabledRow],
+            });
+          } catch (error) {
+            logger.debug('Could not disable select menu:', error);
+          }
+        } catch (error) {
+          logger.error(`Error sending immediate reminder: ${error}`);
+          try {
+            if (!selectInteraction.replied && !selectInteraction.deferred) {
+              await selectInteraction.reply({
+                content: '❌ An error occurred while sending the reminder. Please try again.',
+                flags: MessageFlags.Ephemeral,
+              });
+            } else {
+              await selectInteraction.editReply({
+                content: '❌ An error occurred while sending the reminder. Please try again.',
+              });
+            }
+          } catch (editError) {
+            logger.error(`Could not send error message: ${editError}`);
+          }
+        }
+      });
+
+      collector.on('end', async collected => {
+        if (collected.size === 0) {
+          // Timeout - disable the select menu
+          const disabledRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            selectMenu.setDisabled(true).setPlaceholder('Selection timed out'),
+          );
+
+          try {
+            await interaction.editReply({
+              components: [disabledRow],
+            });
+          } catch (error) {
+            logger.debug('Could not disable select menu after timeout:', error);
+          }
+        }
+      });
+    }
+
+    logger.info(
+      `Remind now command executed by ${interaction.user.tag} - ${events.length} events available`,
+    );
+  } catch (error) {
+    logger.error(`Error in remind_now command: ${error}`);
+    await interaction.reply({
+      content: '❌ An error occurred while preparing the reminder menu. Please try again.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
 }

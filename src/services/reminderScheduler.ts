@@ -399,9 +399,11 @@ export class ReminderScheduler {
       } else {
         // At least someone has reacted - mention only those who haven't reacted yet
         missingUsers = await this.getMissingUsersInChannel(channel, event.usersWhoReacted);
-        
+
         if (missingUsers.length === 0) {
-          logger.info(`All accessible users have reacted to event ${event.messageId} - skipping reminder`);
+          logger.info(
+            `All accessible users have reacted to event ${event.messageId} - skipping reminder`,
+          );
           return 0;
         }
 
@@ -410,7 +412,7 @@ export class ReminderScheduler {
         const usersToMention = missingUsers.slice(0, maxMentions);
         mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
         mentionStrategy = 'individual';
-        
+
         logger.info(
           `Event ${event.messageId}: ${event.usersWhoReacted.length} users reacted - mentioning ${usersToMention.length} missing users`,
         );
@@ -419,7 +421,7 @@ export class ReminderScheduler {
       // Get total accessible users for statistics
       const totalAccessibleUsers = await this.getTotalAccessibleUsers(channel);
       const reactedCount = event.getReactionCount();
-      
+
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
         .setDescription(
@@ -446,7 +448,7 @@ export class ReminderScheduler {
       if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
         const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
         let footerText = `🗑️ Ce message s'auto-détruira dans ${deleteDelayText}`;
-        
+
         if (Settings.is_test_mode()) {
           const currentTime = formatDateForDisplay(new Date());
           footerText += `\n📅 Envoyé le ${currentTime}`;
@@ -460,9 +462,10 @@ export class ReminderScheduler {
       }
 
       // Send the reminder message
-      const allowedMentions = mentionStrategy === 'everyone'
-        ? { parse: ['everyone' as const], repliedUser: false }
-        : { users: missingUsers, repliedUser: false };
+      const allowedMentions =
+        mentionStrategy === 'everyone'
+          ? { parse: ['everyone' as const], repliedUser: false }
+          : { users: missingUsers, repliedUser: false };
 
       const sentMessage = await channel.send({
         content: mentions,
@@ -481,9 +484,13 @@ export class ReminderScheduler {
       }
 
       if (mentionStrategy === 'everyone') {
-        logger.info(`Sent reminder for event ${event.messageId} using @everyone (no reactions yet)`);
+        logger.info(
+          `Sent reminder for event ${event.messageId} using @everyone (no reactions yet)`,
+        );
       } else {
-        logger.info(`Sent reminder for event ${event.messageId} mentioning ${missingUsers.length} users individually`);
+        logger.info(
+          `Sent reminder for event ${event.messageId} mentioning ${missingUsers.length} users individually`,
+        );
       }
       return 1; // Return 1 to indicate reminder was sent
     } catch (error) {
@@ -551,6 +558,28 @@ export class ReminderScheduler {
   }
 
   /**
+   * Send a manual reminder for a specific event
+   * Public method to allow manual reminder triggering from commands
+   */
+  async sendManualReminder(event: Event): Promise<number> {
+    try {
+      logger.info(`Sending manual reminder for event ${event.messageId}`);
+      const count = await this.sendReminder(event);
+
+      if (count > 0) {
+        this.status.lastReminderSent = new Date();
+        // Mark event as reminded (consistent with automatic reminders)
+        await this.eventManager.markEventReminded(event.messageId);
+      }
+
+      return count;
+    } catch (error) {
+      logger.error(`Error sending manual reminder for event ${event.messageId}: ${error}`);
+      return 0;
+    }
+  }
+
+  /**
    * Utility function for adding delays
    */
   private sleep(ms: number): Promise<void> {
@@ -581,20 +610,20 @@ export class ReminderScheduler {
 
       const members = await guild.members.fetch();
       let accessibleCount = 0;
-      
+
       for (const [, member] of members) {
         // Skip bots
         if (member.user.bot) {
           continue;
         }
-        
+
         // Check if user has permission to view the channel
         const permissions = channel.permissionsFor(member);
         if (permissions?.has('ViewChannel')) {
           accessibleCount++;
         }
       }
-      
+
       return accessibleCount;
     } catch (error) {
       logger.error(`Error getting total accessible users for channel ${channel.id}: ${error}`);
@@ -605,7 +634,10 @@ export class ReminderScheduler {
   /**
    * Get users who have access to the channel but haven't reacted yet
    */
-  private async getMissingUsersInChannel(channel: TextChannel, usersWhoReacted: string[]): Promise<string[]> {
+  private async getMissingUsersInChannel(
+    channel: TextChannel,
+    usersWhoReacted: string[],
+  ): Promise<string[]> {
     try {
       const guild = channel.guild;
       if (!guild) {
@@ -615,32 +647,32 @@ export class ReminderScheduler {
 
       // Get all members who can view this channel
       const missingUsers: string[] = [];
-      
+
       // Fetch all guild members (this might be cached)
       const members = await guild.members.fetch();
-      
+
       for (const [userId, member] of members) {
         // Skip bots
         if (member.user.bot) {
           continue;
         }
-        
+
         // Skip users who have already reacted
         if (usersWhoReacted.includes(userId)) {
           continue;
         }
-        
+
         // Check if user has permission to view the channel
         const permissions = channel.permissionsFor(member);
         if (permissions?.has('ViewChannel')) {
           missingUsers.push(userId);
         }
       }
-      
+
       logger.debug(
-        `Found ${missingUsers.length} users who can view channel but haven't reacted yet (out of ${members.size} guild members)`
+        `Found ${missingUsers.length} users who can view channel but haven't reacted yet (out of ${members.size} guild members)`,
       );
-      
+
       return missingUsers;
     } catch (error) {
       logger.error(`Error getting missing users for channel ${channel.id}: ${error}`);
