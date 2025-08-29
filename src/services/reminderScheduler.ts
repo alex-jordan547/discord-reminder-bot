@@ -12,7 +12,7 @@
 import { Client, TextChannel, EmbedBuilder } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from './eventManager';
-import { Event } from '@/models/Event';
+import { Event } from '@/models';
 import { Settings } from '@/config/settings';
 import { formatDateForDisplay } from '@/utils/dateUtils';
 import { GuildConfigManager } from './guildConfigManager';

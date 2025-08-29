@@ -9,7 +9,7 @@
  * - Mention limits and reactions
  */
 
-import { BaseModel } from './BaseModel';
+import { BaseModel, type ModelValidationError } from './BaseModel';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Settings } from '@/config/settings';
 
@@ -109,6 +109,9 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   get adminRoleIds(): string[] {
     return this.data.adminRoleIds;
   }
+  get adminRoleNames(): string[] {
+    return this.data.adminRoleNames;
+  }
   get defaultIntervalMinutes(): number {
     return this.data.defaultIntervalMinutes;
   }
@@ -175,12 +178,18 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   /**
    * Validate configuration values
    */
-  isValid(): boolean {
+  validate(): ModelValidationError[] {
+    const errors: ModelValidationError[] = [];
+
     try {
       // Required fields
       if (!this.data.guildId || !this.data.guildName) {
-        console.log('Missing guildId or guildName:', this.data.guildId, this.data.guildName);
-        return false;
+        if (!this.data.guildId) {
+          errors.push({ field: 'guildId', message: 'Guild ID is required' });
+        }
+        if (!this.data.guildName) {
+          errors.push({ field: 'guildName', message: 'Guild name is required' });
+        }
       }
 
       // Validate intervals - allow 0 for some fields
@@ -188,22 +197,28 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
         typeof this.data.defaultIntervalMinutes !== 'number' ||
         this.data.defaultIntervalMinutes < 0
       ) {
-        console.log('Invalid defaultIntervalMinutes:', this.data.defaultIntervalMinutes);
-        return false;
+        errors.push({
+          field: 'defaultIntervalMinutes',
+          message: 'Default interval must be a non-negative number',
+        });
       }
       if (
         typeof this.data.autoDeleteDelayMinutes !== 'number' ||
         this.data.autoDeleteDelayMinutes < 0
       ) {
-        console.log('Invalid autoDeleteDelayMinutes:', this.data.autoDeleteDelayMinutes);
-        return false;
+        errors.push({
+          field: 'autoDeleteDelayMinutes',
+          message: 'Auto delete delay must be a non-negative number',
+        });
       }
       if (
         typeof this.data.delayBetweenRemindersMs !== 'number' ||
         this.data.delayBetweenRemindersMs < 0
       ) {
-        console.log('Invalid delayBetweenRemindersMs:', this.data.delayBetweenRemindersMs);
-        return false;
+        errors.push({
+          field: 'delayBetweenRemindersMs',
+          message: 'Delay between reminders must be a non-negative number',
+        });
       }
 
       // Validate limits
@@ -211,46 +226,75 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
         typeof this.data.maxMentionsPerReminder !== 'number' ||
         this.data.maxMentionsPerReminder < 0
       ) {
-        console.log('Invalid maxMentionsPerReminder:', this.data.maxMentionsPerReminder);
-        return false;
+        errors.push({
+          field: 'maxMentionsPerReminder',
+          message: 'Max mentions per reminder must be a non-negative number',
+        });
       }
 
       // Validate arrays - ensure they exist and are arrays
       if (!Array.isArray(this.data.adminRoleIds)) {
-        console.log('Invalid adminRoleIds:', this.data.adminRoleIds);
-        return false;
+        errors.push({ field: 'adminRoleIds', message: 'Admin role IDs must be an array' });
       }
       if (!Array.isArray(this.data.adminRoleNames)) {
-        console.log('Invalid adminRoleNames:', this.data.adminRoleNames);
-        return false;
+        errors.push({ field: 'adminRoleNames', message: 'Admin role names must be an array' });
       }
       if (!Array.isArray(this.data.defaultReactions)) {
-        console.log('Invalid defaultReactions:', this.data.defaultReactions);
-        return false;
+        errors.push({ field: 'defaultReactions', message: 'Default reactions must be an array' });
       }
 
       // Validate timezone (basic check)
       if (!this.data.timezone || typeof this.data.timezone !== 'string') {
-        console.log('Invalid timezone:', this.data.timezone);
-        return false;
+        errors.push({ field: 'timezone', message: 'Timezone must be a non-empty string' });
       }
 
       // Validate dates exist
-      if (!this.data.createdAt || !this.data.updatedAt || !this.data.lastUsedAt) {
-        console.log(
-          'Missing dates:',
-          this.data.createdAt,
-          this.data.updatedAt,
-          this.data.lastUsedAt,
-        );
-        return false;
+      if (!this.data.createdAt) {
+        errors.push({ field: 'createdAt', message: 'Created at date is required' });
       }
-
-      return true;
+      if (!this.data.updatedAt) {
+        errors.push({ field: 'updatedAt', message: 'Updated at date is required' });
+      }
+      if (!this.data.lastUsedAt) {
+        errors.push({ field: 'lastUsedAt', message: 'Last used at date is required' });
+      }
     } catch (error) {
-      console.log('Validation error:', error);
-      return false;
+      errors.push({ field: 'general', message: `Validation error: ${error}` });
     }
+
+    return errors;
+  }
+
+  /**
+   * Check if configuration is valid (legacy method for backward compatibility)
+   */
+  isValid(): boolean {
+    return this.validate().length === 0;
+  }
+
+  /**
+   * Convert to Python-style dictionary format
+   */
+  toDict(): Record<string, any> {
+    return {
+      guild_id: this.data.guildId,
+      guild_name: this.data.guildName,
+      reminder_channel_id: this.data.reminderChannelId,
+      reminder_channel_name: this.data.reminderChannelName,
+      admin_role_ids: [...this.data.adminRoleIds],
+      admin_role_names: [...this.data.adminRoleNames],
+      default_interval_minutes: this.data.defaultIntervalMinutes,
+      auto_delete_enabled: this.data.autoDeleteEnabled,
+      auto_delete_delay_minutes: this.data.autoDeleteDelayMinutes,
+      delay_between_reminders_ms: this.data.delayBetweenRemindersMs,
+      max_mentions_per_reminder: this.data.maxMentionsPerReminder,
+      use_everyone_above_limit: this.data.useEveryoneAboveLimit,
+      default_reactions: [...this.data.defaultReactions],
+      timezone: this.data.timezone,
+      created_at: this.data.createdAt.toISOString(),
+      updated_at: this.data.updatedAt.toISOString(),
+      last_used_at: this.data.lastUsedAt.toISOString(),
+    };
   }
 
   /**

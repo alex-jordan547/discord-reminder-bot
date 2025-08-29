@@ -26,7 +26,7 @@ import { ReminderScheduler } from '@/services/reminderScheduler';
 import { parseMessageLink, validateMessageLink } from '@/utils/messageParser';
 import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '@/utils/permissions';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
-import { Event as EventModel } from '@/models/Event';
+import { Event as EventModel } from '@/models';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
 

@@ -24,7 +24,7 @@ import {
 import { createLogger } from '@/utils/loggingConfig';
 import { GuildConfigManager, ChannelOption, RoleOption } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { GuildConfig } from '@/models/GuildConfig';
+import { GuildConfig } from '@/models';
 import { hasAdminRole } from '@/utils/permissions';
 import { Settings } from '@/config/settings';
 

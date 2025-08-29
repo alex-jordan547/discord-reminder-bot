@@ -11,7 +11,7 @@
 import { Client, TextChannel, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { GuildConfig, GuildConfigData } from '@/models/GuildConfig';
+import { GuildConfig, type GuildConfigData } from '@/models';
 
 const logger = createLogger('guild-config-manager');
 

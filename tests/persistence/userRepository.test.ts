@@ -122,13 +122,13 @@ describe('UserRepository', () => {
       // Arrange
       const userData = createTestData.user();
       vi.spyOn(userRepo, 'getByUserAndGuild').mockResolvedValueOnce(undefined);
-      
+
       // Mock the insert chain properly
       const mockValues = vi.fn().mockRejectedValueOnce(new Error('Insert failed'));
       const mockInsert = vi.fn().mockReturnValueOnce({ values: mockValues });
       vi.spyOn(testDrizzle, 'insert').mockReturnValueOnce(mockInsert(testDrizzle.users));
 
-      // Act & Assert  
+      // Act & Assert
       await expect(userRepo.upsert(userData)).rejects.toThrow();
     });
   });

@@ -10,7 +10,7 @@
 
 import { createLogger } from '@/utils/loggingConfig';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { Event } from '@/models/Event';
+import { Event } from '@/models';
 
 const logger = createLogger('event-manager');
 
