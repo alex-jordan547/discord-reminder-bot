@@ -5,7 +5,16 @@
  * serialization, validation, and timezone handling capabilities.
  */
 
-export interface EventData {
+import { 
+  BaseModel, 
+  type BaseModelData, 
+  type ModelValidationError, 
+  validateDiscordId, 
+  validateNonEmptyString,
+  validateInterval
+} from './BaseModel';
+
+export interface EventData extends BaseModelData {
   messageId: string;
   channelId: string;
   guildId: string;
@@ -15,8 +24,6 @@ export interface EventData {
   isPaused: boolean;
   lastReminder: Date;
   usersWhoReacted: string[];
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface EventStatus {
@@ -44,7 +51,7 @@ export interface ValidationError {
 /**
  * Main Event class representing a Discord event being monitored for reminders
  */
-export class Event {
+export class Event extends BaseModel<EventData> {
   public readonly messageId: string;
   public readonly channelId: string;
   public readonly guildId: string;
@@ -54,8 +61,6 @@ export class Event {
   public isPaused: boolean;
   public lastRemindedAt: Date | null;
   public usersWhoReacted: string[];
-  public readonly createdAt: Date;
-  public updatedAt: Date;
 
   // Legacy compatibility
   public get lastReminder(): Date {
@@ -94,6 +99,7 @@ export class Event {
     if (typeof messageIdOrData === 'object') {
       // EventData constructor
       const data = messageIdOrData;
+      super(data);
       this.messageId = data.messageId;
       this.channelId = data.channelId;
       this.guildId = data.guildId;
@@ -103,10 +109,22 @@ export class Event {
       this.isPaused = data.isPaused;
       this.lastRemindedAt = data.lastReminder ? new Date(data.lastReminder) : null;
       this.usersWhoReacted = data.usersWhoReacted || [];
-      this.createdAt = new Date(data.createdAt);
-      this.updatedAt = new Date(data.updatedAt || Date.now());
     } else {
       // Individual parameter constructor
+      const eventData: EventData = {
+        messageId: messageIdOrData,
+        channelId: channelId!,
+        guildId: guildId!,
+        title: title!,
+        description: undefined,
+        intervalMinutes: intervalMinutes!,
+        isPaused: isPaused!,
+        lastReminder: lastRemindedAt || new Date(),
+        usersWhoReacted: usersWhoReacted ? [...usersWhoReacted] : [],
+        createdAt: createdAt!,
+        updatedAt: updatedAt!,
+      };
+      super(eventData);
       this.messageId = messageIdOrData;
       this.channelId = channelId!;
       this.guildId = guildId!;
@@ -115,39 +133,98 @@ export class Event {
       this.lastRemindedAt = lastRemindedAt ?? null;
       this.isPaused = isPaused!;
       this.usersWhoReacted = usersWhoReacted ? [...usersWhoReacted] : [];
-      this.createdAt = createdAt!;
-      this.updatedAt = updatedAt!;
     }
   }
 
   /**
-   * Validate if the event data is valid
+   * Comprehensive validation of event data
+   */
+  validate(): ModelValidationError[] {
+    const errors: ModelValidationError[] = [];
+
+    // Validate Discord IDs (messageId, channelId, guildId)
+    errors.push(...validateDiscordId(this.messageId, 'messageId'));
+    errors.push(...validateDiscordId(this.channelId, 'channelId'));
+    errors.push(...validateDiscordId(this.guildId, 'guildId'));
+
+    // Validate title
+    errors.push(...validateNonEmptyString(this.title, 'title', 100));
+
+    // Validate description (optional but if present, check length)
+    if (this.description !== undefined) {
+      if (typeof this.description !== 'string') {
+        errors.push({ field: 'description', message: 'Description must be a string' });
+      } else if (this.description.length > 1000) {
+        errors.push({ field: 'description', message: 'Description must be 1000 characters or less' });
+      }
+    }
+
+    // Validate intervalMinutes
+    errors.push(...validateInterval(this.intervalMinutes, 'intervalMinutes'));
+
+    // Validate isPaused
+    if (typeof this.isPaused !== 'boolean') {
+      errors.push({ field: 'isPaused', message: 'isPaused must be a boolean' });
+    }
+
+    // Validate lastRemindedAt (optional but if present, must be valid date)
+    if (this.lastRemindedAt !== null && !(this.lastRemindedAt instanceof Date)) {
+      errors.push({ field: 'lastRemindedAt', message: 'lastRemindedAt must be a Date or null' });
+    }
+
+    // Validate usersWhoReacted
+    if (!Array.isArray(this.usersWhoReacted)) {
+      errors.push({ field: 'usersWhoReacted', message: 'usersWhoReacted must be an array' });
+    } else {
+      // Validate each user ID in the array
+      this.usersWhoReacted.forEach((userId, index) => {
+        if (typeof userId !== 'string') {
+          errors.push({ 
+            field: `usersWhoReacted[${index}]`, 
+            message: 'User ID must be a string' 
+          });
+        } else {
+          const userIdErrors = validateDiscordId(userId, `usersWhoReacted[${index}]`);
+          errors.push(...userIdErrors);
+        }
+      });
+
+      // Check for duplicates
+      const uniqueUsers = new Set(this.usersWhoReacted);
+      if (uniqueUsers.size !== this.usersWhoReacted.length) {
+        errors.push({ field: 'usersWhoReacted', message: 'Duplicate user IDs are not allowed' });
+      }
+    }
+
+    // Validate dates exist and are valid
+    if (!this.createdAt || !(this.createdAt instanceof Date) || isNaN(this.createdAt.getTime())) {
+      errors.push({ field: 'createdAt', message: 'createdAt must be a valid Date' });
+    }
+    if (!this.updatedAt || !(this.updatedAt instanceof Date) || isNaN(this.updatedAt.getTime())) {
+      errors.push({ field: 'updatedAt', message: 'updatedAt must be a valid Date' });
+    }
+
+    // Business logic validation
+    if (this.createdAt && this.updatedAt && this.createdAt > this.updatedAt) {
+      errors.push({ field: 'updatedAt', message: 'updatedAt cannot be before createdAt' });
+    }
+
+    if (this.lastRemindedAt && this.createdAt && this.lastRemindedAt < this.createdAt) {
+      errors.push({ 
+        field: 'lastRemindedAt', 
+        message: 'lastRemindedAt cannot be before createdAt' 
+      });
+    }
+
+    return errors;
+  }
+
+  /**
+   * Legacy validation method for backward compatibility
+   * @deprecated Use validate() method instead for detailed error information
    */
   isValid(): boolean {
-    try {
-      // Check required string fields
-      if (!this.messageId || typeof this.messageId !== 'string') return false;
-      if (!this.channelId || typeof this.channelId !== 'string') return false;
-      if (!this.guildId || typeof this.guildId !== 'string') return false;
-      if (!this.title || typeof this.title !== 'string') return false;
-
-      // Check numeric fields
-      if (typeof this.intervalMinutes !== 'number' || this.intervalMinutes <= 0) return false;
-
-      // Check boolean fields
-      if (typeof this.isPaused !== 'boolean') return false;
-
-      // Check date fields
-      if (!this.createdAt || !(this.createdAt instanceof Date)) return false;
-      if (!this.updatedAt || !(this.updatedAt instanceof Date)) return false;
-
-      // Check array fields
-      if (!Array.isArray(this.usersWhoReacted)) return false;
-
-      return true;
-    } catch {
-      return false;
-    }
+    return this.validate().length === 0;
   }
 
   /**
