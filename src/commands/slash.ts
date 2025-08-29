@@ -19,13 +19,9 @@ import {
 } from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
+import { DiscordBotClient, SlashCommand } from '@/types/BotClient';
 
 const logger = createLogger('slash-commands');
-
-export interface SlashCommand {
-  data: any; // SlashCommandBuilder or SlashCommandSubcommandsOnlyBuilder
-  execute: (interaction: ChatInputCommandInteraction, client: Client) => Promise<void>;
-}
 
 // Collection to store all slash commands
 const commands = new Collection<string, SlashCommand>();
@@ -224,15 +220,18 @@ commands.set(helpCommand.data.name, helpCommand);
 /**
  * Setup slash commands on the client
  */
-export function setupSlashCommands(client: Client): void {
+export function setupSlashCommands(client: DiscordBotClient): void {
   // Store commands collection on client for access in interaction handler
-  (client as any).commands = commands;
+  client.commands.clear();
+  commands.forEach((command, name) => {
+    client.commands.set(name, command);
+  });
 
   // Handle all interactions (slash commands and button interactions)
   client.on('interactionCreate', async interaction => {
     // Handle slash commands
     if (interaction.isChatInputCommand()) {
-      const command = commands.get(interaction.commandName);
+      const command = client.commands.get(interaction.commandName);
       if (!command) {
         logger.warn(`Unknown command: ${interaction.commandName}`);
         return;
@@ -282,7 +281,7 @@ export function setupSlashCommands(client: Client): void {
 /**
  * Synchronize slash commands with Discord
  */
-export async function syncSlashCommands(client: Client): Promise<any[]> {
+export async function syncSlashCommands(client: DiscordBotClient): Promise<any[]> {
   const rest = new REST().setToken(Settings.TOKEN);
 
   try {

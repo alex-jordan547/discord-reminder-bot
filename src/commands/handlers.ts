@@ -18,6 +18,7 @@ import {
   StringSelectMenuBuilder,
   MessageFlags,
 } from 'discord.js';
+import { DiscordBotClient } from '@/types/BotClient';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from '@/services/eventManager';
@@ -35,7 +36,7 @@ const logger = createLogger('handlers');
  * Setup all event handlers for the bot
  * Note: Slash commands are handled directly in slash.ts, this function is for future expansion
  */
-export function setupEventHandlers(_client: Client): void {
+export function setupEventHandlers(_client: DiscordBotClient): void {
   logger.info('Event handlers setup complete - slash commands handled in slash.ts');
 }
 
@@ -44,7 +45,7 @@ export function setupEventHandlers(_client: Client): void {
  */
 export async function handleWatchCommand(
   interaction: ChatInputCommandInteraction,
-  client: Client,
+  client: DiscordBotClient,
 ): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
 
@@ -137,7 +138,7 @@ export async function handleWatchCommand(
       }
 
       // Check if event already exists to preserve data
-      const eventManager = (client as any).eventManager as EventManager;
+      const eventManager = client.eventManager;
       const existingEvent = await eventManager.getEvent(parsed.messageId);
 
       let event: EventModel;
@@ -181,7 +182,7 @@ export async function handleWatchCommand(
       }
 
       // Schedule reminders
-      const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
+      const reminderScheduler = client.reminderScheduler;
       await reminderScheduler.scheduleEvent(event);
 
       // Create success embed with appropriate title and description
@@ -241,7 +242,7 @@ export async function handleWatchCommand(
  */
 export async function handleUnwatchCommand(
   interaction: ChatInputCommandInteraction,
-  client: Client,
+  client: DiscordBotClient,
 ): Promise<void> {
   try {
     // Validate permissions
@@ -263,7 +264,7 @@ export async function handleUnwatchCommand(
     }
 
     // Get all events for this guild
-    const eventManager = (client as any).eventManager as EventManager;
+    const eventManager = client.eventManager;
     const events = await eventManager.getEventsByGuild(interaction.guildId!);
 
     if (events.length === 0) {
@@ -365,7 +366,7 @@ export async function handleUnwatchCommand(
 
         if (removed) {
           // Cancel scheduled reminders
-          const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
+          const reminderScheduler = client.reminderScheduler;
           await reminderScheduler.unscheduleEvent(selectedMessageId);
 
           const successEmbed = new EmbedBuilder()
@@ -443,7 +444,7 @@ export async function handleUnwatchCommand(
  */
 export async function handleListCommand(
   interaction: ChatInputCommandInteraction,
-  client: Client,
+  client: DiscordBotClient,
 ): Promise<void> {
   try {
     if (!interaction.guildId) {
@@ -454,7 +455,7 @@ export async function handleListCommand(
       return;
     }
 
-    const eventManager = (client as any).eventManager as EventManager;
+    const eventManager = client.eventManager;
     const events = await eventManager.getEventsByGuild(interaction.guildId);
 
     if (events.length === 0) {
@@ -511,14 +512,14 @@ export async function handleListCommand(
  */
 export async function handleStatusCommand(
   interaction: ChatInputCommandInteraction,
-  client: Client,
+  client: DiscordBotClient,
 ): Promise<void> {
   try {
     // Defer reply immediately to prevent timeout
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const eventManager = (client as any).eventManager as EventManager;
-    const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
+    const eventManager = client.eventManager;
+    const reminderScheduler = client.reminderScheduler;
 
     // Gather statistics
     const totalEvents = await eventManager.getTotalEventCount();
@@ -618,7 +619,7 @@ function formatUptime(seconds: number): string {
  */
 export async function handleRemindNowCommand(
   interaction: ChatInputCommandInteraction,
-  client: Client,
+  client: DiscordBotClient,
 ): Promise<void> {
   try {
     // Validate permissions
@@ -640,7 +641,7 @@ export async function handleRemindNowCommand(
     }
 
     // Get all events for this guild
-    const eventManager = (client as any).eventManager as EventManager;
+    const eventManager = client.eventManager;
     const events = await eventManager.getEventsByGuild(interaction.guildId!);
 
     if (events.length === 0) {
@@ -732,7 +733,7 @@ export async function handleRemindNowCommand(
           }
 
           // Get the reminder scheduler and send the reminder
-          const reminderScheduler = (client as any).reminderScheduler as ReminderScheduler;
+          const reminderScheduler = client.reminderScheduler;
 
           // Use the public sendManualReminder method
           const count = await reminderScheduler.sendManualReminder(selectedEvent);

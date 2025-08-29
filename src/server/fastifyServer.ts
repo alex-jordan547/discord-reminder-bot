@@ -13,6 +13,7 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
+import { DiscordBotClient } from '@/types/BotClient';
 import {
   getErrorStats,
   getCircuitBreakerStatuses,
@@ -253,8 +254,8 @@ export async function createServer(): Promise<FastifyInstance> {
         }
 
         // Get event manager and scheduler status
-        const eventManager = (client as any).eventManager;
-        const reminderScheduler = (client as any).reminderScheduler;
+        const eventManager = client.eventManager;
+        const reminderScheduler = client.reminderScheduler;
 
         const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
         const schedulerStatus = reminderScheduler
@@ -328,7 +329,7 @@ export async function createServer(): Promise<FastifyInstance> {
         return { error: 'Bot not connected' };
       }
 
-      const eventManager = (client as any).eventManager;
+      const eventManager = client.eventManager;
       const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
 
       // Gather guild statistics
@@ -759,7 +760,7 @@ export async function createServer(): Promise<FastifyInstance> {
 /**
  * Helper function to set the Discord client reference for health checks
  */
-export function setDiscordClientReference(client: any): void {
+export function setDiscordClientReference(client: DiscordBotClient): void {
   (global as any).discordClient = client;
   logger.info('Discord client reference set for server health checks');
 }
