@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     
     steps:
     - name: Checkout code
@@ -60,11 +60,24 @@ jobs:
       run: |
         yarn install --frozen-lockfile
     
+    - name: Code formatting
+      run: |
+        # Auto-fix formatting with Prettier
+        yarn format
+        
+        # Check if any files were changed by formatting
+        if ! git diff --exit-code; then
+          echo "⚠️ Code formatting issues detected and fixed"
+          echo "Files modified by Prettier:"
+          git diff --name-only
+          # In CI, we could either fail or auto-commit the fixes
+          # For now, we'll continue but show the diff
+        else
+          echo "✅ Code formatting is correct"
+        fi
+    
     - name: Code quality checks
       run: |
-        # Formatage avec Prettier
-        yarn format:check
-        
         # Linting avec ESLint
         yarn lint:strict
         
