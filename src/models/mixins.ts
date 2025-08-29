@@ -1,10 +1,10 @@
 /**
  * Mixins for model validation and serialization
- * 
+ *
  * Provides reusable functionality that can be mixed into model classes
  */
 
-import type { ModelValidationError } from './BaseModel.js';
+import type { ModelValidationError } from './BaseModel';
 
 /**
  * Validation mixin interface
@@ -15,7 +15,7 @@ export interface ValidationMixin {
 }
 
 /**
- * Serialization mixin interface  
+ * Serialization mixin interface
  */
 export interface SerializationMixin {
   toDict(): Record<string, any>;
@@ -38,17 +38,17 @@ export class ModelUtils {
    */
   static validateModels(models: ValidationMixin[]): ModelValidationError[] {
     const allErrors: ModelValidationError[] = [];
-    
+
     models.forEach((model, index) => {
       const errors = model.validate();
       errors.forEach(error => {
         allErrors.push({
           field: `model[${index}].${error.field}`,
-          message: error.message
+          message: error.message,
         });
       });
     });
-    
+
     return allErrors;
   }
 

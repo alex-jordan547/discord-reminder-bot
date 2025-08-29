@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Discord Client Setup and Event Handlers
- * 
+ *
  * Comprehensive Discord client setup with event handlers for:
  * - Bot ready event with slash command synchronization
  * - Message events for command parsing
@@ -9,7 +9,6 @@
  */
 
 import {
-  Client,
   GatewayIntentBits,
   Events,
   Message,
@@ -17,9 +16,8 @@ import {
   User,
   PartialMessageReaction,
   PartialUser,
-  ActivityType
+  ActivityType,
 } from 'discord.js';
-import { Settings } from '@/config/settings';
 import { featureFlagManager } from '@/config/featureFlags';
 import { createLogger } from '@/utils/loggingConfig';
 import { setupSlashCommands, syncSlashCommands } from '@/commands/slash';
@@ -27,14 +25,16 @@ import { setupEventHandlers } from '@/commands/handlers';
 import { EventManager } from '@/services/eventManager';
 import { ReminderScheduler } from '@/services/reminderScheduler';
 import { ReactionTracker } from '@/services/reactionTracker';
+import { DiscordBotClient, BotServices } from '@/types/BotClient';
 
-const logger = createLogger('bot');
+const logger = createLogger('bot.ts');
 
 /**
  * Create and configure Discord client with all necessary intents and event handlers
  */
-export async function createDiscordClient(): Promise<Client> {
-  const client = new Client({
+export async function createDiscordClient(): Promise<DiscordBotClient> {
+  // Create client first
+  const client = new DiscordBotClient({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
@@ -44,18 +44,20 @@ export async function createDiscordClient(): Promise<Client> {
     ],
   });
 
-  // Initialize services
+  // Initialize services with proper dependencies
   const eventManager = new EventManager();
   const reminderScheduler = new ReminderScheduler(client, eventManager);
   const reactionTracker = new ReactionTracker(eventManager);
 
-  // Store services on client for access in commands
-  (client as any).eventManager = eventManager;
-  (client as any).reminderScheduler = reminderScheduler;
-  (client as any).reactionTracker = reactionTracker;
+  // Attach services to client
+  client.attachServices({
+    eventManager,
+    reminderScheduler,
+    reactionTracker,
+  });
 
   // Bot ready event - called when bot is fully connected
-  client.once(Events.ClientReady, async (readyClient) => {
+  client.once(Events.ClientReady, async readyClient => {
     logger.info(`✅ Bot connected as ${readyClient.user.tag}`);
     logger.info(`📊 Present on ${readyClient.guilds.cache.size} server(s)`);
 
@@ -69,27 +71,27 @@ export async function createDiscordClient(): Promise<Client> {
 
     try {
       // Setup and synchronize slash commands
-      setupSlashCommands(readyClient);
-      const synced = await syncSlashCommands(readyClient);
+      setupSlashCommands(client);
+      const synced = await syncSlashCommands(client);
       logger.info(`⚡ Synchronized ${synced.length} slash command(s) with Discord`);
     } catch (error) {
       logger.error(`Failed to sync slash commands: ${error}`);
     }
 
     // Setup command handlers
-    setupEventHandlers(readyClient);
+    setupEventHandlers(client);
 
-    // Load events from storage
+    // Initialize event manager (creates tables and loads events)
     try {
-      const loadedEvents = await eventManager.loadFromStorage();
-      logger.info(`📥 Loaded ${loadedEvents.length} events from storage`);
+      await client.eventManager.initialize();
+      logger.info('📥 Event manager initialized successfully');
     } catch (error) {
-      logger.error(`Failed to load events from storage: ${error}`);
+      logger.error(`Failed to initialize event manager: ${error}`);
     }
 
     // Initialize reminder scheduler
     try {
-      await reminderScheduler.initialize();
+      await client.reminderScheduler.initialize();
       logger.info('⏰ Reminder scheduler initialized');
     } catch (error) {
       logger.error(`Failed to initialize reminder scheduler: ${error}`);
@@ -108,62 +110,65 @@ export async function createDiscordClient(): Promise<Client> {
   // Message events for legacy command support
   client.on(Events.MessageCreate, async (message: Message) => {
     if (message.author.bot) return;
-    
+
     // Handle legacy text commands if needed
     // This can be removed once full migration to slash commands is complete
   });
 
   // Reaction events for tracking user responses
-  client.on(Events.MessageReactionAdd, async (
-    reaction: MessageReaction | PartialMessageReaction,
-    user: User | PartialUser
-  ) => {
-    try {
-      // Fetch partial data
-      if (reaction.partial) {
-        await reaction.fetch();
+  client.on(
+    Events.MessageReactionAdd,
+    async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+      try {
+        // Fetch partial data
+        if (reaction.partial) {
+          await reaction.fetch();
+        }
+        if (user.partial) {
+          await user.fetch();
+        }
+
+        // Skip bot reactions
+        if (user.bot) return;
+
+        await client.reactionTracker.handleReactionAdd(reaction as MessageReaction, user as User);
+      } catch (error) {
+        logger.error(`Error handling reaction add: ${error}`);
       }
-      if (user.partial) {
-        await user.fetch();
+    },
+  );
+
+  client.on(
+    Events.MessageReactionRemove,
+    async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+      try {
+        // Fetch partial data
+        if (reaction.partial) {
+          await reaction.fetch();
+        }
+        if (user.partial) {
+          await user.fetch();
+        }
+
+        // Skip bot reactions
+        if (user.bot) return;
+
+        await client.reactionTracker.handleReactionRemove(
+          reaction as MessageReaction,
+          user as User,
+        );
+      } catch (error) {
+        logger.error(`Error handling reaction remove: ${error}`);
       }
-
-      // Skip bot reactions
-      if (user.bot) return;
-
-      await reactionTracker.handleReactionAdd(reaction as MessageReaction, user as User);
-    } catch (error) {
-      logger.error(`Error handling reaction add: ${error}`);
-    }
-  });
-
-  client.on(Events.MessageReactionRemove, async (
-    reaction: MessageReaction | PartialMessageReaction,
-    user: User | PartialUser
-  ) => {
-    try {
-      // Fetch partial data
-      if (reaction.partial) {
-        await reaction.fetch();
-      }
-      if (user.partial) {
-        await user.fetch();
-      }
-
-      // Skip bot reactions
-      if (user.bot) return;
-
-      await reactionTracker.handleReactionRemove(reaction as MessageReaction, user as User);
-    } catch (error) {
-      logger.error(`Error handling reaction remove: ${error}`);
-    }
-  });
+    },
+  );
 
   // Error handling
-  client.on(Events.Error, (error) => {
+  client.on(Events.Error, error => {
     logger.error(`Discord client error: ${error.message}`);
   });
 
-  client.on(Events.Warn, (warning) => {
+  client.on(Events.Warn, warning => {
     logger.warn(`Discord client warning: ${warning}`);
   });
 
@@ -172,7 +177,7 @@ export async function createDiscordClient(): Promise<Client> {
     logger.warn(`Shard ${id} disconnected: ${closeEvent.code} ${closeEvent.reason}`);
   });
 
-  client.on(Events.ShardReconnecting, (id) => {
+  client.on(Events.ShardReconnecting, id => {
     logger.info(`Shard ${id} reconnecting...`);
   });
 
@@ -182,9 +187,3 @@ export async function createDiscordClient(): Promise<Client> {
 
   return client;
 }
-
-/**
- * Helper function to create a fully configured Discord client
- * This is used by the main application entry point
- */
-export { createDiscordClient };

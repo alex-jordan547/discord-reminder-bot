@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Reminder Scheduler Service
- * 
+ *
  * Advanced scheduling system that provides:
  * - Dynamic scheduling based on next reminder time
  * - Smart sleep mode when no events are active
@@ -9,11 +9,14 @@
  * - Complete 1:1 migration from Python implementation
  */
 
-import { Client, TextChannel, EmbedBuilder, User } from 'discord.js';
+import { Client, TextChannel, EmbedBuilder } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from './eventManager';
-import { Event } from '@/models/Event';
+import { Event } from '@/models';
 import { Settings } from '@/config/settings';
+import { formatDateForDisplay } from '@/utils/dateUtils';
+import { GuildConfigManager } from './guildConfigManager';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
 
 const logger = createLogger('reminder-scheduler');
 
@@ -29,7 +32,7 @@ export interface SchedulerStatus {
 
 /**
  * Reminder Scheduler Service Class
- * 
+ *
  * Manages the intelligent scheduling of reminder checks and sending.
  * Uses dynamic timing to minimize resource usage while maintaining precision.
  * Migrated 1:1 from Python implementation with exact same behavior.
@@ -40,10 +43,15 @@ export class ReminderScheduler {
   private scheduledTimeout: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private status: SchedulerStatus;
+  private guildConfigManager: GuildConfigManager;
 
   constructor(client: Client, eventManager: EventManager) {
     this.client = client;
     this.eventManager = eventManager;
+
+    // Initialize guild configuration manager
+    const storage = new SqliteStorage();
+    this.guildConfigManager = new GuildConfigManager(client, storage);
     this.status = {
       status: 'stopped',
       nextCheck: null,
@@ -59,13 +67,13 @@ export class ReminderScheduler {
   async initialize(): Promise<void> {
     try {
       logger.info('🎯 Système de planification dynamique des rappels activé (thread-safe)');
-      
+
       this.isRunning = true;
       this.status.status = 'active';
-      
+
       // Schedule the first check
       await this.scheduleNextCheck();
-      
+
       logger.info('Reminder scheduler initialized and running');
     } catch (error) {
       logger.error(`Failed to initialize reminder scheduler: ${error}`);
@@ -79,16 +87,16 @@ export class ReminderScheduler {
    */
   stop(): void {
     logger.info('Stopping reminder scheduler...');
-    
+
     this.isRunning = false;
     this.status.status = 'stopped';
     this.status.nextCheck = null;
-    
+
     if (this.scheduledTimeout) {
       clearTimeout(this.scheduledTimeout);
       this.scheduledTimeout = null;
     }
-    
+
     logger.info('Reminder scheduler stopped');
   }
 
@@ -98,7 +106,7 @@ export class ReminderScheduler {
   async scheduleEvent(event: Event): Promise<void> {
     try {
       logger.info(`Scheduling reminders for event ${event.messageId}`);
-      
+
       // If scheduler is not running, start it
       if (!this.isRunning) {
         await this.initialize();
@@ -117,7 +125,7 @@ export class ReminderScheduler {
   async unscheduleEvent(messageId: string): Promise<void> {
     try {
       logger.info(`Unscheduling event ${messageId}`);
-      
+
       // Reschedule to account for removed event
       await this.scheduleNextCheck();
     } catch (error) {
@@ -143,7 +151,7 @@ export class ReminderScheduler {
 
       // Get all active events
       const activeEvents = await this.eventManager.getActiveEvents();
-      
+
       if (activeEvents.length === 0) {
         // No events to watch, enter sleep mode
         this.enterSleepMode();
@@ -161,7 +169,7 @@ export class ReminderScheduler {
 
         logger.debug(
           `Reminder ${event.messageId}: next_time=${nextTime.toISOString().substr(11, 8)}, ` +
-          `current=${currentTime.toISOString().substr(11, 8)}, diff=${(timeDiff / 1000).toFixed(1)}s`
+            `current=${currentTime.toISOString().substr(11, 8)}, diff=${(timeDiff / 1000).toFixed(1)}s`,
         );
 
         if (nextTime <= currentTime) {
@@ -169,14 +177,14 @@ export class ReminderScheduler {
           overdueEvents.push(event);
           logger.debug(
             `Added reminder ${event.messageId} to overdue list ` +
-            `(overdue by ${(-timeDiff / 1000).toFixed(1)}s)`
+              `(overdue by ${(-timeDiff / 1000).toFixed(1)}s)`,
           );
         } else {
           // Future reminder
           futureReminderTimes.push(nextTime);
           logger.debug(
             `Added reminder ${event.messageId} to future list ` +
-            `(due in ${(timeDiff / 1000).toFixed(1)}s)`
+              `(due in ${(timeDiff / 1000).toFixed(1)}s)`,
           );
         }
       }
@@ -184,12 +192,12 @@ export class ReminderScheduler {
       // Handle overdue reminders immediately
       if (overdueEvents.length > 0) {
         logger.info(
-          `🚨 ${overdueEvents.length} rappel(s) en retard détecté(s), traitement immédiat...`
+          `🚨 ${overdueEvents.length} rappel(s) en retard détecté(s), traitement immédiat...`,
         );
 
         // Process overdue reminders immediately
         await this.checkRemindersImmediate(overdueEvents);
-        
+
         // After processing overdue reminders, reschedule normally
         await this.scheduleNextCheck();
         return;
@@ -197,8 +205,7 @@ export class ReminderScheduler {
 
       // No overdue reminders, schedule for next future reminder
       if (futureReminderTimes.length === 0) {
-        logger.debug('All reminders are paused - entering sleep mode');
-        console.log('😴 Mode veille: Tous les rappels sont en pause');
+        logger.debug('😴 All reminders are paused - entering sleep mode');
         this.enterSleepMode();
         return;
       }
@@ -219,13 +226,9 @@ export class ReminderScheduler {
 
       logger.debug(
         `Next reminder due at ${nextReminder.toISOString().substr(11, 8)}, ` +
-        `waiting ${(timeUntilNext / 1000).toFixed(0)} seconds`
+          `waiting ${(timeUntilNext / 1000).toFixed(0)} seconds`,
       );
-      console.log(
-        `🕰️ Prochain rappel programmé à ${nextReminder.toISOString().substr(11, 8)} ` +
-        `(dans ${(timeUntilNext / 1000).toFixed(0)}s)`
-      );
-      
+
       this.scheduledTimeout = setTimeout(() => {
         this.checkReminders().catch(error => {
           logger.error(`Error in scheduled reminder check: ${error}`);
@@ -233,11 +236,10 @@ export class ReminderScheduler {
           setTimeout(() => this.scheduleNextCheck(), 30000);
         });
       }, timeUntilNext);
-      
     } catch (error) {
       logger.error(`Failed to schedule next check: ${error}`);
       this.status.status = 'error';
-      
+
       // Try to recover by scheduling a check in 1 minute
       setTimeout(() => this.scheduleNextCheck(), 60000);
     }
@@ -250,9 +252,8 @@ export class ReminderScheduler {
     this.status.status = 'sleeping';
     this.status.nextCheck = null;
     this.status.activeEvents = 0;
-    
-    logger.debug('No watched reminders - entering sleep mode (no periodic checks)');
-    console.log('😴 Mode veille: Aucun rappel surveillé, arrêt des vérifications périodiques');
+
+    logger.debug('😴No watched reminders - entering sleep mode (no periodic checks)');
   }
 
   /**
@@ -262,14 +263,13 @@ export class ReminderScheduler {
   private async checkReminders(): Promise<void> {
     try {
       logger.debug('Dynamic reminder check triggered...');
-      
+
       const eventsNeedingReminders = await this.eventManager.getEventsNeedingReminders();
-      
+
       if (eventsNeedingReminders.length === 0) {
         const activeEvents = await this.eventManager.getActiveEvents();
         if (activeEvents.length === 0) {
-          logger.debug('No reminders to check - entering sleep mode');
-          console.log('😴 Aucun rappel à vérifier - entrée en mode veille');
+          logger.debug('😴No reminders to check - entering sleep mode');
           return;
         } else {
           logger.debug(`No reminders due yet. Checked ${activeEvents.length} reminders.`);
@@ -281,16 +281,16 @@ export class ReminderScheduler {
       for (const event of eventsNeedingReminders) {
         logger.info(
           `Reminder due for message ${event.messageId} ` +
-          `(interval: ${event.intervalMinutes}min)`
+            `(interval: ${event.intervalMinutes}min)`,
         );
 
         try {
           const count = await this.sendReminder(event);
           totalReminded += count;
-          
+
           // Mark event as reminded
           await this.eventManager.markEventReminded(event.messageId);
-          
+
           // Add delay between reminders to respect rate limits
           if (eventsNeedingReminders.length > 1) {
             await this.sleep(Settings.DELAY_BETWEEN_REMINDERS || 2000);
@@ -301,22 +301,20 @@ export class ReminderScheduler {
       }
 
       if (totalReminded > 0) {
-        logger.info(`Dynamic reminders sent: ${totalReminded} people notified`);
-        console.log(`✅ Rappels automatiques envoyés: ${totalReminded} personnes notifiées`);
+        logger.info(`✅ Dynamic reminders sent: ${totalReminded} people notified`);
         this.status.lastReminderSent = new Date();
       }
-      
+
       // Update active events count
       const activeEvents = await this.eventManager.getActiveEvents();
       this.status.activeEvents = activeEvents.length;
-      
+
       // Schedule next check
       await this.scheduleNextCheck();
-      
     } catch (error) {
       logger.error(`Error during reminder check: ${error}`);
       this.status.status = 'error';
-      
+
       // Try to recover
       setTimeout(() => this.scheduleNextCheck(), 30000);
     }
@@ -332,10 +330,10 @@ export class ReminderScheduler {
       try {
         const count = await this.sendReminder(event);
         totalReminded += count;
-        
+
         // Mark event as reminded
         await this.eventManager.markEventReminded(event.messageId);
-        
+
         // Add delay between reminders to respect rate limits
         if (overdueEvents.length > 1) {
           await this.sleep(Settings.DELAY_BETWEEN_REMINDERS || 2000);
@@ -356,8 +354,11 @@ export class ReminderScheduler {
    */
   private async sendReminder(event: Event): Promise<number> {
     try {
+      // Get guild-specific configuration
+      const guildConfig = await this.getGuildConfig(event.guildId);
+
       // Get the original event message to update reactions
-      const channel = await this.client.channels.fetch(event.channelId) as TextChannel;
+      const channel = (await this.client.channels.fetch(event.channelId)) as TextChannel;
       if (!channel) {
         logger.error(`Could not find channel ${event.channelId} for event ${event.messageId}`);
         return 0;
@@ -375,14 +376,19 @@ export class ReminderScheduler {
       try {
         originalMessage = await channel.messages.fetch(event.messageId);
       } catch (error) {
-        logger.error(`Could not fetch message ${event.messageId} from channel ${event.channelId}: ${error}`);
-        
+        logger.error(
+          `Could not fetch message ${event.messageId} from channel ${event.channelId}: ${error}`,
+        );
+
         // Message deleted - remove reminder automatically
-        logger.warn(`Message ${event.messageId} appears to have been deleted, removing reminder from watch list`);
+        logger.warn(
+          `Message ${event.messageId} appears to have been deleted, removing reminder from watch list`,
+        );
         const success = await this.eventManager.removeEvent(event.messageId, event.guildId);
         if (success) {
-          logger.info(`Successfully removed deleted message ${event.messageId} from reminder surveillance`);
-          console.log(`🗑️ Rappel supprimé automatiquement - message ${event.messageId} introuvable`);
+          logger.info(
+            `🗑️ Successfully removed deleted message ${event.messageId} from reminder surveillance`,
+          );
         }
         return 0;
       }
@@ -390,91 +396,96 @@ export class ReminderScheduler {
       // Update the list of users who have reacted
       await this.updateEventReactions(event, originalMessage);
 
-      // Update the event's accessible users to reflect current server state
-      await event.updateAccessibleUsersFromBot(this.client);
+      // Determine mention strategy based on reactions
+      let mentions = '';
+      let mentionStrategy = '';
+      let missingUsers: string[] = [];
 
-      // Identify missing users (only from those who can access the channel)
-      const missingUsers = event.getMissingUsers();
+      if (event.usersWhoReacted.length === 0) {
+        // Nobody has reacted yet - use @everyone to wake everyone up
+        mentions = '@everyone';
+        mentionStrategy = 'everyone';
+        logger.debug(`No users have reacted for event ${event.messageId} - using @everyone`);
+      } else {
+        // At least someone has reacted - mention only those who haven't reacted yet
+        missingUsers = await this.getMissingUsersInChannel(channel, event.usersWhoReacted);
 
-      if (missingUsers.length === 0) {
-        logger.debug(`No missing users for event ${event.messageId}`);
-        return 0;
+        if (missingUsers.length === 0) {
+          logger.info(
+            `All accessible users have reacted to event ${event.messageId} - skipping reminder`,
+          );
+          return 0;
+        }
+
+        // Limit mentions to avoid spam using guild-specific configuration
+        const maxMentions = guildConfig.maxMentions;
+        const usersToMention = missingUsers.slice(0, maxMentions);
+        mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
+        mentionStrategy = 'individual';
+
+        logger.info(
+          `Event ${event.messageId}: ${event.usersWhoReacted.length} users reacted - mentioning ${usersToMention.length} missing users`,
+        );
       }
 
-      // Limit mentions to avoid spam
-      const maxMentions = Settings.MAX_MENTIONS_PER_REMINDER || 50;
-      const usersToMention = missingUsers.slice(0, maxMentions);
-      const remaining = missingUsers.length - usersToMention.length;
-
-      // Build the reminder message - exactly as in Python
-      const mentions = usersToMention.map(userId => `<@${userId}>`).join(' ');
+      // Get total accessible users for statistics
+      const totalAccessibleUsers = await this.getTotalAccessibleUsers(channel);
+      const reactedCount = event.getReactionCount();
 
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
         .setDescription(
-          '**Merci de mettre votre disponibilité pour l\'évènement!**\n' +
-          'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)'
+          "**Merci de mettre votre disponibilité pour l'évènement!**\n" +
+            'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)',
         )
-        .setColor(0xFFA500) // Orange color like in Python
+        .setColor(0xffa500) // Orange color like in Python
         .addFields(
           {
             name: '📊 Statistiques',
-            value: 
-              `✅ Ont répondu: **${event.getReactionCount()}**\n` +
-              `❌ Manquants: **${event.getMissingUsersCount()}**\n` +
-              `👥 Total joueurs: **${event.getTotalUsersCount()}**`,
+            value:
+              `👥 Ont réagi: **${reactedCount}/${totalAccessibleUsers}**\n` +
+              `⏳ En attente de réponse: **${Math.max(0, totalAccessibleUsers - reactedCount)}** membres`,
             inline: false,
           },
           {
-            name: '🔗 Lien vers l\'évènement',
+            name: "🔗 Lien vers l'évènement",
             value: `[**Cliquez ici pour voir le message**](https://discord.com/channels/${event.guildId}/${event.channelId}/${event.messageId})`,
             inline: false,
-          }
+          },
         );
 
-      // Handle footer text like in Python
-      if (remaining > 0) {
-        const footerText = `${remaining} personne(s) supplémentaire(s) doive(nt) également répondre (limite de mentions atteinte)`;
-        if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          embed.setFooter({ text: `${footerText} • ${timestamp}` });
-        } else {
-          embed.setFooter({ text: footerText });
-        }
-      } else if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
+      // Handle footer text with proper formatting and timezone using guild-specific configuration
+      if (guildConfig.autoDeleteEnabled && guildConfig.autoDeleteDelayHours > 0) {
+        const deleteDelayText = this.formatAutoDeleteDisplay(guildConfig.autoDeleteDelayHours);
         let footerText = `🗑️ Ce message s'auto-détruira dans ${deleteDelayText}`;
+
         if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          footerText += ` • ${timestamp}`;
+          const currentTime = formatDateForDisplay(new Date());
+          footerText += `\n📅 Envoyé le ${currentTime}`;
         }
         embed.setFooter({ text: footerText });
-      }
-
-      // Combined footer for both remaining mentions and auto-deletion
-      if (remaining > 0 && Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelayText = this.formatAutoDeleteDisplay(Settings.AUTO_DELETE_DELAY_HOURS);
-        let combinedText = `${remaining} personne(s) supplémentaire(s) doive(nt) également répondre (limite de mentions atteinte) • 🗑️ Auto-destruction dans ${deleteDelayText}`;
-        if (Settings.is_test_mode()) {
-          const timestamp = new Date().toISOString();
-          combinedText += ` • ${timestamp}`;
-        }
-        embed.setFooter({ text: combinedText });
+      } else if (Settings.is_test_mode()) {
+        const currentTime = formatDateForDisplay(new Date());
+        embed.setFooter({ text: `📅 Rappel automatique\nEnvoyé le ${currentTime}` });
+      } else {
+        embed.setFooter({ text: '📅 Rappel automatique' });
       }
 
       // Send the reminder message
+      const allowedMentions =
+        mentionStrategy === 'everyone'
+          ? { parse: ['everyone' as const], repliedUser: false }
+          : { users: missingUsers, repliedUser: false };
+
       const sentMessage = await channel.send({
         content: mentions,
         embeds: [embed],
-        allowedMentions: {
-          users: usersToMention,
-          repliedUser: false,
-        },
+        allowedMentions,
       });
 
-      // Schedule auto-deletion if enabled
-      if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS > 0) {
-        const deleteDelay = Settings.AUTO_DELETE_DELAY_HOURS * 60 * 60 * 1000;
+      // Schedule auto-deletion if enabled using guild-specific configuration
+      if (guildConfig.autoDeleteEnabled && guildConfig.autoDeleteDelayHours > 0) {
+        const deleteDelay = guildConfig.autoDeleteDelayHours * 60 * 60 * 1000;
         setTimeout(() => {
           sentMessage.delete().catch(error => {
             logger.debug(`Could not auto-delete reminder: ${error}`);
@@ -482,9 +493,16 @@ export class ReminderScheduler {
         }, deleteDelay);
       }
 
-      logger.info(`Sent reminder for event ${event.messageId} to ${usersToMention.length} users`);
-      return usersToMention.length;
-
+      if (mentionStrategy === 'everyone') {
+        logger.info(
+          `Sent reminder for event ${event.messageId} using @everyone (no reactions yet)`,
+        );
+      } else {
+        logger.info(
+          `Sent reminder for event ${event.messageId} mentioning ${missingUsers.length} users individually`,
+        );
+      }
+      return 1; // Return 1 to indicate reminder was sent
     } catch (error) {
       logger.error(`Unexpected error in send_reminder for event ${event.messageId}: ${error}`);
       return 0;
@@ -496,19 +514,31 @@ export class ReminderScheduler {
    */
   private async updateEventReactions(event: Event, message: any): Promise<void> {
     try {
-      // Clear existing reactions
-      event.setUsersWhoReacted([]);
-      
-      // Update with current reactions
+      // Collect users who have reacted with standard emojis
+      const reactedUsers: string[] = [];
+      const standardEmojis = ['✅', '❌', '❓'];
+
       for (const reaction of message.reactions.cache.values()) {
-        if (event.requiredReactions.includes(reaction.emoji.name || reaction.emoji.toString())) {
+        const emojiName = reaction.emoji.name || reaction.emoji.toString();
+        if (standardEmojis.includes(emojiName)) {
           const users = await reaction.users.fetch();
           for (const user of users.values()) {
-            if (!user.bot) {
-              event.addUserReaction(user.id);
+            if (!user.bot && !reactedUsers.includes(user.id)) {
+              reactedUsers.push(user.id);
             }
           }
         }
+      }
+
+      // Update event with fresh data and save to database
+      const success = await this.eventManager.updateUserReactions(event.messageId, reactedUsers);
+      if (success) {
+        event.usersWhoReacted = reactedUsers; // Update local object too
+        logger.debug(
+          `Updated reactions for event ${event.messageId}: ${reactedUsers.length} users reacted`,
+        );
+      } else {
+        logger.error(`Failed to save updated reactions for event ${event.messageId}`);
       }
     } catch (error) {
       logger.error(`Error updating reactions for event ${event.messageId}: ${error}`);
@@ -531,10 +561,56 @@ export class ReminderScheduler {
   }
 
   /**
+   * Get guild-specific configuration for reminder settings
+   */
+  private async getGuildConfig(guildId: string) {
+    try {
+      const config = await this.guildConfigManager.getGuildConfig(guildId);
+      return {
+        maxMentions: config?.maxMentionsPerReminder ?? Settings.MAX_MENTIONS_PER_REMINDER,
+        autoDeleteEnabled: config?.autoDeleteEnabled ?? Settings.AUTO_DELETE_REMINDERS,
+        autoDeleteDelayHours: config?.getAutoDeleteDelayHours() ?? Settings.AUTO_DELETE_DELAY_HOURS,
+        delayBetweenRemindersMs:
+          config?.delayBetweenRemindersMs ?? Settings.DELAY_BETWEEN_REMINDERS,
+      };
+    } catch (error) {
+      logger.error(`Error getting guild config for ${guildId}, using defaults:`, error);
+      return {
+        maxMentions: Settings.MAX_MENTIONS_PER_REMINDER,
+        autoDeleteEnabled: Settings.AUTO_DELETE_REMINDERS,
+        autoDeleteDelayHours: Settings.AUTO_DELETE_DELAY_HOURS,
+        delayBetweenRemindersMs: Settings.DELAY_BETWEEN_REMINDERS,
+      };
+    }
+  }
+
+  /**
    * Get current scheduler status
    */
   getStatus(): SchedulerStatus {
     return { ...this.status };
+  }
+
+  /**
+   * Send a manual reminder for a specific event
+   * Public method to allow manual reminder triggering from commands
+   */
+  async sendManualReminder(event: Event): Promise<number> {
+    try {
+      logger.info(`Sending manual reminder for event ${event.messageId}`);
+      const count = await this.sendReminder(event);
+
+      if (count > 0) {
+        this.status.lastReminderSent = new Date();
+        // Mark event as reminded (consistent with automatic reminders)
+        await this.eventManager.markEventReminded(event.messageId);
+      }
+
+      return count;
+    } catch (error) {
+      logger.error(`Error sending manual reminder for event ${event.messageId}: ${error}`);
+      return 0;
+    }
   }
 
   /**
@@ -551,9 +627,91 @@ export class ReminderScheduler {
     if (!this.isRunning) {
       throw new Error('Scheduler is not running');
     }
-    
+
     logger.info('Forcing immediate reminder check');
     await this.checkReminders();
+  }
+
+  /**
+   * Get total number of users who can access the channel (excluding bots)
+   */
+  private async getTotalAccessibleUsers(channel: TextChannel): Promise<number> {
+    try {
+      const guild = channel.guild;
+      if (!guild) {
+        return 0;
+      }
+
+      const members = await guild.members.fetch();
+      let accessibleCount = 0;
+
+      for (const [, member] of members) {
+        // Skip bots
+        if (member.user.bot) {
+          continue;
+        }
+
+        // Check if user has permission to view the channel
+        const permissions = channel.permissionsFor(member);
+        if (permissions?.has('ViewChannel')) {
+          accessibleCount++;
+        }
+      }
+
+      return accessibleCount;
+    } catch (error) {
+      logger.error(`Error getting total accessible users for channel ${channel.id}: ${error}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Get users who have access to the channel but haven't reacted yet
+   */
+  private async getMissingUsersInChannel(
+    channel: TextChannel,
+    usersWhoReacted: string[],
+  ): Promise<string[]> {
+    try {
+      const guild = channel.guild;
+      if (!guild) {
+        logger.warn('Channel has no guild, cannot get missing users');
+        return [];
+      }
+
+      // Get all members who can view this channel
+      const missingUsers: string[] = [];
+
+      // Fetch all guild members (this might be cached)
+      const members = await guild.members.fetch();
+
+      for (const [userId, member] of members) {
+        // Skip bots
+        if (member.user.bot) {
+          continue;
+        }
+
+        // Skip users who have already reacted
+        if (usersWhoReacted.includes(userId)) {
+          continue;
+        }
+
+        // Check if user has permission to view the channel
+        const permissions = channel.permissionsFor(member);
+        if (permissions?.has('ViewChannel')) {
+          missingUsers.push(userId);
+        }
+      }
+
+      logger.debug(
+        `Found ${missingUsers.length} users who can view channel but haven't reacted yet (out of ${members.size} guild members)`,
+      );
+
+      return missingUsers;
+    } catch (error) {
+      logger.error(`Error getting missing users for channel ${channel.id}: ${error}`);
+      return [];
+    }
   }
 
   /**
@@ -570,11 +728,9 @@ export class ReminderScheduler {
       const totalEvents = await this.eventManager.getTotalEventCount();
       const activeEvents = await this.eventManager.getActiveEvents();
       const nextReminderTime = await this.eventManager.getNextReminderTime();
-      
-      const nextReminderIn = nextReminderTime 
-        ? nextReminderTime.getTime() - Date.now()
-        : null;
-      
+
+      const nextReminderIn = nextReminderTime ? nextReminderTime.getTime() - Date.now() : null;
+
       return {
         totalEvents,
         activeEvents: activeEvents.length,

@@ -1,13 +1,15 @@
 /**
  * SQLite storage implementation for Discord Reminder Bot
- * 
+ *
  * Provides comprehensive CRUD operations, migrations, and optimized queries
  * for all model types with connection pooling and transaction support.
  */
 
-import { DatabaseManager, getDatabase } from './database.js';
-import { Event, Guild, User, Reaction, ReminderLog } from '../models/index.js';
-import type { EventData, GuildData, UserData, ReactionData, ReminderLogData, ReminderStatus } from '../models/index.js';
+import Database from 'better-sqlite3';
+import { Event } from '@/models';
+import { createLogger } from '@/utils/loggingConfig';
+
+const logger = createLogger('sqliteStorage.ts');
 
 export interface StorageOperationResult {
   success: boolean;
@@ -30,13 +32,106 @@ export interface EventFilters {
 }
 
 /**
+ * Database interface for backwards compatibility
+ */
+interface DatabaseInterface {
+  run(sql: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number }>;
+  get(sql: string, params?: any[]): Promise<any>;
+  all(sql: string, params?: any[]): Promise<any[]>;
+  executeTransaction(statements: { sql: string; params: any[] }[]): Promise<void>;
+  connect(): Promise<void>;
+  close(): Promise<void>;
+  isAvailable(): Promise<boolean>;
+}
+
+/**
+ * Simple database wrapper for better-sqlite3
+ */
+class SimpleDatabaseManager implements DatabaseInterface {
+  private db: Database.Database | null = null;
+  private dbPath: string;
+
+  constructor(dbPath: string = 'discord_bot.db') {
+    this.dbPath = dbPath;
+  }
+
+  async connect(): Promise<void> {
+    if (!this.db) {
+      this.db = new Database(this.dbPath);
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('synchronous = NORMAL');
+      this.db.pragma('cache_size = 1000');
+      this.db.pragma('temp_store = memory');
+    }
+  }
+
+  async run(
+    sql: string,
+    params: any[] = [],
+  ): Promise<{ changes: number; lastInsertRowid: number }> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    const result = stmt.run(...params);
+    return { changes: result.changes, lastInsertRowid: Number(result.lastInsertRowid) };
+  }
+
+  async get(sql: string, params: any[] = []): Promise<any> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    return stmt.get(...params);
+  }
+
+  async all(sql: string, params: any[] = []): Promise<any[]> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    return stmt.all(...params);
+  }
+
+  async executeTransaction(statements: { sql: string; params: any[] }[]): Promise<void> {
+    if (!this.db) await this.connect();
+    const transaction = this.db!.transaction(() => {
+      for (const stmt of statements) {
+        const prepared = this.db!.prepare(stmt.sql);
+        prepared.run(...stmt.params);
+      }
+    });
+    transaction();
+  }
+
+  async close(): Promise<void> {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      if (!this.db) await this.connect();
+      return this.db !== null;
+    } catch {
+      return false;
+    }
+  }
+}
+
+let databaseInstance: SimpleDatabaseManager | null = null;
+
+export function getDatabase(): SimpleDatabaseManager {
+  if (!databaseInstance) {
+    databaseInstance = new SimpleDatabaseManager();
+  }
+  return databaseInstance;
+}
+
+/**
  * Main SQLite storage class with comprehensive model operations
  */
 export class SqliteStorage {
-  private db: DatabaseManager;
+  private db: DatabaseInterface;
   private isInitialized = false;
 
-  constructor(databaseManager?: DatabaseManager) {
+  constructor(databaseManager?: DatabaseInterface) {
     this.db = databaseManager || getDatabase();
   }
 
@@ -49,278 +144,169 @@ export class SqliteStorage {
       await this.createTables();
       await this.runMigrations();
       this.isInitialized = true;
-      
-      console.log('SQLite storage initialized successfully');
+
+      logger.info('SQLite storage initialized successfully');
       return true;
     } catch (error) {
-      console.error('Failed to initialize SQLite storage:', error);
+      logger.error('Failed to initialize SQLite storage:', error);
       return false;
     }
   }
 
   /**
-   * Create all database tables with proper relationships and indexes
+   * Create simplified database table - only events table needed
    */
   private async createTables(): Promise<void> {
-    const tableCreationSQL = [
-      // Guilds table
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS guilds (
-            guild_id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            settings TEXT DEFAULT '{}',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )
-        `,
-        params: [],
-      },
+    logger.info('Creating database tables...');
+    try {
+      const tableCreationSQL = [
+        // Events table - simplified without foreign key constraints
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS events (
+              message_id TEXT PRIMARY KEY,
+              channel_id TEXT NOT NULL,
+              guild_id TEXT NOT NULL,
+              title TEXT NOT NULL,
+              description TEXT,
+              interval_minutes REAL DEFAULT 60.0,
+              is_paused INTEGER DEFAULT 0,
+              last_reminder DATETIME DEFAULT CURRENT_TIMESTAMP,
+              users_who_reacted TEXT DEFAULT '[]',
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `,
+          params: [],
+        },
 
-      // Users table  
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS users (
-            user_id TEXT NOT NULL,
-            guild_id TEXT NOT NULL,
-            username TEXT NOT NULL,
-            is_bot INTEGER DEFAULT 0,
-            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, guild_id),
-            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
-          )
-        `,
-        params: [],
-      },
+        // Guild configurations table
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS guild_configs (
+              guild_id TEXT PRIMARY KEY,
+              guild_name TEXT NOT NULL,
+              reminder_channel_id TEXT,
+              reminder_channel_name TEXT DEFAULT 'Canal original',
+              admin_role_ids TEXT DEFAULT '[]',
+              admin_role_names TEXT DEFAULT '[]',
+              default_interval_minutes REAL DEFAULT 60.0,
+              auto_delete_enabled INTEGER DEFAULT 1,
+              auto_delete_delay_minutes REAL DEFAULT 60.0,
+              delay_between_reminders_ms INTEGER DEFAULT 2000,
+              max_mentions_per_reminder INTEGER DEFAULT 50,
+              use_everyone_above_limit INTEGER DEFAULT 1,
+              default_reactions TEXT DEFAULT '["✅","❌","❓"]',
+              timezone TEXT DEFAULT 'Europe/Paris',
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `,
+          params: [],
+        },
+      ];
 
-      // Events table
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS events (
-            message_id TEXT PRIMARY KEY,
-            channel_id TEXT NOT NULL,
-            guild_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            interval_minutes REAL DEFAULT 60.0,
-            is_paused INTEGER DEFAULT 0,
-            last_reminder DATETIME DEFAULT CURRENT_TIMESTAMP,
-            required_reactions TEXT DEFAULT '["✅", "❌", "❓"]',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
-          )
-        `,
-        params: [],
-      },
-
-      // Reactions table
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS reactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_message_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            emoji TEXT NOT NULL,
-            reacted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (event_message_id, user_id),
-            FOREIGN KEY (event_message_id) REFERENCES events(message_id) ON DELETE CASCADE
-          )
-        `,
-        params: [],
-      },
-
-      // Reminder logs table
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS reminder_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_message_id TEXT NOT NULL,
-            scheduled_at DATETIME NOT NULL,
-            sent_at DATETIME,
-            users_notified INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'pending',
-            error_message TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (event_message_id) REFERENCES events(message_id) ON DELETE CASCADE
-          )
-        `,
-        params: [],
-      },
-    ];
-
-    await this.db.executeTransaction(tableCreationSQL);
-    await this.createIndexes();
+      await this.db.executeTransaction(tableCreationSQL);
+      await this.createIndexes();
+      logger.info('Database tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create database tables:', error);
+      throw error;
+    }
   }
 
   /**
    * Create optimized indexes for better query performance
    */
   private async createIndexes(): Promise<void> {
-    const indexCreationSQL = [
-      // Guild indexes
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_guilds_created_at ON guilds(created_at)', params: [] },
+    logger.debug('Creating database indexes for better performance...');
+    try {
+      const indexCreationSQL = [
+        // Event indexes - optimized for common queries
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused ON events(guild_id, is_paused)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_reminder_interval ON events(last_reminder, interval_minutes)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_created ON events(guild_id, created_at)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)',
+          params: [],
+        },
 
-      // User indexes
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_users_guild_id ON users(guild_id)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_users_is_bot ON users(is_bot)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)', params: [] },
+        // Guild config indexes
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_guild_configs_last_used ON guild_configs(last_used_at)',
+          params: [],
+        },
+      ];
 
-      // Event indexes (matching Python implementation)
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused ON events(guild_id, is_paused)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_events_reminder_interval ON events(last_reminder, interval_minutes)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_created ON events(guild_id, created_at)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)', params: [] },
-
-      // Reaction indexes
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_reactions_event_id ON reactions(event_message_id)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_reactions_user_id ON reactions(user_id)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_reactions_emoji ON reactions(event_message_id, emoji)', params: [] },
-
-      // Reminder log indexes
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_reminder_logs_event_scheduled ON reminder_logs(event_message_id, scheduled_at)', params: [] },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_reminder_logs_status_scheduled ON reminder_logs(status, scheduled_at)', params: [] },
-    ];
-
-    await this.db.executeTransaction(indexCreationSQL);
+      await this.db.executeTransaction(indexCreationSQL);
+      logger.debug('Database indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create database indexes:', error);
+      throw error;
+    }
   }
 
   /**
    * Run database migrations (for future schema updates)
    */
   private async runMigrations(): Promise<void> {
-    // Create migrations table if it doesn't exist
-    await this.db.run(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    logger.debug('Running database migrations...');
+    try {
+      // Create migrations table if it doesn't exist
+      await this.db.run(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version INTEGER PRIMARY KEY,
+          applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    // Future migrations will be added here
-    // Example:
-    // await this.runMigration(1, 'Add new column to events table');
+      logger.debug('Database migrations completed');
+      // Future migrations will be added here
+      // Example:
+      // await this.runMigration(1, 'Add new column to events table');
+    } catch (error) {
+      logger.error('Failed to run database migrations:', error);
+      throw error;
+    }
   }
 
   /**
    * Run a specific migration
    */
-  private async runMigration(version: number, description: string, migrationSQL: string[]): Promise<void> {
+  private async runMigration(
+    version: number,
+    description: string,
+    migrationSQL: string[],
+  ): Promise<void> {
     // Check if migration already applied
-    const existing = await this.db.get(
-      'SELECT version FROM schema_migrations WHERE version = ?',
-      [version]
-    );
+    const existing = await this.db.get('SELECT version FROM schema_migrations WHERE version = ?', [
+      version,
+    ]);
 
     if (existing) {
       return; // Migration already applied
     }
 
-    console.log(`Running migration ${version}: ${description}`);
-    
-    const statements = migrationSQL.map(sql => ({ sql, params: [] }));
+    logger.info(`Running migration ${version}: ${description}`);
+
+    const statements = migrationSQL.map(sql => ({ sql, params: [] as any[] }));
     statements.push({
       sql: 'INSERT INTO schema_migrations (version) VALUES (?)',
-      params: [version]
+      params: [version] as any[],
     });
 
     await this.db.executeTransaction(statements);
-    console.log(`Migration ${version} completed`);
-  }
-
-  // ==================== GUILD OPERATIONS ====================
-
-  /**
-   * Create or update a guild
-   */
-  async saveGuild(guild: Guild): Promise<StorageOperationResult> {
-    try {
-      guild.fullClean(); // Validate before saving
-      const data = guild.toDict();
-
-      await this.db.run(`
-        INSERT OR REPLACE INTO guilds 
-        (guild_id, name, settings, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        data.guild_id,
-        data.name,
-        data.settings,
-        data.created_at,
-        data.updated_at
-      ]);
-
-      return { success: true, affectedRows: 1 };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to save guild: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  /**
-   * Get a guild by ID
-   */
-  async getGuild(guildId: string): Promise<Guild | null> {
-    try {
-      const row = await this.db.get(
-        'SELECT * FROM guilds WHERE guild_id = ?',
-        [guildId]
-      );
-
-      return row ? Guild.fromDict(row) : null;
-    } catch (error) {
-      console.error('Failed to get guild:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get all guilds with pagination
-   */
-  async getAllGuilds(options: PaginationOptions = {}): Promise<Guild[]> {
-    try {
-      const { limit = 100, offset = 0, orderBy = 'created_at', orderDirection = 'DESC' } = options;
-      
-      const rows = await this.db.all(`
-        SELECT * FROM guilds 
-        ORDER BY ${orderBy} ${orderDirection}
-        LIMIT ? OFFSET ?
-      `, [limit, offset]);
-
-      return rows.map(row => Guild.fromDict(row));
-    } catch (error) {
-      console.error('Failed to get all guilds:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Delete a guild and all related data
-   */
-  async deleteGuild(guildId: string): Promise<StorageOperationResult> {
-    try {
-      const result = await this.db.run(
-        'DELETE FROM guilds WHERE guild_id = ?',
-        [guildId]
-      );
-
-      return { 
-        success: true, 
-        affectedRows: result.changes 
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to delete guild: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
+    logger.info(`Migration ${version} completed`);
   }
 
   // ==================== EVENT OPERATIONS ====================
@@ -330,33 +316,45 @@ export class SqliteStorage {
    */
   async saveEvent(event: Event): Promise<StorageOperationResult> {
     try {
-      event.fullClean(); // Validate before saving
+      // Validate before saving
+      if (!event.isValid()) {
+        logger.error('Event data is invalid');
+        return { success: false, error: 'Event data is invalid' };
+      }
       const data = event.toDict();
 
-      await this.db.run(`
+      await this.db.run(
+        `
         INSERT OR REPLACE INTO events 
         (message_id, channel_id, guild_id, title, description, interval_minutes, 
-         is_paused, last_reminder, required_reactions, created_at, updated_at)
+         is_paused, last_reminder, users_who_reacted, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        data.message_id,
-        data.channel_id,
-        data.guild_id,
-        data.title,
-        data.description,
-        data.interval_minutes,
-        data.is_paused ? 1 : 0,
-        data.last_reminder,
-        JSON.stringify(data.required_reactions),
-        data.created_at,
-        data.updated_at
-      ]);
+      `,
+        [
+          data.message_id,
+          data.channel_id,
+          data.guild_id,
+          data.title,
+          data.description,
+          data.interval_minutes,
+          data.is_paused ? 1 : 0,
+          data.last_reminder,
+          JSON.stringify(data.users_who_reacted),
+          data.created_at,
+          data.updated_at,
+        ],
+      );
+
+      logger.debug(`Event ${event.messageId} - (${event.title}) saved/updated successfully in DB`);
 
       return { success: true, affectedRows: 1 };
     } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to save event: ${error instanceof Error ? error.message : String(error)}` 
+      logger.error(
+        `Failed to save event: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return {
+        success: false,
+        error: `Failed to save event: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -365,26 +363,28 @@ export class SqliteStorage {
    * Get an event by message ID
    */
   async getEvent(messageId: string): Promise<Event | null> {
+    logger.debug(`Retrieving event with messageId: ${messageId}`);
     try {
-      const row = await this.db.get(
-        'SELECT * FROM events WHERE message_id = ?',
-        [messageId]
-      );
+      const row = await this.db.get('SELECT * FROM events WHERE message_id = ?', [messageId]);
 
-      if (!row) return null;
+      if (!row) {
+        logger.debug(`No event found with messageId: ${messageId}`);
+        return null;
+      }
 
-      // Parse required_reactions JSON
-      if (typeof row.required_reactions === 'string') {
+      // Parse users_who_reacted JSON
+      if (typeof row.users_who_reacted === 'string') {
         try {
-          row.required_reactions = JSON.parse(row.required_reactions);
+          row.users_who_reacted = JSON.parse(row.users_who_reacted);
         } catch {
-          row.required_reactions = ['✅', '❌', '❓'];
+          row.users_who_reacted = [];
         }
       }
 
+      logger.debug(`Event retrieved successfully: ${messageId} - ${row.title}`);
       return Event.fromDict(row);
     } catch (error) {
-      console.error('Failed to get event:', error);
+      logger.error(`Failed to get event ${messageId}:`, error);
       return null;
     }
   }
@@ -393,6 +393,7 @@ export class SqliteStorage {
    * Get events with filters and pagination
    */
   async getEvents(filters: EventFilters = {}, options: PaginationOptions = {}): Promise<Event[]> {
+    logger.debug('Retrieving events with filters:', { filters, options });
     try {
       const { limit = 100, offset = 0, orderBy = 'created_at', orderDirection = 'DESC' } = options;
       const { guildId, channelId, isPaused } = filters;
@@ -425,26 +426,31 @@ export class SqliteStorage {
 
       params.push(limit, offset);
 
-      const rows = await this.db.all(`
+      const rows = await this.db.all(
+        `
         SELECT * FROM events 
         WHERE ${whereClause}
         ORDER BY ${orderBy} ${orderDirection}
         LIMIT ? OFFSET ?
-      `, params);
+      `,
+        params,
+      );
+
+      logger.debug(`Retrieved ${rows.length} events from database`);
 
       return rows.map(row => {
-        // Parse required_reactions JSON
-        if (typeof row.required_reactions === 'string') {
+        // Parse users_who_reacted JSON
+        if (typeof row.users_who_reacted === 'string') {
           try {
-            row.required_reactions = JSON.parse(row.required_reactions);
+            row.users_who_reacted = JSON.parse(row.users_who_reacted);
           } catch {
-            row.required_reactions = ['✅', '❌', '❓'];
+            row.users_who_reacted = [];
           }
         }
         return Event.fromDict(row);
       });
     } catch (error) {
-      console.error('Failed to get events:', error);
+      logger.error('Failed to get events:', error);
       return [];
     }
   }
@@ -453,6 +459,7 @@ export class SqliteStorage {
    * Get events that are due for reminders (optimized query)
    */
   async getDueEvents(guildId?: string): Promise<Event[]> {
+    logger.debug(`Retrieving due events${guildId ? ` for guild: ${guildId}` : ''}`);
     try {
       let sql = `
         SELECT * FROM events 
@@ -470,19 +477,21 @@ export class SqliteStorage {
 
       const rows = await this.db.all(sql, params);
 
+      logger.info(`Found ${rows.length} due events${guildId ? ` for guild ${guildId}` : ''}`);
+
       return rows.map(row => {
-        // Parse required_reactions JSON
-        if (typeof row.required_reactions === 'string') {
+        // Parse users_who_reacted JSON
+        if (typeof row.users_who_reacted === 'string') {
           try {
-            row.required_reactions = JSON.parse(row.required_reactions);
+            row.users_who_reacted = JSON.parse(row.users_who_reacted);
           } catch {
-            row.required_reactions = ['✅', '❌', '❓'];
+            row.users_who_reacted = [];
           }
         }
         return Event.fromDict(row);
       });
     } catch (error) {
-      console.error('Failed to get due events:', error);
+      logger.error('Failed to get due events:', error);
       return [];
     }
   }
@@ -491,21 +500,32 @@ export class SqliteStorage {
    * Update event's last reminder timestamp
    */
   async markReminderSent(messageId: string): Promise<StorageOperationResult> {
+    logger.debug(`Marking reminder as sent for event: ${messageId}`);
     try {
-      const result = await this.db.run(`
+      const result = await this.db.run(
+        `
         UPDATE events 
         SET last_reminder = datetime('now'), updated_at = datetime('now')
         WHERE message_id = ?
-      `, [messageId]);
+      `,
+        [messageId],
+      );
 
-      return { 
-        success: true, 
-        affectedRows: result.changes 
+      if (result.changes > 0) {
+        logger.debug(`Successfully marked reminder as sent for event: ${messageId}`);
+      } else {
+        logger.warn(`No event found to mark reminder as sent: ${messageId}`);
+      }
+
+      return {
+        success: true,
+        affectedRows: result.changes,
       };
     } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to mark reminder sent: ${error instanceof Error ? error.message : String(error)}` 
+      logger.error(`Failed to mark reminder sent for ${messageId}:`, error);
+      return {
+        success: false,
+        error: `Failed to mark reminder sent: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -515,233 +535,22 @@ export class SqliteStorage {
    */
   async deleteEvent(messageId: string): Promise<StorageOperationResult> {
     try {
-      const result = await this.db.run(
-        'DELETE FROM events WHERE message_id = ?',
-        [messageId]
+      const result = await this.db.run('DELETE FROM events WHERE message_id = ?', [messageId]);
+
+      logger.debug(`Event ${messageId} deleted from DB`);
+
+      return {
+        success: true,
+        affectedRows: result.changes,
+      };
+    } catch (error) {
+      logger.error(
+        `Failed to DELETE event: ${error instanceof Error ? error.message : String(error)}`,
       );
-
-      return { 
-        success: true, 
-        affectedRows: result.changes 
+      return {
+        success: false,
+        error: `Failed to delete event: ${error instanceof Error ? error.message : String(error)}`,
       };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to delete event: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  // ==================== USER OPERATIONS ====================
-
-  /**
-   * Create or update a user
-   */
-  async saveUser(user: User): Promise<StorageOperationResult> {
-    try {
-      user.fullClean(); // Validate before saving
-      const data = user.toDict();
-
-      await this.db.run(`
-        INSERT OR REPLACE INTO users 
-        (user_id, guild_id, username, is_bot, last_seen, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        data.user_id,
-        data.guild_id,
-        data.username,
-        data.is_bot ? 1 : 0,
-        data.last_seen,
-        data.created_at,
-        data.updated_at
-      ]);
-
-      return { success: true, affectedRows: 1 };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to save user: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  /**
-   * Get a user by user ID and guild ID
-   */
-  async getUser(userId: string, guildId: string): Promise<User | null> {
-    try {
-      const row = await this.db.get(
-        'SELECT * FROM users WHERE user_id = ? AND guild_id = ?',
-        [userId, guildId]
-      );
-
-      return row ? User.fromDict(row) : null;
-    } catch (error) {
-      console.error('Failed to get user:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get all users in a guild
-   */
-  async getGuildUsers(guildId: string, includeBot: boolean = false): Promise<User[]> {
-    try {
-      let sql = 'SELECT * FROM users WHERE guild_id = ?';
-      const params = [guildId];
-
-      if (!includeBot) {
-        sql += ' AND is_bot = 0';
-      }
-
-      sql += ' ORDER BY username ASC';
-
-      const rows = await this.db.all(sql, params);
-      return rows.map(row => User.fromDict(row));
-    } catch (error) {
-      console.error('Failed to get guild users:', error);
-      return [];
-    }
-  }
-
-  // ==================== REACTION OPERATIONS ====================
-
-  /**
-   * Add or update a user's reaction to an event
-   */
-  async saveReaction(reaction: Reaction): Promise<StorageOperationResult> {
-    try {
-      reaction.fullClean(); // Validate before saving
-      const data = reaction.toDict();
-
-      await this.db.run(`
-        INSERT OR REPLACE INTO reactions 
-        (event_message_id, user_id, emoji, reacted_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [
-        data.event_message_id,
-        data.user_id,
-        data.emoji,
-        data.reacted_at,
-        data.created_at,
-        data.updated_at
-      ]);
-
-      return { success: true, affectedRows: 1 };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to save reaction: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  /**
-   * Remove a user's reaction from an event
-   */
-  async removeReaction(eventMessageId: string, userId: string): Promise<StorageOperationResult> {
-    try {
-      const result = await this.db.run(
-        'DELETE FROM reactions WHERE event_message_id = ? AND user_id = ?',
-        [eventMessageId, userId]
-      );
-
-      return { 
-        success: true, 
-        affectedRows: result.changes 
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to remove reaction: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  /**
-   * Get all reactions for an event
-   */
-  async getEventReactions(eventMessageId: string): Promise<Reaction[]> {
-    try {
-      const rows = await this.db.all(
-        'SELECT * FROM reactions WHERE event_message_id = ? ORDER BY reacted_at ASC',
-        [eventMessageId]
-      );
-
-      return rows.map(row => Reaction.fromDict(row));
-    } catch (error) {
-      console.error('Failed to get event reactions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get users who have reacted to an event
-   */
-  async getEventReactedUsers(eventMessageId: string): Promise<string[]> {
-    try {
-      const rows = await this.db.all(
-        'SELECT DISTINCT user_id FROM reactions WHERE event_message_id = ?',
-        [eventMessageId]
-      );
-
-      return rows.map(row => row.user_id);
-    } catch (error) {
-      console.error('Failed to get event reacted users:', error);
-      return [];
-    }
-  }
-
-  // ==================== REMINDER LOG OPERATIONS ====================
-
-  /**
-   * Save a reminder log entry
-   */
-  async saveReminderLog(reminderLog: ReminderLog): Promise<StorageOperationResult> {
-    try {
-      reminderLog.fullClean(); // Validate before saving
-      const data = reminderLog.toDict();
-
-      await this.db.run(`
-        INSERT INTO reminder_logs 
-        (event_message_id, scheduled_at, sent_at, users_notified, status, error_message, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        data.event_message_id,
-        data.scheduled_at,
-        data.sent_at,
-        data.users_notified,
-        data.status,
-        data.error_message,
-        data.created_at,
-        data.updated_at
-      ]);
-
-      return { success: true, affectedRows: 1 };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: `Failed to save reminder log: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-
-  /**
-   * Get reminder logs for an event
-   */
-  async getEventReminderLogs(eventMessageId: string, limit: number = 50): Promise<ReminderLog[]> {
-    try {
-      const rows = await this.db.all(`
-        SELECT * FROM reminder_logs 
-        WHERE event_message_id = ? 
-        ORDER BY scheduled_at DESC 
-        LIMIT ?
-      `, [eventMessageId, limit]);
-
-      return rows.map(row => ReminderLog.fromDict(row));
-    } catch (error) {
-      console.error('Failed to get event reminder logs:', error);
-      return [];
     }
   }
 
@@ -754,16 +563,12 @@ export class SqliteStorage {
     try {
       const stats: Record<string, any> = {};
 
-      // Table row counts
-      const tables = ['guilds', 'users', 'events', 'reactions', 'reminder_logs'];
-      for (const table of tables) {
-        const result = await this.db.get(`SELECT COUNT(*) as count FROM ${table}`);
-        stats[`${table}_count`] = result?.count || 0;
-      }
+      // Event counts
+      const totalEvents = await this.db.get('SELECT COUNT(*) as count FROM events');
+      stats.total_events_count = totalEvents?.count || 0;
 
-      // Event-specific stats
       const activeEvents = await this.db.get(
-        'SELECT COUNT(*) as count FROM events WHERE is_paused = 0'
+        'SELECT COUNT(*) as count FROM events WHERE is_paused = 0',
       );
       stats.active_events_count = activeEvents?.count || 0;
 
@@ -774,13 +579,9 @@ export class SqliteStorage {
       `);
       stats.due_events_count = dueEvents?.count || 0;
 
-      // Database info
-      const dbInfo = await this.db.getDatabaseInfo();
-      stats.database_info = dbInfo;
-
       return stats;
     } catch (error) {
-      console.error('Failed to get storage stats:', error);
+      logger.error('Failed to get storage stats:', error);
       return {};
     }
   }
@@ -788,7 +589,7 @@ export class SqliteStorage {
   /**
    * Test storage functionality
    */
-  async testStorage(): Promise<{success: boolean, tests: Record<string, boolean>}> {
+  async testStorage(): Promise<{ success: boolean; tests: Record<string, boolean> }> {
     const tests: Record<string, boolean> = {};
     let allPassed = true;
 
@@ -797,21 +598,18 @@ export class SqliteStorage {
       tests.connection = await this.db.isAvailable();
       if (!tests.connection) allPassed = false;
 
-      // Test table existence
-      const tables = ['guilds', 'users', 'events', 'reactions', 'reminder_logs'];
-      for (const table of tables) {
-        try {
-          await this.db.get(`SELECT COUNT(*) FROM ${table}`);
-          tests[`table_${table}`] = true;
-        } catch {
-          tests[`table_${table}`] = false;
-          allPassed = false;
-        }
+      // Test events table existence
+      try {
+        await this.db.get('SELECT COUNT(*) FROM events');
+        tests.table_events = true;
+      } catch {
+        tests.table_events = false;
+        allPassed = false;
       }
 
       return { success: allPassed, tests };
     } catch (error) {
-      console.error('Storage test failed:', error);
+      logger.error('Storage test failed:', error);
       return { success: false, tests };
     }
   }
@@ -829,5 +627,170 @@ export class SqliteStorage {
    */
   isReady(): boolean {
     return this.isInitialized;
+  }
+
+  // ===========================
+  // Guild Configuration Methods
+  // ===========================
+
+  /**
+   * Save or update guild configuration
+   */
+  async saveGuildConfig(config: any): Promise<StorageOperationResult> {
+    try {
+      const sql = `
+        INSERT OR REPLACE INTO guild_configs (
+          guild_id, guild_name, reminder_channel_id, reminder_channel_name,
+          admin_role_ids, admin_role_names, default_interval_minutes,
+          auto_delete_enabled, auto_delete_delay_minutes, delay_between_reminders_ms,
+          max_mentions_per_reminder, use_everyone_above_limit, default_reactions,
+          timezone, created_at, updated_at, last_used_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const params = [
+        config.guildId,
+        config.guildName,
+        config.reminderChannelId,
+        config.reminderChannelName || 'Canal original',
+        JSON.stringify(Array.isArray(config.adminRoleIds) ? config.adminRoleIds : []),
+        JSON.stringify(Array.isArray(config.adminRoleNames) ? config.adminRoleNames : []),
+        config.defaultIntervalMinutes || 60,
+        config.autoDeleteEnabled ? 1 : 0,
+        config.autoDeleteDelayMinutes || 60,
+        config.delayBetweenRemindersMs || 2000,
+        config.maxMentionsPerReminder || 50,
+        config.useEveryoneAboveLimit ? 1 : 0,
+        JSON.stringify(
+          Array.isArray(config.defaultReactions) ? config.defaultReactions : ['✅', '❌', '❓'],
+        ),
+        config.timezone || 'Europe/Paris',
+        config.createdAt?.toISOString() || new Date().toISOString(),
+        config.updatedAt?.toISOString() || new Date().toISOString(),
+        config.lastUsedAt?.toISOString() || new Date().toISOString(),
+      ];
+
+      const result = await this.db.run(sql, params);
+
+      logger.debug(
+        `Guild config ${config.guildId} - (${config.guildName}) saved/updated successfully in DB`,
+      );
+
+      return {
+        success: true,
+        affectedRows: result.changes,
+      };
+    } catch (error) {
+      logger.error('Error saving guild config:', error);
+      logger.error('Guild config data:', config);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get guild configuration by guild ID
+   */
+  async getGuildConfig(guildId: string): Promise<any | null> {
+    try {
+      const sql = 'SELECT * FROM guild_configs WHERE guild_id = ?';
+      const result = await this.db.get(sql, [guildId]);
+
+      if (!result) {
+        return null;
+      }
+
+      // Parse JSON fields
+      return {
+        guildId: result.guild_id,
+        guildName: result.guild_name,
+        reminderChannelId: result.reminder_channel_id,
+        reminderChannelName: result.reminder_channel_name,
+        adminRoleIds: JSON.parse(result.admin_role_ids || '[]'),
+        adminRoleNames: JSON.parse(result.admin_role_names || '[]'),
+        defaultIntervalMinutes: result.default_interval_minutes,
+        autoDeleteEnabled: Boolean(result.auto_delete_enabled),
+        autoDeleteDelayMinutes: result.auto_delete_delay_minutes,
+        delayBetweenRemindersMs: result.delay_between_reminders_ms,
+        maxMentionsPerReminder: result.max_mentions_per_reminder,
+        useEveryoneAboveLimit: Boolean(result.use_everyone_above_limit),
+        defaultReactions: JSON.parse(result.default_reactions || '[]'),
+        timezone: result.timezone,
+        createdAt: new Date(result.created_at),
+        updatedAt: new Date(result.updated_at),
+        lastUsedAt: new Date(result.last_used_at),
+      };
+    } catch (error) {
+      logger.error(`Error getting guild config for ${guildId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete guild configuration
+   */
+  async deleteGuildConfig(guildId: string): Promise<StorageOperationResult> {
+    try {
+      const sql = 'DELETE FROM guild_configs WHERE guild_id = ?';
+      const result = await this.db.run(sql, [guildId]);
+
+      return {
+        success: true,
+        affectedRows: result.changes,
+      };
+    } catch (error) {
+      logger.error(`Error deleting guild config for ${guildId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get all guild configurations (for management purposes)
+   */
+  async getAllGuildConfigs(): Promise<any[]> {
+    try {
+      const sql = 'SELECT * FROM guild_configs ORDER BY last_used_at DESC';
+      const results = await this.db.all(sql);
+
+      return results.map(result => ({
+        guildId: result.guild_id,
+        guildName: result.guild_name,
+        reminderChannelId: result.reminder_channel_id,
+        reminderChannelName: result.reminder_channel_name,
+        adminRoleIds: JSON.parse(result.admin_role_ids || '[]'),
+        adminRoleNames: JSON.parse(result.admin_role_names || '[]'),
+        defaultIntervalMinutes: result.default_interval_minutes,
+        autoDeleteEnabled: Boolean(result.auto_delete_enabled),
+        autoDeleteDelayMinutes: result.auto_delete_delay_minutes,
+        delayBetweenRemindersMs: result.delay_between_reminders_ms,
+        maxMentionsPerReminder: result.max_mentions_per_reminder,
+        useEveryoneAboveLimit: Boolean(result.use_everyone_above_limit),
+        defaultReactions: JSON.parse(result.default_reactions || '[]'),
+        timezone: result.timezone,
+        createdAt: new Date(result.created_at),
+        updatedAt: new Date(result.updated_at),
+        lastUsedAt: new Date(result.last_used_at),
+      }));
+    } catch (error) {
+      logger.error('Error getting all guild configs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update guild config last used timestamp
+   */
+  async touchGuildConfig(guildId: string): Promise<void> {
+    try {
+      const sql = 'UPDATE guild_configs SET last_used_at = ? WHERE guild_id = ?';
+      await this.db.run(sql, [new Date().toISOString(), guildId]);
+    } catch (error) {
+      logger.error(`Error touching guild config ${guildId}:`, error);
+    }
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Enhanced Permission & Security System
- * 
+ *
  * Advanced utilities for checking Discord permissions:
  * - Admin role validation with rate limiting
  * - Channel permission checking with security context
@@ -10,7 +10,14 @@
  * - Security monitoring and reporting
  */
 
-import { GuildMember, GuildChannel, User, PermissionFlagsBits, TextChannel, Guild } from 'discord.js';
+import {
+  GuildMember,
+  GuildChannel,
+  User,
+  PermissionFlagsBits,
+  TextChannel,
+  Guild,
+} from 'discord.js';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
 import { executeWithRetry } from '@/utils/errorRecovery';
@@ -65,27 +72,27 @@ const suspiciousActivityLog = new Map<string, SecurityContext[]>();
 
 // Rate limiting configurations for different actions
 const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
-  'command_execution': {
+  command_execution: {
     maxRequests: 10,
     windowMs: 60000, // 1 minute
     blockDurationMs: 300000, // 5 minutes
   },
-  'event_creation': {
+  event_creation: {
     maxRequests: 5,
     windowMs: 300000, // 5 minutes
     blockDurationMs: 600000, // 10 minutes
   },
-  'event_deletion': {
+  event_deletion: {
     maxRequests: 10,
     windowMs: 60000, // 1 minute
     blockDurationMs: 180000, // 3 minutes
   },
-  'api_access': {
+  api_access: {
     maxRequests: 100,
     windowMs: 3600000, // 1 hour
     blockDurationMs: 1800000, // 30 minutes
   },
-  'list_events': {
+  list_events: {
     maxRequests: 20,
     windowMs: 60000, // 1 minute
     blockDurationMs: 60000, // 1 minute
@@ -98,14 +105,15 @@ const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
 export function checkRateLimit(
   userId: string,
   action: string,
-  config?: RateLimitConfig
+  config?: RateLimitConfig,
 ): { allowed: boolean; retryAfter?: number; isBlocked?: boolean } {
-  const rateLimitConfig = config || RATE_LIMIT_CONFIGS[action] || RATE_LIMIT_CONFIGS['command_execution'];
+  const rateLimitConfig =
+    config || RATE_LIMIT_CONFIGS[action] || RATE_LIMIT_CONFIGS['command_execution'];
   const key = `${userId}:${action}`;
   const now = Date.now();
-  
+
   const entry = rateLimitStore.get(key);
-  
+
   if (!entry) {
     // First request
     rateLimitStore.set(key, {
@@ -115,7 +123,7 @@ export function checkRateLimit(
     });
     return { allowed: true };
   }
-  
+
   // Check if user is currently blocked
   if (entry.resetTime > now && entry.count > rateLimitConfig.maxRequests) {
     const blockEndTime = entry.lastRequest + rateLimitConfig.blockDurationMs;
@@ -128,7 +136,7 @@ export function checkRateLimit(
       };
     }
   }
-  
+
   // Reset window if expired
   if (now >= entry.resetTime) {
     entry.count = 1;
@@ -137,7 +145,7 @@ export function checkRateLimit(
     rateLimitStore.set(key, entry);
     return { allowed: true };
   }
-  
+
   // Check if within rate limit
   if (entry.count < rateLimitConfig.maxRequests) {
     entry.count++;
@@ -145,12 +153,12 @@ export function checkRateLimit(
     rateLimitStore.set(key, entry);
     return { allowed: true };
   }
-  
+
   // Rate limited
   logger.warn(`⚠️ Rate limit exceeded for user ${userId} on action ${action}`);
   entry.lastRequest = now;
   rateLimitStore.set(key, entry);
-  
+
   return {
     allowed: false,
     retryAfter: Math.ceil((entry.resetTime - now) / 1000),
@@ -163,16 +171,16 @@ export function checkRateLimit(
 function logSuspiciousActivity(context: SecurityContext, reason: string): void {
   const key = context.userId;
   const activities = suspiciousActivityLog.get(key) || [];
-  
+
   activities.push({ ...context, action: `${context.action} - ${reason}` });
-  
+
   // Keep only last 100 activities per user
   if (activities.length > 100) {
     activities.splice(0, activities.length - 100);
   }
-  
+
   suspiciousActivityLog.set(key, activities);
-  
+
   logger.warn(`🔍 Suspicious activity detected for ${context.userId}: ${reason}`, {
     userId: context.userId,
     guildId: context.guildId,
@@ -186,11 +194,11 @@ function logSuspiciousActivity(context: SecurityContext, reason: string): void {
  */
 export function validateSecurityContext(context: SecurityContext): PermissionResult {
   const now = Date.now();
-  
+
   // Check for rapid-fire requests (potential bot)
   const recentActivities = suspiciousActivityLog.get(context.userId) || [];
-  const recentCount = recentActivities.filter(a => (now - a.timestamp) < 10000).length; // 10 seconds
-  
+  const recentCount = recentActivities.filter(a => now - a.timestamp < 10000).length; // 10 seconds
+
   if (recentCount > 20) {
     logSuspiciousActivity(context, 'Excessive request frequency');
     return {
@@ -199,18 +207,18 @@ export function validateSecurityContext(context: SecurityContext): PermissionRes
       securityFlags: ['rapid_requests'],
     };
   }
-  
+
   // Check for unusual time patterns (potential automation)
   if (recentActivities.length > 10) {
     const intervals = [];
     for (let i = 1; i < Math.min(recentActivities.length, 10); i++) {
-      intervals.push(recentActivities[i].timestamp - recentActivities[i-1].timestamp);
+      intervals.push(recentActivities[i].timestamp - recentActivities[i - 1].timestamp);
     }
-    
+
     // Check if intervals are suspiciously regular (±100ms)
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     const irregularIntervals = intervals.filter(i => Math.abs(i - avgInterval) > 100).length;
-    
+
     if (irregularIntervals < intervals.length * 0.3) {
       logSuspiciousActivity(context, 'Regular timing pattern detected');
       return {
@@ -220,7 +228,7 @@ export function validateSecurityContext(context: SecurityContext): PermissionRes
       };
     }
   }
-  
+
   return { allowed: true };
 }
 
@@ -230,26 +238,26 @@ export function validateSecurityContext(context: SecurityContext): PermissionRes
 export function cleanupRateLimits(): void {
   const now = Date.now();
   const keysToDelete: string[] = [];
-  
+
   for (const [key, entry] of rateLimitStore.entries()) {
     // Remove entries older than 1 hour
-    if ((now - entry.lastRequest) > 3600000) {
+    if (now - entry.lastRequest > 3600000) {
       keysToDelete.push(key);
     }
   }
-  
+
   keysToDelete.forEach(key => rateLimitStore.delete(key));
-  
+
   // Clean up suspicious activity logs older than 24 hours
   for (const [userId, activities] of suspiciousActivityLog.entries()) {
-    const filtered = activities.filter(a => (now - a.timestamp) < 86400000);
+    const filtered = activities.filter(a => now - a.timestamp < 86400000);
     if (filtered.length === 0) {
       suspiciousActivityLog.delete(userId);
     } else {
       suspiciousActivityLog.set(userId, filtered);
     }
   }
-  
+
   logger.debug(`Cleaned up ${keysToDelete.length} rate limit entries and old activity logs`);
 }
 
@@ -262,7 +270,7 @@ setInterval(cleanupRateLimits, 300000); // Every 5 minutes
 export function checkPermissionSecure(
   member: GuildMember,
   action: string,
-  context?: Partial<SecurityContext>
+  context?: Partial<SecurityContext>,
 ): PermissionResult {
   const securityContext: SecurityContext = {
     userId: member.id,
@@ -273,13 +281,13 @@ export function checkPermissionSecure(
     ipAddress: context?.ipAddress,
     userAgent: context?.userAgent,
   };
-  
+
   // Security validation
   const securityResult = validateSecurityContext(securityContext);
   if (!securityResult.allowed) {
     return securityResult;
   }
-  
+
   // Rate limiting
   const rateLimitResult = checkRateLimit(member.id, action);
   if (!rateLimitResult.allowed) {
@@ -290,7 +298,7 @@ export function checkPermissionSecure(
       retryAfter: rateLimitResult.retryAfter,
     };
   }
-  
+
   // Permission check
   const hasPermission = hasAdminRole(member);
   if (!hasPermission) {
@@ -301,7 +309,7 @@ export function checkPermissionSecure(
       reason: `Insufficient permissions for action: ${action}`,
     };
   }
-  
+
   return { allowed: true };
 }
 
@@ -311,16 +319,14 @@ export function checkPermissionSecure(
 export function hasAdminRole(member: GuildMember): boolean {
   try {
     const adminRoles = Settings.ADMIN_ROLES;
-    
+
     if (!adminRoles || adminRoles.length === 0) {
       // If no admin roles configured, check for Administrator permission
       return member.permissions.has(PermissionFlagsBits.Administrator);
     }
 
     // Check if user has any of the configured admin roles
-    const hasRole = member.roles.cache.some(role => 
-      adminRoles.includes(role.name)
-    );
+    const hasRole = member.roles.cache.some(role => adminRoles.includes(role.name));
 
     if (hasRole) {
       return true;
@@ -330,6 +336,35 @@ export function hasAdminRole(member: GuildMember): boolean {
     return member.permissions.has(PermissionFlagsBits.Administrator);
   } catch (error) {
     logger.error(`Error checking admin role for ${member.user.tag}: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Check if a guild member has admin role based on guild-specific admin roles
+ */
+export function hasGuildAdminRole(member: GuildMember, guildAdminRoles?: string[]): boolean {
+  try {
+    // If no guild-specific roles provided, use global settings
+    const adminRoles =
+      guildAdminRoles && guildAdminRoles.length > 0 ? guildAdminRoles : Settings.ADMIN_ROLES;
+
+    if (!adminRoles || adminRoles.length === 0) {
+      // If no admin roles configured, check for Administrator permission
+      return member.permissions.has(PermissionFlagsBits.Administrator);
+    }
+
+    // Check if user has any of the configured admin roles
+    const hasRole = member.roles.cache.some(role => adminRoles.includes(role.name));
+
+    if (hasRole) {
+      return true;
+    }
+
+    // Fallback to checking Administrator permission
+    return member.permissions.has(PermissionFlagsBits.Administrator);
+  } catch (error) {
+    logger.error(`Error checking guild admin role for ${member.user.tag}: ${error}`);
     return false;
   }
 }
@@ -377,14 +412,10 @@ export function validatePermissions(channel: GuildChannel, user: User): boolean 
       PermissionFlagsBits.ReadMessageHistory,
     ];
 
-    const hasAllPermissions = requiredPermissions.every(perm => 
-      permissions.has(perm)
-    );
+    const hasAllPermissions = requiredPermissions.every(perm => permissions.has(perm));
 
     if (!hasAllPermissions) {
-      const missingPerms = requiredPermissions.filter(perm => 
-        !permissions.has(perm)
-      );
+      const missingPerms = requiredPermissions.filter(perm => !permissions.has(perm));
       logger.warn(`Missing permissions in ${channel.name}: ${missingPerms.join(', ')}`);
     }
 
@@ -412,7 +443,7 @@ export function canManageEvents(member: GuildMember): boolean {
 /**
  * Check if a member can view event lists
  */
-export function canViewEvents(member: GuildMember): boolean {
+export function canViewEvents(): boolean {
   // For now, anyone can view events in their server
   // This could be restricted to admin roles if needed
   return true;
@@ -421,7 +452,10 @@ export function canViewEvents(member: GuildMember): boolean {
 /**
  * Get permission info for a member in a specific channel
  */
-export function getPermissionInfo(member: GuildMember, channel?: GuildChannel): {
+export function getPermissionInfo(
+  member: GuildMember,
+  channel?: GuildChannel,
+): {
   isAdmin: boolean;
   canManageEvents: boolean;
   canViewEvents: boolean;
@@ -456,26 +490,29 @@ export function getPermissionInfo(member: GuildMember, channel?: GuildChannel): 
  */
 export function validateMultiServerIsolation(
   member: GuildMember,
-  targetGuildId?: string
+  targetGuildId?: string,
 ): PermissionResult {
   // Ensure user can only access data from their own guild
   if (targetGuildId && member.guild.id !== targetGuildId) {
     logger.warn(`🚫 Cross-guild access attempt by ${member.user.tag} to guild ${targetGuildId}`);
-    logSuspiciousActivity({
-      userId: member.id,
-      guildId: member.guild.id,
-      channelId: '',
-      action: 'cross_guild_access',
-      timestamp: Date.now(),
-    }, `Attempted to access guild ${targetGuildId}`);
-    
+    logSuspiciousActivity(
+      {
+        userId: member.id,
+        guildId: member.guild.id,
+        channelId: '',
+        action: 'cross_guild_access',
+        timestamp: Date.now(),
+      },
+      `Attempted to access guild ${targetGuildId}`,
+    );
+
     return {
       allowed: false,
       reason: 'Cross-guild access denied',
       securityFlags: ['cross_guild_access'],
     };
   }
-  
+
   return { allowed: true };
 }
 
@@ -484,21 +521,21 @@ export function validateMultiServerIsolation(
  */
 export async function validateBotPermissionsSecure(
   guild: Guild,
-  requiredPermissions?: bigint[]
+  requiredPermissions?: bigint[],
 ): Promise<PermissionResult> {
   try {
     const botMember = await executeWithRetry(
       () => guild.members.fetch(guild.client.user!.id),
-      'api_call'
+      'api_call',
     );
-    
+
     if (!botMember) {
       return {
         allowed: false,
         reason: 'Bot not found in guild',
       };
     }
-    
+
     const permissions = requiredPermissions || [
       PermissionFlagsBits.ViewChannel,
       PermissionFlagsBits.SendMessages,
@@ -506,15 +543,15 @@ export async function validateBotPermissionsSecure(
       PermissionFlagsBits.ReadMessageHistory,
       PermissionFlagsBits.AddReactions,
     ];
-    
+
     const missingPermissions: string[] = [];
-    
+
     for (const permission of permissions) {
       if (!botMember.permissions.has(permission)) {
         missingPermissions.push(formatPermissionName(permission));
       }
     }
-    
+
     if (missingPermissions.length > 0) {
       logger.error(`🚫 Bot missing permissions in ${guild.name}: ${missingPermissions.join(', ')}`);
       return {
@@ -522,9 +559,8 @@ export async function validateBotPermissionsSecure(
         reason: `Missing permissions: ${missingPermissions.join(', ')}`,
       };
     }
-    
+
     return { allowed: true };
-    
   } catch (error) {
     logger.error(`Error validating bot permissions in ${guild.name}: ${error}`);
     return {
@@ -551,7 +587,7 @@ export function validateBotGuildPermissions(member: GuildMember): {
   ];
 
   const missingPermissions: string[] = [];
-  
+
   for (const permission of requiredPermissions) {
     if (!member.permissions.has(permission)) {
       missingPermissions.push(permission.toString());
@@ -589,12 +625,12 @@ export function formatPermissionName(permission: bigint): string {
  */
 export function generatePermissionReport(member: GuildMember, channel?: GuildChannel): string {
   const report = [];
-  
+
   report.push(`Permission Report for ${member.user.tag}:`);
   report.push(`- Is Admin: ${hasAdminRole(member)}`);
   report.push(`- Can Manage Events: ${canManageEvents(member)}`);
   report.push(`- Can View Events: ${canViewEvents(member)}`);
-  
+
   if (channel) {
     report.push(`\nChannel Permissions (${channel.name}):`);
     const permissions = getPermissionInfo(member, channel).channelPermissions;
@@ -605,10 +641,10 @@ export function generatePermissionReport(member: GuildMember, channel?: GuildCha
       report.push(`- Can Read History: ${permissions.canReadHistory}`);
     }
   }
-  
+
   report.push(`\nAdmin Roles Configured: ${Settings.ADMIN_ROLES.join(', ')}`);
   report.push(`User Roles: ${member.roles.cache.map(r => r.name).join(', ')}`);
-  
+
   return report.join('\n');
 }
 
@@ -622,31 +658,32 @@ export function getSecurityStats(): {
   topSuspiciousUsers: Array<{ userId: string; activityCount: number }>;
 } {
   const now = Date.now();
-  
+
   // Count blocked users
   let blockedUsers = 0;
   for (const [key, entry] of rateLimitStore.entries()) {
-    if (entry.count > 10 && entry.resetTime > now) { // Assuming blocked if exceeded limit
+    if (entry.count > 10 && entry.resetTime > now) {
+      // Assuming blocked if exceeded limit
       blockedUsers++;
     }
   }
-  
+
   // Count recent suspicious activities
   let suspiciousActivities = 0;
   const userActivityCounts: Record<string, number> = {};
-  
+
   for (const [userId, activities] of suspiciousActivityLog.entries()) {
-    const recentActivities = activities.filter(a => (now - a.timestamp) < 86400000); // Last 24h
+    const recentActivities = activities.filter(a => now - a.timestamp < 86400000); // Last 24h
     suspiciousActivities += recentActivities.length;
     userActivityCounts[userId] = recentActivities.length;
   }
-  
+
   const topSuspiciousUsers = Object.entries(userActivityCounts)
     .filter(([_, count]) => count > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(([userId, activityCount]) => ({ userId, activityCount }));
-  
+
   return {
     rateLimitEntries: rateLimitStore.size,
     blockedUsers,
@@ -660,7 +697,7 @@ export function getSecurityStats(): {
  */
 export function generateSecurityReport(): string {
   const stats = getSecurityStats();
-  
+
   const report = [
     '=== Security & Permissions Report ===',
     `Rate Limit Entries: ${stats.rateLimitEntries}`,
@@ -668,7 +705,7 @@ export function generateSecurityReport(): string {
     `Suspicious Activities (24h): ${stats.suspiciousActivities}`,
     '',
   ];
-  
+
   if (stats.topSuspiciousUsers.length > 0) {
     report.push('🔍 Top Suspicious Users:');
     stats.topSuspiciousUsers.forEach(({ userId, activityCount }, index) => {
@@ -676,13 +713,15 @@ export function generateSecurityReport(): string {
     });
     report.push('');
   }
-  
+
   // Add rate limit configurations
   report.push('⚙️ Rate Limit Configurations:');
   Object.entries(RATE_LIMIT_CONFIGS).forEach(([action, config]) => {
-    report.push(`  ${action}: ${config.maxRequests} requests/${Math.floor(config.windowMs/1000)}s`);
+    report.push(
+      `  ${action}: ${config.maxRequests} requests/${Math.floor(config.windowMs / 1000)}s`,
+    );
   });
-  
+
   return report.join('\n');
 }
 
@@ -701,7 +740,9 @@ export async function validateBotSetup(member: GuildMember): Promise<{
     // Check basic guild permissions
     const guildPerms = validateBotGuildPermissions(member);
     if (!guildPerms.valid) {
-      issues.push(`Missing guild permissions: ${guildPerms.missing.map(formatPermissionName).join(', ')}`);
+      issues.push(
+        `Missing guild permissions: ${guildPerms.missing.map(formatPermissionName).join(', ')}`,
+      );
     }
 
     // Check admin role configuration
@@ -712,7 +753,7 @@ export async function validateBotSetup(member: GuildMember): Promise<{
       const configuredRoles = Settings.ADMIN_ROLES;
       const existingRoles = guild.roles.cache.map(r => r.name);
       const missingRoles = configuredRoles.filter(role => !existingRoles.includes(role));
-      
+
       if (missingRoles.length > 0) {
         warnings.push(`Configured admin roles not found in server: ${missingRoles.join(', ')}`);
       }
@@ -730,7 +771,9 @@ export async function validateBotSetup(member: GuildMember): Promise<{
     }
 
     if (securityStats.suspiciousActivities > 50) {
-      warnings.push(`High suspicious activity: ${securityStats.suspiciousActivities} activities in 24h`);
+      warnings.push(
+        `High suspicious activity: ${securityStats.suspiciousActivities} activities in 24h`,
+      );
     }
 
     return {

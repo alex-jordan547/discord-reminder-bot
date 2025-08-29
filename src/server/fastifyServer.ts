@@ -1,6 +1,6 @@
 /**
  * Discord Reminder Bot - Enhanced Fastify Server with Advanced Monitoring
- * 
+ *
  * Comprehensive server for:
  * - Health check endpoints with detailed metrics
  * - Bot status monitoring with error recovery info
@@ -13,17 +13,14 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
-import { 
-  getErrorStats, 
-  getCircuitBreakerStatuses, 
+import { DiscordBotClient } from '@/types/BotClient';
+import {
+  getErrorStats,
+  getCircuitBreakerStatuses,
   getErrorRecoveryHealth,
-  generateErrorReport 
+  generateErrorReport,
 } from '@/utils/errorRecovery';
-import { 
-  getSecurityStats, 
-  generateSecurityReport,
-  cleanupRateLimits 
-} from '@/utils/permissions';
+import { getSecurityStats, generateSecurityReport, cleanupRateLimits } from '@/utils/permissions';
 
 const logger = createLogger('server');
 
@@ -187,7 +184,7 @@ export async function createServer(): Promise<FastifyInstance> {
   fastify.addHook('onResponse', async (request, reply) => {
     const responseTime = Date.now() - (request as any).startTime;
     totalResponseTime += responseTime;
-    
+
     // Log to recent activity
     if (recentActivity.length >= 100) {
       recentActivity.shift();
@@ -197,7 +194,7 @@ export async function createServer(): Promise<FastifyInstance> {
       type: reply.statusCode >= 400 ? 'error' : 'request',
       message: `${request.method} ${request.url} - ${reply.statusCode} (${responseTime}ms)`,
     });
-    
+
     if (reply.statusCode >= 400) {
       errorCount++;
     }
@@ -206,27 +203,94 @@ export async function createServer(): Promise<FastifyInstance> {
   /**
    * Basic health check endpoint
    */
-  fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply): Promise<HealthResponse> => {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      version: '2.0.0',
-      nodeVersion: process.version,
-    };
-  });
+  fastify.get(
+    '/health',
+    async (request: FastifyRequest, reply: FastifyReply): Promise<HealthResponse> => {
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: '2.0.0',
+        nodeVersion: process.version,
+      };
+    },
+  );
 
   /**
    * Detailed bot status endpoint with enhanced monitoring
    */
-  fastify.get('/health/bot', async (request: FastifyRequest, reply: FastifyReply): Promise<BotStatusResponse> => {
-    try {
-      // Access bot client from global context (set by main application)
-      const client = (global as any).discordClient;
-      
-      if (!client) {
-        reply.code(503);
+  fastify.get(
+    '/health/bot',
+    async (request: FastifyRequest, reply: FastifyReply): Promise<BotStatusResponse> => {
+      try {
+        // Access bot client from global context (set by main application)
+        const client = (global as any).discordClient;
+
+        if (!client) {
+          reply.code(503);
+          return {
+            status: 'error',
+            connected: false,
+            guilds: 0,
+            events: 0,
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            scheduler: {
+              status: 'disconnected',
+              nextCheck: null,
+            },
+            errorRecovery: {
+              healthy: false,
+              stats: {},
+              circuitBreakers: [],
+            },
+            security: {
+              rateLimitEntries: 0,
+              blockedUsers: 0,
+              suspiciousActivities: 0,
+            },
+          };
+        }
+
+        // Get event manager and scheduler status
+        const eventManager = client.eventManager;
+        const reminderScheduler = client.reminderScheduler;
+
+        const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
+        const schedulerStatus = reminderScheduler
+          ? reminderScheduler.getStatus()
+          : { status: 'unknown', nextCheck: null };
+
+        // Get error recovery and security stats
+        const errorRecoveryHealth = getErrorRecoveryHealth();
+        const securityStats = getSecurityStats();
+
+        return {
+          status: 'ok',
+          connected: client.isReady(),
+          guilds: client.guilds.cache.size,
+          events: totalEvents,
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          scheduler: {
+            status: schedulerStatus.status,
+            nextCheck: schedulerStatus.nextCheck ? schedulerStatus.nextCheck.toISOString() : null,
+          },
+          errorRecovery: {
+            healthy: errorRecoveryHealth.healthy,
+            stats: errorRecoveryHealth.stats,
+            circuitBreakers: errorRecoveryHealth.circuitBreakers,
+          },
+          security: {
+            rateLimitEntries: securityStats.rateLimitEntries,
+            blockedUsers: securityStats.blockedUsers,
+            suspiciousActivities: securityStats.suspiciousActivities,
+          },
+        };
+      } catch (error) {
+        logger.error(`Error in bot health check: ${error}`);
+        reply.code(500);
         return {
           status: 'error',
           connected: false,
@@ -235,72 +299,13 @@ export async function createServer(): Promise<FastifyInstance> {
           uptime: process.uptime(),
           memory: process.memoryUsage(),
           scheduler: {
-            status: 'disconnected',
+            status: 'error',
             nextCheck: null,
-          },
-          errorRecovery: {
-            healthy: false,
-            stats: {},
-            circuitBreakers: [],
-          },
-          security: {
-            rateLimitEntries: 0,
-            blockedUsers: 0,
-            suspiciousActivities: 0,
           },
         };
       }
-
-      // Get event manager and scheduler status
-      const eventManager = (client as any).eventManager;
-      const reminderScheduler = (client as any).reminderScheduler;
-      
-      const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
-      const schedulerStatus = reminderScheduler ? reminderScheduler.getStatus() : { status: 'unknown', nextCheck: null };
-      
-      // Get error recovery and security stats
-      const errorRecoveryHealth = getErrorRecoveryHealth();
-      const securityStats = getSecurityStats();
-
-      return {
-        status: 'ok',
-        connected: client.isReady(),
-        guilds: client.guilds.cache.size,
-        events: totalEvents,
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        scheduler: {
-          status: schedulerStatus.status,
-          nextCheck: schedulerStatus.nextCheck ? schedulerStatus.nextCheck.toISOString() : null,
-        },
-        errorRecovery: {
-          healthy: errorRecoveryHealth.healthy,
-          stats: errorRecoveryHealth.stats,
-          circuitBreakers: errorRecoveryHealth.circuitBreakers,
-        },
-        security: {
-          rateLimitEntries: securityStats.rateLimitEntries,
-          blockedUsers: securityStats.blockedUsers,
-          suspiciousActivities: securityStats.suspiciousActivities,
-        },
-      };
-    } catch (error) {
-      logger.error(`Error in bot health check: ${error}`);
-      reply.code(500);
-      return {
-        status: 'error',
-        connected: false,
-        guilds: 0,
-        events: 0,
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        scheduler: {
-          status: 'error',
-          nextCheck: null,
-        },
-      };
-    }
-  });
+    },
+  );
 
   /**
    * Bot statistics endpoint (requires auth in production)
@@ -311,7 +316,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -324,9 +329,9 @@ export async function createServer(): Promise<FastifyInstance> {
         return { error: 'Bot not connected' };
       }
 
-      const eventManager = (client as any).eventManager;
+      const eventManager = client.eventManager;
       const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
-      
+
       // Gather guild statistics
       const guilds = Array.from(client.guilds.cache.values()).map(guild => ({
         id: guild.id,
@@ -367,7 +372,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -377,17 +382,17 @@ export async function createServer(): Promise<FastifyInstance> {
       const client = (global as any).discordClient;
       const eventManager = client?.eventManager;
       const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
-      
+
       // Calculate performance metrics
       const avgResponseTime = requestCount > 0 ? totalResponseTime / requestCount : 0;
       const requestsPerMinute = requestCount;
       const errorsPerMinute = errorCount;
-      
+
       // Get system metrics
       const cpuUsage = process.cpuUsage();
       const errorRecoveryHealth = getErrorRecoveryHealth();
       const securityStats = getSecurityStats();
-      
+
       const metrics: MonitoringMetrics = {
         system: {
           uptime: process.uptime(),
@@ -406,13 +411,22 @@ export async function createServer(): Promise<FastifyInstance> {
         errorRecovery: {
           healthy: errorRecoveryHealth.healthy,
           totalCalls: errorRecoveryHealth.stats.totalCalls,
-          successRate: errorRecoveryHealth.stats.totalCalls > 0 ? 
-            (errorRecoveryHealth.stats.successfulCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 100,
-          failureRate: errorRecoveryHealth.stats.totalCalls > 0 ?
-            (errorRecoveryHealth.stats.failedCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 0,
-          retryRate: errorRecoveryHealth.stats.totalCalls > 0 ?
-            (errorRecoveryHealth.stats.retriedCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 0,
-          circuitBreakersOpen: errorRecoveryHealth.circuitBreakers.filter(cb => cb.state === 'open').length,
+          successRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.successfulCalls / errorRecoveryHealth.stats.totalCalls) *
+                100
+              : 100,
+          failureRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.failedCalls / errorRecoveryHealth.stats.totalCalls) * 100
+              : 0,
+          retryRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.retriedCalls / errorRecoveryHealth.stats.totalCalls) *
+                100
+              : 0,
+          circuitBreakersOpen: errorRecoveryHealth.circuitBreakers.filter(cb => cb.state === 'open')
+            .length,
         },
         security: {
           rateLimitEntries: securityStats.rateLimitEntries,
@@ -444,7 +458,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -454,33 +468,33 @@ export async function createServer(): Promise<FastifyInstance> {
       const client = (global as any).discordClient;
       const eventManager = client?.eventManager;
       const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
-      
+
       const errorRecoveryHealth = getErrorRecoveryHealth();
       const securityStats = getSecurityStats();
-      
+
       // Determine overall system status
       let status: 'healthy' | 'warning' | 'critical' = 'healthy';
       const issues: string[] = [];
-      
+
       if (!client?.isReady()) {
         status = 'critical';
         issues.push('Discord bot is not connected');
       }
-      
+
       if (!errorRecoveryHealth.healthy) {
         status = status === 'critical' ? 'critical' : 'warning';
         issues.push(...errorRecoveryHealth.issues);
       }
-      
+
       if (securityStats.blockedUsers > 5) {
         status = status === 'critical' ? 'critical' : 'warning';
         issues.push(`High number of blocked users: ${securityStats.blockedUsers}`);
       }
-      
+
       // Get metrics
       const avgResponseTime = requestCount > 0 ? totalResponseTime / requestCount : 0;
       const cpuUsage = process.cpuUsage();
-      
+
       const metrics: MonitoringMetrics = {
         system: {
           uptime: process.uptime(),
@@ -499,13 +513,22 @@ export async function createServer(): Promise<FastifyInstance> {
         errorRecovery: {
           healthy: errorRecoveryHealth.healthy,
           totalCalls: errorRecoveryHealth.stats.totalCalls,
-          successRate: errorRecoveryHealth.stats.totalCalls > 0 ? 
-            (errorRecoveryHealth.stats.successfulCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 100,
-          failureRate: errorRecoveryHealth.stats.totalCalls > 0 ?
-            (errorRecoveryHealth.stats.failedCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 0,
-          retryRate: errorRecoveryHealth.stats.totalCalls > 0 ?
-            (errorRecoveryHealth.stats.retriedCalls / errorRecoveryHealth.stats.totalCalls) * 100 : 0,
-          circuitBreakersOpen: errorRecoveryHealth.circuitBreakers.filter(cb => cb.state === 'open').length,
+          successRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.successfulCalls / errorRecoveryHealth.stats.totalCalls) *
+                100
+              : 100,
+          failureRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.failedCalls / errorRecoveryHealth.stats.totalCalls) * 100
+              : 0,
+          retryRate:
+            errorRecoveryHealth.stats.totalCalls > 0
+              ? (errorRecoveryHealth.stats.retriedCalls / errorRecoveryHealth.stats.totalCalls) *
+                100
+              : 0,
+          circuitBreakersOpen: errorRecoveryHealth.circuitBreakers.filter(cb => cb.state === 'open')
+            .length,
         },
         security: {
           rateLimitEntries: securityStats.rateLimitEntries,
@@ -519,10 +542,10 @@ export async function createServer(): Promise<FastifyInstance> {
           errorsPerMinute: errorCount,
         },
       };
-      
+
       // Generate alerts
       const alerts = [];
-      
+
       if (errorRecoveryHealth.circuitBreakers.some(cb => cb.state === 'open')) {
         alerts.push({
           level: 'error' as const,
@@ -531,7 +554,7 @@ export async function createServer(): Promise<FastifyInstance> {
           component: 'error-recovery',
         });
       }
-      
+
       if (securityStats.suspiciousActivities > 20) {
         alerts.push({
           level: 'warning' as const,
@@ -540,8 +563,9 @@ export async function createServer(): Promise<FastifyInstance> {
           component: 'security',
         });
       }
-      
-      if (process.memoryUsage().heapUsed > 500 * 1024 * 1024) { // 500MB
+
+      if (process.memoryUsage().heapUsed > 500 * 1024 * 1024) {
+        // 500MB
         alerts.push({
           level: 'warning' as const,
           message: 'High memory usage detected',
@@ -549,7 +573,7 @@ export async function createServer(): Promise<FastifyInstance> {
           component: 'system',
         });
       }
-      
+
       const dashboardData: DashboardData = {
         overview: {
           status,
@@ -562,9 +586,8 @@ export async function createServer(): Promise<FastifyInstance> {
         alerts,
         recentActivity: recentActivity.slice(-20), // Last 20 activities
       };
-      
+
       return dashboardData;
-      
     } catch (error) {
       logger.error(`Error in dashboard endpoint: ${error}`);
       reply.code(500);
@@ -581,7 +604,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -609,7 +632,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -637,7 +660,7 @@ export async function createServer(): Promise<FastifyInstance> {
       if (Settings.NODE_ENV === 'production') {
         const authHeader = request.headers.authorization;
         const expectedToken = Settings.API_TOKEN;
-        
+
         if (!authHeader || !expectedToken || authHeader !== `Bearer ${expectedToken}`) {
           reply.code(401);
           return { error: 'Unauthorized' };
@@ -646,7 +669,7 @@ export async function createServer(): Promise<FastifyInstance> {
 
       // Trigger cleanup operations
       cleanupRateLimits();
-      
+
       return {
         success: true,
         message: 'Cleanup operations completed',
@@ -695,14 +718,14 @@ export async function createServer(): Promise<FastifyInstance> {
       message: 'The requested endpoint does not exist',
       availableEndpoints: [
         '/health',
-        '/health/bot', 
+        '/health/bot',
         '/api',
         '/api/stats',
         '/api/metrics',
         '/api/dashboard',
         '/api/reports/errors',
         '/api/reports/security',
-        '/api/maintenance/cleanup'
+        '/api/maintenance/cleanup',
       ],
     };
   });
@@ -712,7 +735,7 @@ export async function createServer(): Promise<FastifyInstance> {
    */
   fastify.setErrorHandler(async (error, request, reply) => {
     logger.error(`Server error on ${request.method} ${request.url}: ${error.message}`);
-    
+
     reply.code(error.statusCode || 500);
     return {
       error: error.name || 'Internal Server Error',
@@ -729,7 +752,7 @@ export async function createServer(): Promise<FastifyInstance> {
       logger.error(`Error during periodic cleanup: ${error}`);
     }
   }, 300000); // Every 5 minutes
-  
+
   logger.info('Fastify server configured successfully with advanced monitoring');
   return fastify;
 }
@@ -737,7 +760,7 @@ export async function createServer(): Promise<FastifyInstance> {
 /**
  * Helper function to set the Discord client reference for health checks
  */
-export function setDiscordClientReference(client: any): void {
+export function setDiscordClientReference(client: DiscordBotClient): void {
   (global as any).discordClient = client;
   logger.info('Discord client reference set for server health checks');
 }
@@ -749,7 +772,7 @@ function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / (24 * 3600));
   const hours = Math.floor((seconds % (24 * 3600)) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  
+
   if (days > 0) {
     return `${days}d ${hours}h ${minutes}m`;
   } else if (hours > 0) {

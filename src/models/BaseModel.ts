@@ -1,6 +1,6 @@
 /**
  * Base model class and validation utilities
- * 
+ *
  * Provides common functionality for all models including validation,
  * serialization, and timestamp management.
  */
@@ -33,13 +33,15 @@ export interface BaseModelData {
  * Base model class that provides common functionality for all models
  * Includes automatic timestamps, validation, and serialization capabilities
  */
-export abstract class BaseModel implements SerializableModel {
+export abstract class BaseModel<T = any> implements SerializableModel {
   public readonly createdAt: Date;
   public updatedAt: Date;
+  protected data: T;
 
-  constructor(data: BaseModelData) {
+  constructor(data: T & BaseModelData) {
     this.createdAt = new Date(data.createdAt || Date.now());
     this.updatedAt = new Date(data.updatedAt || Date.now());
+    this.data = data;
   }
 
   /**
@@ -63,7 +65,7 @@ export abstract class BaseModel implements SerializableModel {
   fullClean(): void {
     // Run custom cleaning logic
     this.clean();
-    
+
     // Run validation and throw if errors exist
     const errors = this.validate();
     if (errors.length > 0) {
@@ -87,10 +89,12 @@ export function validateDiscordId(id: string, fieldName: string = 'id'): ModelVa
     DiscordIdSchema.parse(id);
     return [];
   } catch {
-    return [{
-      field: fieldName,
-      message: 'Must be a valid Discord ID (17-19 digits)'
-    }];
+    return [
+      {
+        field: fieldName,
+        message: 'Must be a valid Discord ID (17-19 digits)',
+      },
+    ];
   }
 }
 
@@ -99,53 +103,69 @@ export function validateEmoji(emoji: string, fieldName: string = 'emoji'): Model
     EmojiSchema.parse(emoji);
     return [];
   } catch {
-    return [{
-      field: fieldName,
-      message: 'Must be a valid emoji (1-10 characters)'
-    }];
+    return [
+      {
+        field: fieldName,
+        message: 'Must be a valid emoji (1-10 characters)',
+      },
+    ];
   }
 }
 
-export function validateInterval(minutes: number, fieldName: string = 'intervalMinutes'): ModelValidationError[] {
+export function validateInterval(
+  minutes: number,
+  fieldName: string = 'intervalMinutes',
+): ModelValidationError[] {
   try {
     IntervalSchema.parse(minutes);
     return [];
   } catch {
-    return [{
-      field: fieldName,
-      message: 'Must be between 1 minute and 10080 minutes (1 week)'
-    }];
+    return [
+      {
+        field: fieldName,
+        message: 'Must be between 1 minute and 10080 minutes (1 week)',
+      },
+    ];
   }
 }
 
-export function validateJsonString(jsonStr: string, fieldName: string = 'jsonField'): ModelValidationError[] {
+export function validateJsonString(
+  jsonStr: string,
+  fieldName: string = 'jsonField',
+): ModelValidationError[] {
   try {
     JSON.parse(jsonStr);
     return [];
   } catch {
-    return [{
-      field: fieldName,
-      message: 'Must be valid JSON'
-    }];
+    return [
+      {
+        field: fieldName,
+        message: 'Must be valid JSON',
+      },
+    ];
   }
 }
 
-export function validateNonEmptyString(value: string, fieldName: string, maxLength?: number): ModelValidationError[] {
+export function validateNonEmptyString(
+  value: string,
+  fieldName: string,
+  maxLength?: number,
+): ModelValidationError[] {
   const errors: ModelValidationError[] = [];
-  
+
   if (!value || value.trim().length === 0) {
     errors.push({
       field: fieldName,
-      message: 'Cannot be empty'
+      message: 'Cannot be empty',
     });
   }
-  
+
   if (maxLength && value.length > maxLength) {
     errors.push({
       field: fieldName,
-      message: `Cannot exceed ${maxLength} characters`
+      message: `Cannot exceed ${maxLength} characters`,
     });
   }
-  
+
   return errors;
 }

@@ -1,10 +1,17 @@
 /**
  * Guild model for Discord Reminder Bot
- * 
+ *
  * Represents a Discord guild (server) with settings and metadata
  */
 
-import { BaseModel, type BaseModelData, type ModelValidationError, validateDiscordId, validateNonEmptyString, validateJsonString } from './BaseModel.js';
+import {
+  BaseModel,
+  type BaseModelData,
+  type ModelValidationError,
+  validateDiscordId,
+  validateNonEmptyString,
+  validateJsonString,
+} from './BaseModel.js';
 
 export interface GuildData extends BaseModelData {
   guildId: string;
@@ -33,7 +40,7 @@ export class Guild extends BaseModel {
    */
   static fromDict(data: Record<string, any>): Guild {
     let settings = {};
-    
+
     // Handle settings that might be JSON string or object
     if (typeof data.settings === 'string') {
       try {
@@ -141,7 +148,7 @@ export class Guild extends BaseModel {
     } catch {
       errors.push({
         field: 'settings',
-        message: 'Settings must be serializable to JSON'
+        message: 'Settings must be serializable to JSON',
       });
     }
 

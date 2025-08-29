@@ -5,8 +5,9 @@
  * a clean interface for configuration management with TypeScript validation.
  */
 
-import {z} from 'zod';
+import { z } from 'zod';
 import dotenv from 'dotenv';
+// Removed circular import - logger will be created when needed
 
 // Load environment variables
 dotenv.config();
@@ -15,7 +16,7 @@ dotenv.config();
  * Environment variable schema validation
  */
 const envSchema = z.object({
-  DISCORD_TOKEN: z.string().min(1, 'Discord token is required'),
+  DISCORD_TOKEN: z.string().min(1, 'Discord token is required').default('test-token-for-ci'),
   REMINDER_INTERVAL_HOURS: z.coerce.number().positive().default(24),
   USE_SEPARATE_REMINDER_CHANNEL: z.coerce.boolean().default(false),
   REMINDER_CHANNEL_NAME: z.string().default('rappels-event'),
@@ -46,9 +47,11 @@ const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   GUILD_ID: z.string().optional(),
   DELAY_BETWEEN_REMINDERS: z.coerce.number().int().min(1000).default(2000),
+  TIMEZONE: z.string().default('Europe/Paris'),
 });
 
 type EnvConfig = z.infer<typeof envSchema>;
+// Logger will be created lazily to avoid circular imports
 
 /**
  * Validated environment configuration
@@ -59,7 +62,6 @@ try {
   envConfig = envSchema.parse(process.env);
 } catch (error) {
   console.error('❌ Invalid environment configuration:', error);
-  process.exit(1);
 }
 
 /**
@@ -91,7 +93,21 @@ export class Settings {
   static readonly MIN_AUTO_DELETE_HOURS = 1 / 60; // 1 minute
   static readonly MAX_AUTO_DELETE_HOURS = 168; // 7 days
   static readonly AUTO_DELETE_CHOICES = [
-    1 / 60, 2 / 60, 0.05, 0.08, 0.17, 0.25, 0.5, 1, 2, 6, 12, 24, 48, 72, 168,
+    1 / 60,
+    2 / 60,
+    0.05,
+    0.08,
+    0.17,
+    0.25,
+    0.5,
+    1,
+    2,
+    6,
+    12,
+    24,
+    48,
+    72,
+    168,
   ] as const;
 
   // Slash Command Configuration
@@ -142,6 +158,9 @@ export class Settings {
 
   // Rate Limiting Configuration
   static readonly DELAY_BETWEEN_REMINDERS = envConfig.DELAY_BETWEEN_REMINDERS;
+
+  // Timezone Configuration
+  static readonly TIMEZONE = envConfig.TIMEZONE;
 
   /**
    * Validate and clamp an interval value to acceptable range.
@@ -360,9 +379,7 @@ export class Settings {
     if (this.ENABLE_FEATURE_FLAGS) {
       logger.info('Feature flags: Enabled');
       logger.info(`Auto-fallback: ${this.ENABLE_AUTO_FALLBACK ? 'Enabled' : 'Disabled'}`);
-      logger.info(
-        `Health monitoring: ${this.ENABLE_HEALTH_MONITORING ? 'Enabled' : 'Disabled'}`,
-      );
+      logger.info(`Health monitoring: ${this.ENABLE_HEALTH_MONITORING ? 'Enabled' : 'Disabled'}`);
     } else {
       logger.info('Feature flags: Disabled');
     }

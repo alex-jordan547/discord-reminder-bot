@@ -330,4 +330,3 @@ export const featureFlagManager = new FeatureFlagManager();
 
 // Export the manager as default for convenience
 export default featureFlagManager;
-

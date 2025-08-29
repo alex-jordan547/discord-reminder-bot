@@ -1,10 +1,15 @@
 /**
  * ReminderLog model for Discord Reminder Bot
- * 
+ *
  * Represents a log entry for sent reminders
  */
 
-import { BaseModel, type BaseModelData, type ModelValidationError, validateDiscordId } from './BaseModel.js';
+import {
+  BaseModel,
+  type BaseModelData,
+  type ModelValidationError,
+  validateDiscordId,
+} from './BaseModel.js';
 
 export type ReminderStatus = 'pending' | 'sent' | 'failed';
 
@@ -44,9 +49,14 @@ export class ReminderLog extends BaseModel {
    */
   static fromDict(data: Record<string, any>): ReminderLog {
     return new ReminderLog({
-      eventMessageId: String(data.event_message_id || data.eventMessageId || (data.event?.message_id) || (data.event?.messageId)),
+      eventMessageId: String(
+        data.event_message_id ||
+          data.eventMessageId ||
+          data.event?.message_id ||
+          data.event?.messageId,
+      ),
       scheduledAt: new Date(data.scheduled_at || data.scheduledAt),
-      sentAt: (data.sent_at || data.sentAt) ? new Date(data.sent_at || data.sentAt) : undefined,
+      sentAt: data.sent_at || data.sentAt ? new Date(data.sent_at || data.sentAt) : undefined,
       usersNotified: Number(data.users_notified || data.usersNotified || 0),
       status: (data.status as ReminderStatus) || 'pending',
       errorMessage: data.error_message || data.errorMessage,
@@ -167,7 +177,7 @@ export class ReminderLog extends BaseModel {
     if (!validStatuses.includes(this.status)) {
       errors.push({
         field: 'status',
-        message: `Status must be one of: ${validStatuses.join(', ')}`
+        message: `Status must be one of: ${validStatuses.join(', ')}`,
       });
     }
 
@@ -175,7 +185,7 @@ export class ReminderLog extends BaseModel {
     if (this.usersNotified < 0) {
       errors.push({
         field: 'usersNotified',
-        message: 'Users notified count cannot be negative'
+        message: 'Users notified count cannot be negative',
       });
     }
 
@@ -183,7 +193,7 @@ export class ReminderLog extends BaseModel {
     if (isNaN(this.scheduledAt.getTime())) {
       errors.push({
         field: 'scheduledAt',
-        message: 'Scheduled at must be a valid date'
+        message: 'Scheduled at must be a valid date',
       });
     }
 
@@ -191,7 +201,7 @@ export class ReminderLog extends BaseModel {
     if (this.sentAt && isNaN(this.sentAt.getTime())) {
       errors.push({
         field: 'sentAt',
-        message: 'Sent at must be a valid date'
+        message: 'Sent at must be a valid date',
       });
     }
 
@@ -199,14 +209,14 @@ export class ReminderLog extends BaseModel {
     if (this.status === 'sent' && !this.sentAt) {
       errors.push({
         field: 'sentAt',
-        message: 'Sent reminders must have a sent_at timestamp'
+        message: 'Sent reminders must have a sent_at timestamp',
       });
     }
 
     if (this.status === 'failed' && (!this.errorMessage || this.errorMessage.trim().length === 0)) {
       errors.push({
         field: 'errorMessage',
-        message: 'Failed reminders must have an error message'
+        message: 'Failed reminders must have an error message',
       });
     }
 
@@ -224,8 +234,10 @@ export class ReminderLog extends BaseModel {
    * Check if this reminder log equals another (by event and scheduled time)
    */
   equals(other: ReminderLog): boolean {
-    return this.eventMessageId === other.eventMessageId && 
-           this.scheduledAt.getTime() === other.scheduledAt.getTime();
+    return (
+      this.eventMessageId === other.eventMessageId &&
+      this.scheduledAt.getTime() === other.scheduledAt.getTime()
+    );
   }
 
   /**

@@ -1,1 +1,368 @@
-/**\n * Discord Reminder Bot - Configuration Validation Utilities\n * \n * Comprehensive validation for:\n * - Environment variables\n * - Configuration settings\n * - Runtime data validation\n * - Input sanitization\n */\n\nimport { Settings } from '@/config/settings';\nimport { createLogger } from '@/utils/loggingConfig';\n\nconst logger = createLogger('validation');\n\n/**\n * Validation error class\n */\nexport class ValidationError extends Error {\n  constructor(message: string, public field?: string) {\n    super(message);\n    this.name = 'ValidationError';\n  }\n}\n\n/**\n * Validate environment configuration\n */\nexport function validateEnvironmentConfig(): string[] {\n  const errors: string[] = [];\n\n  try {\n    // Required settings\n    if (!Settings.TOKEN || Settings.TOKEN.trim() === '') {\n      errors.push('DISCORD_TOKEN is required');\n    } else if (!isValidDiscordToken(Settings.TOKEN)) {\n      errors.push('DISCORD_TOKEN format appears invalid');\n    }\n\n    // Interval validation\n    if (Settings.REMINDER_INTERVAL_HOURS <= 0) {\n      errors.push('REMINDER_INTERVAL_HOURS must be greater than 0');\n    }\n\n    const maxInterval = Settings.is_test_mode() ? 168 : 24; // 1 week max in test mode, 24h in production\n    if (Settings.REMINDER_INTERVAL_HOURS > maxInterval) {\n      errors.push(`REMINDER_INTERVAL_HOURS cannot exceed ${maxInterval} hours`);\n    }\n\n    // Admin roles validation\n    if (Settings.ADMIN_ROLES.some(role => role.trim() === '')) {\n      errors.push('ADMIN_ROLES cannot contain empty role names');\n    }\n\n    // Log level validation\n    const validLogLevels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];\n    if (!validLogLevels.includes(Settings.LOG_LEVEL.toUpperCase())) {\n      errors.push(`LOG_LEVEL must be one of: ${validLogLevels.join(', ')}`);\n    }\n\n    // Server configuration validation\n    if (Settings.SERVER_ENABLED) {\n      if (Settings.SERVER_PORT < 1 || Settings.SERVER_PORT > 65535) {\n        errors.push('SERVER_PORT must be between 1 and 65535');\n      }\n\n      if (!Settings.SERVER_HOST || Settings.SERVER_HOST.trim() === '') {\n        errors.push('SERVER_HOST is required when server is enabled');\n      }\n    }\n\n    // Auto-delete validation\n    if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS <= 0) {\n      errors.push('AUTO_DELETE_DELAY_HOURS must be greater than 0 when auto-delete is enabled');\n    }\n\n    // Rate limiting validation\n    if (Settings.MAX_MENTIONS_PER_REMINDER < 1) {\n      errors.push('MAX_MENTIONS_PER_REMINDER must be at least 1');\n    }\n\n    if (Settings.MAX_MENTIONS_PER_REMINDER > 100) {\n      errors.push('MAX_MENTIONS_PER_REMINDER cannot exceed 100 (Discord API limit)');\n    }\n\n    if (Settings.DELAY_BETWEEN_REMINDERS < 1000) {\n      errors.push('DELAY_BETWEEN_REMINDERS must be at least 1000ms');\n    }\n\n    // Database path validation (if applicable)\n    if (Settings.DATABASE_PATH && !isValidPath(Settings.DATABASE_PATH)) {\n      errors.push('DATABASE_PATH contains invalid characters');\n    }\n\n  } catch (error) {\n    logger.error(`Error during environment validation: ${error}`);\n    errors.push('Critical error during validation');\n  }\n\n  return errors;\n}\n\n/**\n * Validate Discord token format (basic check)\n */\nfunction isValidDiscordToken(token: string): boolean {\n  // Discord bot tokens are typically base64-encoded and have a specific pattern\n  // This is a basic format check, not a validity check\n  if (token.length < 50) {\n    return false;\n  }\n\n  // Bot tokens typically start with the bot's user ID followed by a dot\n  const parts = token.split('.');\n  if (parts.length < 3) {\n    return false;\n  }\n\n  // First part should be the user ID (numeric)\n  if (!/^\\d+$/.test(parts[0])) {\n    return false;\n  }\n\n  return true;\n}\n\n/**\n * Validate file path for security\n */\nfunction isValidPath(path: string): boolean {\n  // Basic path validation - reject paths with dangerous patterns\n  const dangerousPatterns = [\n    /\\.\\.\\//,  // Directory traversal\n    /^\\//,     // Absolute paths (in some contexts)\n    /[<>:\"|?*]/, // Invalid filename characters on Windows\n  ];\n\n  return !dangerousPatterns.some(pattern => pattern.test(path));\n}\n\n/**\n * Validate interval minutes for reminders\n */\nexport function validateInterval(intervalMinutes: number): {\n  valid: boolean;\n  error?: string;\n} {\n  if (!Number.isInteger(intervalMinutes) || intervalMinutes <= 0) {\n    return {\n      valid: false,\n      error: 'Interval must be a positive integer',\n    };\n  }\n\n  const minInterval = Settings.is_test_mode() ? 1 : 5;\n  const maxInterval = Settings.is_test_mode() ? 10080 : 1440; // 1 week vs 24h\n\n  if (intervalMinutes < minInterval) {\n    return {\n      valid: false,\n      error: `Interval must be at least ${minInterval} minutes`,\n    };\n  }\n\n  if (intervalMinutes > maxInterval) {\n    return {\n      valid: false,\n      error: `Interval cannot exceed ${maxInterval} minutes`,\n    };\n  }\n\n  return { valid: true };\n}\n\n/**\n * Validate Discord snowflake ID\n */\nexport function validateSnowflake(id: string): boolean {\n  return /^\\d{17,20}$/.test(id);\n}\n\n/**\n * Validate event title\n */\nexport function validateEventTitle(title: string): {\n  valid: boolean;\n  error?: string;\n  sanitized?: string;\n} {\n  if (!title || typeof title !== 'string') {\n    return {\n      valid: false,\n      error: 'Title is required and must be a string',\n    };\n  }\n\n  const trimmed = title.trim();\n  if (trimmed.length === 0) {\n    return {\n      valid: false,\n      error: 'Title cannot be empty',\n    };\n  }\n\n  if (trimmed.length > 100) {\n    return {\n      valid: true,\n      sanitized: trimmed.substring(0, 100),\n    };\n  }\n\n  // Remove potentially harmful characters\n  const sanitized = trimmed.replace(/[<>@]/g, '');\n  \n  return {\n    valid: true,\n    sanitized: sanitized || 'Untitled Event',\n  };\n}\n\n/**\n * Validate user ID list\n */\nexport function validateUserIdList(userIds: string[]): {\n  valid: boolean;\n  error?: string;\n  sanitized?: string[];\n} {\n  if (!Array.isArray(userIds)) {\n    return {\n      valid: false,\n      error: 'User IDs must be an array',\n    };\n  }\n\n  const validIds = userIds.filter(id => \n    typeof id === 'string' && validateSnowflake(id)\n  );\n\n  if (validIds.length !== userIds.length) {\n    const invalidCount = userIds.length - validIds.length;\n    logger.warn(`Filtered out ${invalidCount} invalid user IDs`);\n  }\n\n  // Remove duplicates\n  const uniqueIds = [...new Set(validIds)];\n\n  return {\n    valid: true,\n    sanitized: uniqueIds,\n  };\n}\n\n/**\n * Validate configuration object\n */\nexport function validateConfigObject(config: any): {\n  valid: boolean;\n  errors: string[];\n  warnings: string[];\n} {\n  const errors: string[] = [];\n  const warnings: string[] = [];\n\n  if (!config || typeof config !== 'object') {\n    return {\n      valid: false,\n      errors: ['Configuration must be an object'],\n      warnings: [],\n    };\n  }\n\n  // Validate required fields exist\n  const requiredFields = ['TOKEN'];\n  for (const field of requiredFields) {\n    if (!(field in config) || !config[field]) {\n      errors.push(`Missing required field: ${field}`);\n    }\n  }\n\n  // Validate optional fields if present\n  if ('REMINDER_INTERVAL_HOURS' in config) {\n    const interval = config.REMINDER_INTERVAL_HOURS;\n    if (typeof interval !== 'number' || interval <= 0) {\n      errors.push('REMINDER_INTERVAL_HOURS must be a positive number');\n    }\n  }\n\n  if ('ADMIN_ROLES' in config) {\n    if (!Array.isArray(config.ADMIN_ROLES)) {\n      errors.push('ADMIN_ROLES must be an array');\n    } else if (config.ADMIN_ROLES.some((role: any) => typeof role !== 'string')) {\n      errors.push('All ADMIN_ROLES must be strings');\n    }\n  }\n\n  return {\n    valid: errors.length === 0,\n    errors,\n    warnings,\n  };\n}\n\n/**\n * Runtime validation for Event objects\n */\nexport function validateEventData(eventData: any): {\n  valid: boolean;\n  errors: string[];\n  sanitized?: any;\n} {\n  const errors: string[] = [];\n  const sanitized: any = {};\n\n  // Required fields\n  if (!eventData.messageId || !validateSnowflake(eventData.messageId)) {\n    errors.push('Valid messageId is required');\n  } else {\n    sanitized.messageId = eventData.messageId;\n  }\n\n  if (!eventData.channelId || !validateSnowflake(eventData.channelId)) {\n    errors.push('Valid channelId is required');\n  } else {\n    sanitized.channelId = eventData.channelId;\n  }\n\n  if (!eventData.guildId || !validateSnowflake(eventData.guildId)) {\n    errors.push('Valid guildId is required');\n  } else {\n    sanitized.guildId = eventData.guildId;\n  }\n\n  // Title validation\n  const titleValidation = validateEventTitle(eventData.title);\n  if (!titleValidation.valid) {\n    errors.push(titleValidation.error!);\n  } else {\n    sanitized.title = titleValidation.sanitized || eventData.title;\n  }\n\n  // Interval validation\n  const intervalValidation = validateInterval(eventData.intervalMinutes);\n  if (!intervalValidation.valid) {\n    errors.push(intervalValidation.error!);\n  } else {\n    sanitized.intervalMinutes = eventData.intervalMinutes;\n  }\n\n  // User reactions validation\n  const userIdsValidation = validateUserIdList(eventData.usersWhoReacted || []);\n  if (!userIdsValidation.valid) {\n    errors.push(userIdsValidation.error!);\n  } else {\n    sanitized.usersWhoReacted = userIdsValidation.sanitized || [];\n  }\n\n  // Optional fields\n  sanitized.lastRemindedAt = eventData.lastRemindedAt instanceof Date ? eventData.lastRemindedAt : null;\n  sanitized.isPaused = Boolean(eventData.isPaused);\n  sanitized.createdAt = eventData.createdAt instanceof Date ? eventData.createdAt : new Date();\n  sanitized.updatedAt = new Date();\n\n  return {\n    valid: errors.length === 0,\n    errors,\n    sanitized: errors.length === 0 ? sanitized : undefined,\n  };\n}\n\n/**\n * Sanitize input string for safety\n */\nexport function sanitizeString(input: string, maxLength: number = 1000): string {\n  if (typeof input !== 'string') {\n    return '';\n  }\n\n  return input\n    .trim()\n    .substring(0, maxLength)\n    .replace(/[\\x00-\\x08\\x0E-\\x1F\\x7F]/g, '') // Remove control characters\n    .replace(/<script[^>]*>.*?<\\/script>/gi, '') // Remove script tags\n    .replace(/javascript:/gi, '') // Remove javascript: URLs\n    .replace(/on\\w+\\s*=/gi, ''); // Remove on* event handlers\n}\n\n/**\n * Generate validation report\n */\nexport function generateValidationReport(): {\n  environment: { valid: boolean; errors: string[] };\n  settings: { valid: boolean; issues: string[] };\n  summary: string;\n} {\n  const envErrors = validateEnvironmentConfig();\n  const envValid = envErrors.length === 0;\n\n  // Settings validation\n  const settingsIssues: string[] = [];\n  \n  try {\n    Settings.logConfiguration(logger);\n  } catch (error) {\n    settingsIssues.push(`Settings logging failed: ${error}`);\n  }\n\n  const settingsValid = settingsIssues.length === 0;\n\n  let summary = 'Configuration Validation Complete:\\n';\n  summary += `- Environment: ${envValid ? '✅ Valid' : '❌ Issues found'}\\n`;\n  summary += `- Settings: ${settingsValid ? '✅ Valid' : '❌ Issues found'}`;\n  \n  if (!envValid) {\n    summary += `\\n\\nEnvironment Issues (${envErrors.length}):`;\n    envErrors.forEach(error => {\n      summary += `\\n  - ${error}`;\n    });\n  }\n\n  if (!settingsValid) {\n    summary += `\\n\\nSettings Issues (${settingsIssues.length}):`;\n    settingsIssues.forEach(issue => {\n      summary += `\\n  - ${issue}`;\n    });\n  }\n\n  return {\n    environment: { valid: envValid, errors: envErrors },\n    settings: { valid: settingsValid, issues: settingsIssues },\n    summary,\n  };\n}
+/**
+ * Discord Reminder Bot - Configuration Validation Utilities
+ *
+ * Comprehensive validation for:
+ * - Environment variables
+ * - Configuration settings
+ * - Runtime data validation
+ * - Input sanitization
+ */
+
+import { Settings } from '@/config/settings';
+import { createLogger } from '@/utils/loggingConfig';
+
+const logger = createLogger('validation');
+
+/**
+ * Validation error class
+ */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+/**
+ * Validate environment configuration
+ */
+export function validateEnvironmentConfig(): string[] {
+  const errors: string[] = [];
+
+  try {
+    // --- Required settings ---
+    if (!Settings.TOKEN || Settings.TOKEN.trim() === '') {
+      errors.push('DISCORD_TOKEN is required');
+    } else if (!isValidDiscordToken(Settings.TOKEN)) {
+      errors.push('DISCORD_TOKEN format appears invalid');
+    }
+
+    // --- Interval validation ---
+    if (Settings.REMINDER_INTERVAL_HOURS <= 0) {
+      errors.push('REMINDER_INTERVAL_HOURS must be greater than 0');
+    }
+
+    const maxInterval = Settings.is_test_mode() ? 168 : 24; // 1 week max in test mode, 24h in production
+    if (Settings.REMINDER_INTERVAL_HOURS > maxInterval) {
+      errors.push(`REMINDER_INTERVAL_HOURS cannot exceed ${maxInterval} hours`);
+    }
+
+    // --- Admin roles ---
+    if (Settings.ADMIN_ROLES.some(r => r.trim() === '')) {
+      errors.push('ADMIN_ROLES cannot contain empty role names');
+    }
+
+    // --- Log level ---
+    const validLogLevels = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+    if (!validLogLevels.includes(Settings.LOG_LEVEL.toUpperCase())) {
+      errors.push(`LOG_LEVEL must be one of: ${validLogLevels.join(', ')}`);
+    }
+
+    // --- Server config ---
+    if (Settings.SERVER_ENABLED) {
+      if (Settings.SERVER_PORT < 1 || Settings.SERVER_PORT > 65535) {
+        errors.push('SERVER_PORT must be between 1 and 65535');
+      }
+
+      if (!Settings.SERVER_HOST || Settings.SERVER_HOST.trim() === '') {
+        errors.push('SERVER_HOST is required when server is enabled');
+      }
+    }
+
+    // --- Auto-delete ---
+    if (Settings.AUTO_DELETE_REMINDERS && Settings.AUTO_DELETE_DELAY_HOURS <= 0) {
+      errors.push('AUTO_DELETE_DELAY_HOURS must be greater than 0 when auto-delete is enabled');
+    }
+
+    // --- Rate limiting ---
+    if (Settings.MAX_MENTIONS_PER_REMINDER < 1) {
+      errors.push('MAX_MENTIONS_PER_REMINDER must be at least 1');
+    }
+
+    if (Settings.MAX_MENTIONS_PER_REMINDER > 100) {
+      errors.push('MAX_MENTIONS_PER_REMINDER cannot exceed 100 (Discord API limit)');
+    }
+
+    if (Settings.DELAY_BETWEEN_REMINDERS < 1000) {
+      errors.push('DELAY_BETWEEN_REMINDERS must be at least 1000ms');
+    }
+
+    // --- Database ---
+    if (Settings.DATABASE_PATH && !isValidPath(Settings.DATABASE_PATH)) {
+      errors.push('DATABASE_PATH contains invalid characters');
+    }
+  } catch (error) {
+    logger.error(`Error during environment validation: ${error}`);
+    errors.push('Critical error during validation');
+  }
+
+  return errors;
+}
+
+/**
+ * Validate Discord token format (basic)
+ */
+function isValidDiscordToken(token: string): boolean {
+  if (token.length < 50) return false;
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  // First part should be base64-encoded user ID
+  // Second part should be base64-encoded timestamp
+  // Third part should be base64-encoded HMAC
+  const base64Pattern = /^[A-Za-z0-9+/]+=*$/;
+  return parts.every(part => base64Pattern.test(part));
+}
+/**
+ * Validate file path safety
+ */
+function isValidPath(path: string): boolean {
+  const dangerousPatterns = [
+    /\.\.\//, // directory traversal
+    /^\//, // absolute paths
+    /[<>:"|?*]/, // invalid filename chars
+  ];
+
+  return !dangerousPatterns.some(p => p.test(path));
+}
+
+/**
+ * Validate interval minutes
+ */
+export function validateInterval(intervalMinutes: number): {
+  valid: boolean;
+  error?: string;
+} {
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes <= 0) {
+    return { valid: false, error: 'Interval must be a positive integer' };
+  }
+
+  const minInterval = Settings.is_test_mode() ? 1 : 5;
+  const maxInterval = Settings.is_test_mode() ? 10080 : 1440;
+
+  if (intervalMinutes < minInterval) {
+    return { valid: false, error: `Interval must be at least ${minInterval} minutes` };
+  }
+  if (intervalMinutes > maxInterval) {
+    return { valid: false, error: `Interval cannot exceed ${maxInterval} minutes` };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate Discord snowflake
+ */
+export function validateSnowflake(id: string): boolean {
+  return /^\d{17,20}$/.test(id);
+}
+
+/**
+ * Validate event title
+ */
+export function validateEventTitle(title: string): {
+  valid: boolean;
+  error?: string;
+  sanitized?: string;
+} {
+  if (!title || typeof title !== 'string') {
+    return { valid: false, error: 'Title is required and must be a string' };
+  }
+
+  const trimmed = title.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Title cannot be empty' };
+  }
+
+  if (trimmed.length > 100) {
+    return { valid: true, sanitized: trimmed.substring(0, 100) };
+  }
+
+  const sanitized = trimmed.replace(/[<>@]/g, '');
+  return { valid: true, sanitized: sanitized || 'Untitled Event' };
+}
+
+/**
+ * Validate user IDs
+ */
+export function validateUserIdList(userIds: string[]): {
+  valid: boolean;
+  error?: string;
+  sanitized?: string[];
+} {
+  if (!Array.isArray(userIds)) {
+    return { valid: false, error: 'User IDs must be an array' };
+  }
+
+  const validIds = userIds.filter(id => typeof id === 'string' && validateSnowflake(id));
+
+  if (validIds.length !== userIds.length) {
+    logger.warn(`Filtered out ${userIds.length - validIds.length} invalid user IDs`);
+  }
+
+  return { valid: true, sanitized: [...new Set(validIds)] };
+}
+
+/**
+ * Validate config object
+ */
+export function validateConfigObject(config: any): {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!config || typeof config !== 'object') {
+    return { valid: false, errors: ['Configuration must be an object'], warnings: [] };
+  }
+
+  // required
+  const requiredFields = ['TOKEN'];
+  for (const field of requiredFields) {
+    if (!(field in config) || !config[field]) {
+      errors.push(`Missing required field: ${field}`);
+    }
+  }
+
+  // optionals
+  if ('REMINDER_INTERVAL_HOURS' in config) {
+    const interval = config.REMINDER_INTERVAL_HOURS;
+    if (typeof interval !== 'number' || interval <= 0) {
+      errors.push('REMINDER_INTERVAL_HOURS must be a positive number');
+    }
+  }
+
+  if ('ADMIN_ROLES' in config) {
+    if (!Array.isArray(config.ADMIN_ROLES)) {
+      errors.push('ADMIN_ROLES must be an array');
+    } else if (config.ADMIN_ROLES.some((r: any) => typeof r !== 'string')) {
+      errors.push('All ADMIN_ROLES must be strings');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Runtime validation for Event objects
+ */
+export function validateEventData(eventData: any): {
+  valid: boolean;
+  errors: string[];
+  sanitized?: any;
+} {
+  const errors: string[] = [];
+  const sanitized: any = {};
+
+  if (!eventData.messageId || !validateSnowflake(eventData.messageId)) {
+    errors.push('Valid messageId is required');
+  } else {
+    sanitized.messageId = eventData.messageId;
+  }
+
+  if (!eventData.channelId || !validateSnowflake(eventData.channelId)) {
+    errors.push('Valid channelId is required');
+  } else {
+    sanitized.channelId = eventData.channelId;
+  }
+
+  if (!eventData.guildId || !validateSnowflake(eventData.guildId)) {
+    errors.push('Valid guildId is required');
+  } else {
+    sanitized.guildId = eventData.guildId;
+  }
+
+  const titleValidation = validateEventTitle(eventData.title);
+  if (!titleValidation.valid) {
+    errors.push(titleValidation.error!);
+  } else {
+    sanitized.title = titleValidation.sanitized || eventData.title;
+  }
+
+  const intervalValidation = validateInterval(eventData.intervalMinutes);
+  if (!intervalValidation.valid) {
+    errors.push(intervalValidation.error!);
+  } else {
+    sanitized.intervalMinutes = eventData.intervalMinutes;
+  }
+
+  const userIdsValidation = validateUserIdList(eventData.usersWhoReacted || []);
+  if (!userIdsValidation.valid) {
+    errors.push(userIdsValidation.error!);
+  } else {
+    sanitized.usersWhoReacted = userIdsValidation.sanitized || [];
+  }
+
+  sanitized.lastRemindedAt =
+    eventData.lastRemindedAt instanceof Date ? eventData.lastRemindedAt : null;
+  sanitized.isPaused = Boolean(eventData.isPaused);
+  sanitized.createdAt = eventData.createdAt instanceof Date ? eventData.createdAt : new Date();
+  sanitized.updatedAt = new Date();
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    sanitized: errors.length === 0 ? sanitized : undefined,
+  };
+}
+
+/**
+ * Sanitize arbitrary string input
+ */
+/*
+export function sanitizeString(input: string, maxLength = 1000): string {
+  if (typeof input !== 'string') return '';
+
+  return input
+    .trim()
+    .substring(0, maxLength)
+    .replace(/[\x00-\x08\x0E-\x1F\x7F]/g, '') // control chars
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // strip scripts
+    .replace(/javascript:/gi, '') // javascript urls
+    .replace(/on\w+\s*=/gi, ''); // inline event handlers
+}
+*/
+
+/**
+ * Generate validation report
+ */
+export function generateValidationReport(): {
+  environment: { valid: boolean; errors: string[] };
+  settings: { valid: boolean; issues: string[] };
+  summary: string;
+} {
+  const envErrors = validateEnvironmentConfig();
+  const envValid = envErrors.length === 0;
+
+  const settingsIssues: string[] = [];
+  try {
+    Settings.logConfiguration(logger);
+  } catch (error) {
+    settingsIssues.push(`Settings logging failed: ${error}`);
+  }
+
+  const settingsValid = settingsIssues.length === 0;
+
+  let summary = 'Configuration Validation Complete:\n';
+  summary += `- Environment: ${envValid ? '✅ Valid' : '❌ Issues found'}\n`;
+  summary += `- Settings: ${settingsValid ? '✅ Valid' : '❌ Issues found'}`;
+
+  if (!envValid) {
+    summary += `\n\nEnvironment Issues (${envErrors.length}):`;
+    envErrors.forEach(e => (summary += `\n  - ${e}`));
+  }
+
+  if (!settingsValid) {
+    summary += `\n\nSettings Issues (${settingsIssues.length}):`;
+    settingsIssues.forEach(i => (summary += `\n  - ${i}`));
+  }
+
+  return {
+    environment: { valid: envValid, errors: envErrors },
+    settings: { valid: settingsValid, issues: settingsIssues },
+    summary,
+  };
+}
