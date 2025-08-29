@@ -92,6 +92,8 @@ jobs:
       continue-on-error: true
     
     - name: Unit tests
+      env:
+        DISCORD_TOKEN: test-token-for-ci
       run: |
         # Tests avec Vitest et coverage
         yarn test:coverage

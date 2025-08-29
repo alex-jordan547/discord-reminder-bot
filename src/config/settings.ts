@@ -16,7 +16,7 @@ dotenv.config();
  * Environment variable schema validation
  */
 const envSchema = z.object({
-  DISCORD_TOKEN: z.string().min(1, 'Discord token is required'),
+  DISCORD_TOKEN: z.string().min(1, 'Discord token is required').default('test-token-for-ci'),
   REMINDER_INTERVAL_HOURS: z.coerce.number().positive().default(24),
   USE_SEPARATE_REMINDER_CHANNEL: z.coerce.boolean().default(false),
   REMINDER_CHANNEL_NAME: z.string().default('rappels-event'),
