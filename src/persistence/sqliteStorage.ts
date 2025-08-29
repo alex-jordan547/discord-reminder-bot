@@ -5,11 +5,12 @@
  * for all model types with connection pooling and transaction support.
  */
 
-import { DatabaseManager, getDatabase } from './database';
+import Database from 'better-sqlite3';
 import { Event } from '@/models';
 import { createLogger } from '@/utils/loggingConfig';
 
 const logger = createLogger('sqliteStorage.ts');
+
 export interface StorageOperationResult {
   success: boolean;
   error?: string;
@@ -31,13 +32,106 @@ export interface EventFilters {
 }
 
 /**
+ * Database interface for backwards compatibility
+ */
+interface DatabaseInterface {
+  run(sql: string, params?: any[]): Promise<{ changes: number; lastInsertRowid: number }>;
+  get(sql: string, params?: any[]): Promise<any>;
+  all(sql: string, params?: any[]): Promise<any[]>;
+  executeTransaction(statements: { sql: string; params: any[] }[]): Promise<void>;
+  connect(): Promise<void>;
+  close(): Promise<void>;
+  isAvailable(): Promise<boolean>;
+}
+
+/**
+ * Simple database wrapper for better-sqlite3
+ */
+class SimpleDatabaseManager implements DatabaseInterface {
+  private db: Database.Database | null = null;
+  private dbPath: string;
+
+  constructor(dbPath: string = 'discord_bot.db') {
+    this.dbPath = dbPath;
+  }
+
+  async connect(): Promise<void> {
+    if (!this.db) {
+      this.db = new Database(this.dbPath);
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('synchronous = NORMAL');
+      this.db.pragma('cache_size = 1000');
+      this.db.pragma('temp_store = memory');
+    }
+  }
+
+  async run(
+    sql: string,
+    params: any[] = [],
+  ): Promise<{ changes: number; lastInsertRowid: number }> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    const result = stmt.run(...params);
+    return { changes: result.changes, lastInsertRowid: Number(result.lastInsertRowid) };
+  }
+
+  async get(sql: string, params: any[] = []): Promise<any> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    return stmt.get(...params);
+  }
+
+  async all(sql: string, params: any[] = []): Promise<any[]> {
+    if (!this.db) await this.connect();
+    const stmt = this.db!.prepare(sql);
+    return stmt.all(...params);
+  }
+
+  async executeTransaction(statements: { sql: string; params: any[] }[]): Promise<void> {
+    if (!this.db) await this.connect();
+    const transaction = this.db!.transaction(() => {
+      for (const stmt of statements) {
+        const prepared = this.db!.prepare(stmt.sql);
+        prepared.run(...stmt.params);
+      }
+    });
+    transaction();
+  }
+
+  async close(): Promise<void> {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      if (!this.db) await this.connect();
+      return this.db !== null;
+    } catch {
+      return false;
+    }
+  }
+}
+
+let databaseInstance: SimpleDatabaseManager | null = null;
+
+export function getDatabase(): SimpleDatabaseManager {
+  if (!databaseInstance) {
+    databaseInstance = new SimpleDatabaseManager();
+  }
+  return databaseInstance;
+}
+
+/**
  * Main SQLite storage class with comprehensive model operations
  */
 export class SqliteStorage {
-  private db: DatabaseManager;
+  private db: DatabaseInterface;
   private isInitialized = false;
 
-  constructor(databaseManager?: DatabaseManager) {
+  constructor(databaseManager?: DatabaseInterface) {
     this.db = databaseManager || getDatabase();
   }
 
@@ -63,106 +157,127 @@ export class SqliteStorage {
    * Create simplified database table - only events table needed
    */
   private async createTables(): Promise<void> {
-    const tableCreationSQL = [
-      // Events table - simplified without foreign key constraints
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS events (
-            message_id TEXT PRIMARY KEY,
-            channel_id TEXT NOT NULL,
-            guild_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            interval_minutes REAL DEFAULT 60.0,
-            is_paused INTEGER DEFAULT 0,
-            last_reminder DATETIME DEFAULT CURRENT_TIMESTAMP,
-            users_who_reacted TEXT DEFAULT '[]',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )
-        `,
-        params: [],
-      },
-      
-      // Guild configurations table
-      {
-        sql: `
-          CREATE TABLE IF NOT EXISTS guild_configs (
-            guild_id TEXT PRIMARY KEY,
-            guild_name TEXT NOT NULL,
-            reminder_channel_id TEXT,
-            reminder_channel_name TEXT DEFAULT 'Canal original',
-            admin_role_ids TEXT DEFAULT '[]',
-            admin_role_names TEXT DEFAULT '[]',
-            default_interval_minutes REAL DEFAULT 60.0,
-            auto_delete_enabled INTEGER DEFAULT 1,
-            auto_delete_delay_minutes REAL DEFAULT 60.0,
-            delay_between_reminders_ms INTEGER DEFAULT 2000,
-            max_mentions_per_reminder INTEGER DEFAULT 50,
-            use_everyone_above_limit INTEGER DEFAULT 1,
-            default_reactions TEXT DEFAULT '["✅","❌","❓"]',
-            timezone TEXT DEFAULT 'Europe/Paris',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )
-        `,
-        params: [],
-      },
-    ];
+    logger.info('Creating database tables...');
+    try {
+      const tableCreationSQL = [
+        // Events table - simplified without foreign key constraints
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS events (
+              message_id TEXT PRIMARY KEY,
+              channel_id TEXT NOT NULL,
+              guild_id TEXT NOT NULL,
+              title TEXT NOT NULL,
+              description TEXT,
+              interval_minutes REAL DEFAULT 60.0,
+              is_paused INTEGER DEFAULT 0,
+              last_reminder DATETIME DEFAULT CURRENT_TIMESTAMP,
+              users_who_reacted TEXT DEFAULT '[]',
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `,
+          params: [],
+        },
 
-    await this.db.executeTransaction(tableCreationSQL);
-    await this.createIndexes();
+        // Guild configurations table
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS guild_configs (
+              guild_id TEXT PRIMARY KEY,
+              guild_name TEXT NOT NULL,
+              reminder_channel_id TEXT,
+              reminder_channel_name TEXT DEFAULT 'Canal original',
+              admin_role_ids TEXT DEFAULT '[]',
+              admin_role_names TEXT DEFAULT '[]',
+              default_interval_minutes REAL DEFAULT 60.0,
+              auto_delete_enabled INTEGER DEFAULT 1,
+              auto_delete_delay_minutes REAL DEFAULT 60.0,
+              delay_between_reminders_ms INTEGER DEFAULT 2000,
+              max_mentions_per_reminder INTEGER DEFAULT 50,
+              use_everyone_above_limit INTEGER DEFAULT 1,
+              default_reactions TEXT DEFAULT '["✅","❌","❓"]',
+              timezone TEXT DEFAULT 'Europe/Paris',
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `,
+          params: [],
+        },
+      ];
+
+      await this.db.executeTransaction(tableCreationSQL);
+      await this.createIndexes();
+      logger.info('Database tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create database tables:', error);
+      throw error;
+    }
   }
 
   /**
    * Create optimized indexes for better query performance
    */
   private async createIndexes(): Promise<void> {
-    const indexCreationSQL = [
-      // Event indexes - optimized for common queries
-      {
-        sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused ON events(guild_id, is_paused)',
-        params: [],
-      },
-      {
-        sql: 'CREATE INDEX IF NOT EXISTS idx_events_reminder_interval ON events(last_reminder, interval_minutes)',
-        params: [],
-      },
-      {
-        sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_created ON events(guild_id, created_at)',
-        params: [],
-      },
-      {
-        sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)',
-        params: [],
-      },
-      
-      // Guild config indexes
-      {
-        sql: 'CREATE INDEX IF NOT EXISTS idx_guild_configs_last_used ON guild_configs(last_used_at)',
-        params: [],
-      },
-    ];
+    logger.debug('Creating database indexes for better performance...');
+    try {
+      const indexCreationSQL = [
+        // Event indexes - optimized for common queries
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused ON events(guild_id, is_paused)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_reminder_interval ON events(last_reminder, interval_minutes)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_created ON events(guild_id, created_at)',
+          params: [],
+        },
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)',
+          params: [],
+        },
 
-    await this.db.executeTransaction(indexCreationSQL);
+        // Guild config indexes
+        {
+          sql: 'CREATE INDEX IF NOT EXISTS idx_guild_configs_last_used ON guild_configs(last_used_at)',
+          params: [],
+        },
+      ];
+
+      await this.db.executeTransaction(indexCreationSQL);
+      logger.debug('Database indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create database indexes:', error);
+      throw error;
+    }
   }
 
   /**
    * Run database migrations (for future schema updates)
    */
   private async runMigrations(): Promise<void> {
-    // Create migrations table if it doesn't exist
-    await this.db.run(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    logger.debug('Running database migrations...');
+    try {
+      // Create migrations table if it doesn't exist
+      await this.db.run(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version INTEGER PRIMARY KEY,
+          applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    // Future migrations will be added here
-    // Example:
-    // await this.runMigration(1, 'Add new column to events table');
+      logger.debug('Database migrations completed');
+      // Future migrations will be added here
+      // Example:
+      // await this.runMigration(1, 'Add new column to events table');
+    } catch (error) {
+      logger.error('Failed to run database migrations:', error);
+      throw error;
+    }
   }
 
   /**
@@ -184,10 +299,10 @@ export class SqliteStorage {
 
     logger.info(`Running migration ${version}: ${description}`);
 
-    const statements = migrationSQL.map(sql => ({ sql, params: [] }));
+    const statements = migrationSQL.map(sql => ({ sql, params: [] as any[] }));
     statements.push({
       sql: 'INSERT INTO schema_migrations (version) VALUES (?)',
-      params: [version],
+      params: [version] as any[],
     });
 
     await this.db.executeTransaction(statements);
@@ -248,10 +363,14 @@ export class SqliteStorage {
    * Get an event by message ID
    */
   async getEvent(messageId: string): Promise<Event | null> {
+    logger.debug(`Retrieving event with messageId: ${messageId}`);
     try {
       const row = await this.db.get('SELECT * FROM events WHERE message_id = ?', [messageId]);
 
-      if (!row) return null;
+      if (!row) {
+        logger.debug(`No event found with messageId: ${messageId}`);
+        return null;
+      }
 
       // Parse users_who_reacted JSON
       if (typeof row.users_who_reacted === 'string') {
@@ -262,9 +381,10 @@ export class SqliteStorage {
         }
       }
 
+      logger.debug(`Event retrieved successfully: ${messageId} - ${row.title}`);
       return Event.fromDict(row);
     } catch (error) {
-      logger.error('Failed to get event:', error);
+      logger.error(`Failed to get event ${messageId}:`, error);
       return null;
     }
   }
@@ -273,6 +393,7 @@ export class SqliteStorage {
    * Get events with filters and pagination
    */
   async getEvents(filters: EventFilters = {}, options: PaginationOptions = {}): Promise<Event[]> {
+    logger.debug('Retrieving events with filters:', { filters, options });
     try {
       const { limit = 100, offset = 0, orderBy = 'created_at', orderDirection = 'DESC' } = options;
       const { guildId, channelId, isPaused } = filters;
@@ -315,6 +436,8 @@ export class SqliteStorage {
         params,
       );
 
+      logger.debug(`Retrieved ${rows.length} events from database`);
+
       return rows.map(row => {
         // Parse users_who_reacted JSON
         if (typeof row.users_who_reacted === 'string') {
@@ -336,6 +459,7 @@ export class SqliteStorage {
    * Get events that are due for reminders (optimized query)
    */
   async getDueEvents(guildId?: string): Promise<Event[]> {
+    logger.debug(`Retrieving due events${guildId ? ` for guild: ${guildId}` : ''}`);
     try {
       let sql = `
         SELECT * FROM events 
@@ -352,6 +476,8 @@ export class SqliteStorage {
       sql += ' ORDER BY last_reminder ASC';
 
       const rows = await this.db.all(sql, params);
+
+      logger.info(`Found ${rows.length} due events${guildId ? ` for guild ${guildId}` : ''}`);
 
       return rows.map(row => {
         // Parse users_who_reacted JSON
@@ -374,6 +500,7 @@ export class SqliteStorage {
    * Update event's last reminder timestamp
    */
   async markReminderSent(messageId: string): Promise<StorageOperationResult> {
+    logger.debug(`Marking reminder as sent for event: ${messageId}`);
     try {
       const result = await this.db.run(
         `
@@ -384,11 +511,18 @@ export class SqliteStorage {
         [messageId],
       );
 
+      if (result.changes > 0) {
+        logger.debug(`Successfully marked reminder as sent for event: ${messageId}`);
+      } else {
+        logger.warn(`No event found to mark reminder as sent: ${messageId}`);
+      }
+
       return {
         success: true,
         affectedRows: result.changes,
       };
     } catch (error) {
+      logger.error(`Failed to mark reminder sent for ${messageId}:`, error);
       return {
         success: false,
         error: `Failed to mark reminder sent: ${error instanceof Error ? error.message : String(error)}`,
@@ -527,7 +661,9 @@ export class SqliteStorage {
         config.delayBetweenRemindersMs || 2000,
         config.maxMentionsPerReminder || 50,
         config.useEveryoneAboveLimit ? 1 : 0,
-        JSON.stringify(Array.isArray(config.defaultReactions) ? config.defaultReactions : ['✅', '❌', '❓']),
+        JSON.stringify(
+          Array.isArray(config.defaultReactions) ? config.defaultReactions : ['✅', '❌', '❓'],
+        ),
         config.timezone || 'Europe/Paris',
         config.createdAt?.toISOString() || new Date().toISOString(),
         config.updatedAt?.toISOString() || new Date().toISOString(),
@@ -535,9 +671,11 @@ export class SqliteStorage {
       ];
 
       const result = await this.db.run(sql, params);
-      
-      logger.debug(`Guild config ${config.guildId} - (${config.guildName}) saved/updated successfully in DB`);
-      
+
+      logger.debug(
+        `Guild config ${config.guildId} - (${config.guildName}) saved/updated successfully in DB`,
+      );
+
       return {
         success: true,
         affectedRows: result.changes,
