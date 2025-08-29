@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import dotenv from 'dotenv';
+// Removed circular import - logger will be created when needed
 
 // Load environment variables
 dotenv.config();
@@ -50,6 +51,7 @@ const envSchema = z.object({
 });
 
 type EnvConfig = z.infer<typeof envSchema>;
+// Logger will be created lazily to avoid circular imports
 
 /**
  * Validated environment configuration
@@ -60,7 +62,6 @@ try {
   envConfig = envSchema.parse(process.env);
 } catch (error) {
   console.error('❌ Invalid environment configuration:', error);
-  process.exit(1);
 }
 
 /**

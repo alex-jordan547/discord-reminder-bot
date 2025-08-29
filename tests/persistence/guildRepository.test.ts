@@ -64,14 +64,14 @@ describe('GuildRepository', () => {
       const testGuild = createTestData.guild();
       await testDrizzle.insert(schema.guilds).values(testGuild);
 
-      const updatedGuild = { ...testGuild, name: 'Updated Guild Name' };
+      const updatedGuild = { ...testGuild, guildName: 'Updated Guild Name' };
 
       // Act
       const result = await guildRepo.upsert(updatedGuild);
 
       // Assert
       expect(result).toBeDefined();
-      expect(result?.name).toBe('Updated Guild Name');
+      expect(result?.guildName).toBe('Updated Guild Name');
     });
   });
 });
