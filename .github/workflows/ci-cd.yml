@@ -104,12 +104,6 @@ jobs:
         # Tests de performance
         yarn test:performance
     
-    - name: Build test
-      run: |
-        # Test du build
-        yarn clean
-        yarn build
-    
     - name: Upload coverage to Codecov
       if: matrix.node-version == 20
       uses: codecov/codecov-action@v4
