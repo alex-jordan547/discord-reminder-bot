@@ -323,6 +323,9 @@ export class SqliteStorage {
       }
       const data = event.toDict();
 
+      // Handle description field - convert undefined to null for database storage
+      const descriptionValue = data.description !== undefined ? data.description : null;
+
       await this.db.run(
         `
         INSERT OR REPLACE INTO events 
@@ -335,7 +338,7 @@ export class SqliteStorage {
           data.channel_id,
           data.guild_id,
           data.title,
-          data.description,
+          descriptionValue,
           data.interval_minutes,
           data.is_paused ? 1 : 0,
           data.last_reminder,
@@ -380,6 +383,14 @@ export class SqliteStorage {
           row.users_who_reacted = [];
         }
       }
+
+      // Handle description field - convert null to undefined
+      logger.debug(`Description value from database: ${row.description} (type: ${typeof row.description})`);
+      if (row.description === null) {
+        row.description = undefined;
+        logger.debug('Converted null description to undefined');
+      }
+      logger.debug(`Description value after processing: ${row.description} (type: ${typeof row.description})`);
 
       logger.debug(`Event retrieved successfully: ${messageId} - ${row.title}`);
       return Event.fromDict(row);
@@ -447,6 +458,12 @@ export class SqliteStorage {
             row.users_who_reacted = [];
           }
         }
+
+        // Handle description field - convert null to undefined
+        if (row.description === null) {
+          row.description = undefined;
+        }
+
         return Event.fromDict(row);
       });
     } catch (error) {
@@ -488,6 +505,12 @@ export class SqliteStorage {
             row.users_who_reacted = [];
           }
         }
+
+        // Handle description field - convert null to undefined
+        if (row.description === null) {
+          row.description = undefined;
+        }
+
         return Event.fromDict(row);
       });
     } catch (error) {
@@ -723,7 +746,7 @@ export class SqliteStorage {
         lastUsedAt: new Date(result.last_used_at),
       };
     } catch (error) {
-      logger.error(`Error getting guild config for ${guildId}:`, error);
+      logger.error(`Error getting guild config for ${guildId}:${error}`);
       return null;
     }
   }

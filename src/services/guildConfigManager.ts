@@ -93,7 +93,7 @@ export class GuildConfigManager {
       logger.info(`Created default configuration for guild ${guild.name} (${guildId})`);
       return defaultConfig;
     } catch (error) {
-      logger.error(`Error getting guild config for ${guildId}:`, error);
+      logger.error(`Error getting guild config for ${guildId}: ${error}`);
       return null;
     }
   }
