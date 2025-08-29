@@ -63,9 +63,9 @@ export async function handleWatchCommand(
     const storage = new SqliteStorage();
     const guildConfigManager = new GuildConfigManager(client, storage);
     const guildConfig = await guildConfigManager.getGuildConfig(interaction.guild.id);
-    
+
     const intervalMinutes =
-      (interaction.options.get('interval')?.value as number) || 
+      (interaction.options.get('interval')?.value as number) ||
       (guildConfig ? guildConfig.defaultIntervalMinutes : Settings.REMINDER_INTERVAL_HOURS * 60);
 
     const member = interaction.member as GuildMember;
@@ -575,7 +575,7 @@ export async function handleStatusCommand(
     logger.info(`Status command executed by ${interaction.user.tag}`);
   } catch (error) {
     logger.error(`Error in status command: ${error}`);
-    
+
     try {
       if (interaction.deferred) {
         await interaction.editReply({

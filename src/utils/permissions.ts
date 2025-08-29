@@ -346,7 +346,8 @@ export function hasAdminRole(member: GuildMember): boolean {
 export function hasGuildAdminRole(member: GuildMember, guildAdminRoles?: string[]): boolean {
   try {
     // If no guild-specific roles provided, use global settings
-    const adminRoles = guildAdminRoles && guildAdminRoles.length > 0 ? guildAdminRoles : Settings.ADMIN_ROLES;
+    const adminRoles =
+      guildAdminRoles && guildAdminRoles.length > 0 ? guildAdminRoles : Settings.ADMIN_ROLES;
 
     if (!adminRoles || adminRoles.length === 0) {
       // If no admin roles configured, check for Administrator permission

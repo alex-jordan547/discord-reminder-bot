@@ -157,7 +157,7 @@ export class Settings {
 
   // Rate Limiting Configuration
   static readonly DELAY_BETWEEN_REMINDERS = envConfig.DELAY_BETWEEN_REMINDERS;
-  
+
   // Timezone Configuration
   static readonly TIMEZONE = envConfig.TIMEZONE;
 

@@ -48,7 +48,7 @@ export async function createDiscordClient(): Promise<DiscordBotClient> {
   const eventManager = new EventManager();
   const reminderScheduler = new ReminderScheduler(client, eventManager);
   const reactionTracker = new ReactionTracker(eventManager);
-  
+
   // Attach services to client
   client.attachServices({
     eventManager,
@@ -153,7 +153,10 @@ export async function createDiscordClient(): Promise<DiscordBotClient> {
         // Skip bot reactions
         if (user.bot) return;
 
-        await client.reactionTracker.handleReactionRemove(reaction as MessageReaction, user as User);
+        await client.reactionTracker.handleReactionRemove(
+          reaction as MessageReaction,
+          user as User,
+        );
       } catch (error) {
         logger.error(`Error handling reaction remove: ${error}`);
       }

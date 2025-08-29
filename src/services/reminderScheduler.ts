@@ -48,7 +48,7 @@ export class ReminderScheduler {
   constructor(client: Client, eventManager: EventManager) {
     this.client = client;
     this.eventManager = eventManager;
-    
+
     // Initialize guild configuration manager
     const storage = new SqliteStorage();
     this.guildConfigManager = new GuildConfigManager(client, storage);
@@ -570,7 +570,8 @@ export class ReminderScheduler {
         maxMentions: config?.maxMentionsPerReminder ?? Settings.MAX_MENTIONS_PER_REMINDER,
         autoDeleteEnabled: config?.autoDeleteEnabled ?? Settings.AUTO_DELETE_REMINDERS,
         autoDeleteDelayHours: config?.getAutoDeleteDelayHours() ?? Settings.AUTO_DELETE_DELAY_HOURS,
-        delayBetweenRemindersMs: config?.delayBetweenRemindersMs ?? Settings.DELAY_BETWEEN_REMINDERS
+        delayBetweenRemindersMs:
+          config?.delayBetweenRemindersMs ?? Settings.DELAY_BETWEEN_REMINDERS,
       };
     } catch (error) {
       logger.error(`Error getting guild config for ${guildId}, using defaults:`, error);
@@ -578,7 +579,7 @@ export class ReminderScheduler {
         maxMentions: Settings.MAX_MENTIONS_PER_REMINDER,
         autoDeleteEnabled: Settings.AUTO_DELETE_REMINDERS,
         autoDeleteDelayHours: Settings.AUTO_DELETE_DELAY_HOURS,
-        delayBetweenRemindersMs: Settings.DELAY_BETWEEN_REMINDERS
+        delayBetweenRemindersMs: Settings.DELAY_BETWEEN_REMINDERS,
       };
     }
   }
