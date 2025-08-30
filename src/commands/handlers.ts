@@ -9,7 +9,6 @@
  */
 
 import {
-  Client,
   ChatInputCommandInteraction,
   GuildMember,
   TextChannel,
@@ -17,18 +16,25 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   MessageFlags,
+  StringSelectMenuInteraction,
 } from 'discord.js';
 import { DiscordBotClient } from '@/types/BotClient';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
-import { EventManager } from '@/services/eventManager';
-import { ReminderScheduler } from '@/services/reminderScheduler';
 import { parseMessageLink, validateMessageLink } from '@/utils/messageParser';
 import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '@/utils/permissions';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Event as EventModel } from '@/models';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
+import {
+  getSelectableMessages,
+  createMessageSelectMenu,
+  createMessageSelectionEmbed,
+  createTimeSelectMenu,
+  createTimeSelectionEmbed,
+  MessageSelectionOption,
+} from '@/utils/messageSelector';
 
 const logger = createLogger('handlers');
 
@@ -205,7 +211,11 @@ export async function handleWatchCommand(
             : `Now watching the message for reactions!`,
         )
         .addFields(
-          { name: '📝 Message', value: `[Jump to message](${messageLink})`, inline: false },
+          {
+            name: '📝 Message',
+            value: `[Jump to message](https://discord.com/channels/${interaction.guildId}/${parsed.channelId}/${parsed.messageId})`,
+            inline: false,
+          },
           { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
           {
             name: '🔔 Next Reminder',
@@ -883,7 +893,8 @@ async function handleInteractiveWatchCommand(
     }
 
     // Ensure we're in a text channel
-    if (!interaction.channel || interaction.channel.type !== 0) { // 0 = GUILD_TEXT
+    if (!interaction.channel || interaction.channel.type !== 0) {
+      // 0 = GUILD_TEXT
       await interaction.reply({
         content: '❌ This command can only be used in text channels.',
         flags: MessageFlags.Ephemeral,
@@ -909,7 +920,8 @@ async function handleInteractiveWatchCommand(
     // Check if we have any suitable messages
     if (selectableMessages.length === 0) {
       await interaction.reply({
-        content: '❌ No suitable messages found in this channel. The channel needs at least one user message (not bot or system messages).',
+        content:
+          '❌ No suitable messages found in this channel. The channel needs at least one user message (not bot or system messages).',
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -941,7 +953,7 @@ async function handleInteractiveWatchCommand(
     });
 
     if (collector) {
-      collector.on('collect', async (selectInteraction) => {
+      collector.on('collect', async selectInteraction => {
         try {
           await selectInteraction.deferUpdate();
 
@@ -960,7 +972,9 @@ async function handleInteractiveWatchCommand(
           // Show time selection interface
           const timeSelectMenu = createTimeSelectMenu(`watch_time_select_${interaction.user.id}`);
           const timeEmbed = createTimeSelectionEmbed(selectedMessage);
-          const timeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(timeSelectMenu);
+          const timeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            timeSelectMenu,
+          );
 
           await selectInteraction.editReply({
             embeds: [timeEmbed],
@@ -979,7 +993,7 @@ async function handleInteractiveWatchCommand(
           });
 
           if (timeCollector) {
-            timeCollector.on('collect', async (timeSelectInteraction) => {
+            timeCollector.on('collect', async timeSelectInteraction => {
               try {
                 await timeSelectInteraction.deferUpdate();
 
@@ -1068,8 +1082,13 @@ async function handleInteractiveWatchCommand(
                   const reminderScheduler = client.reminderScheduler;
                   await reminderScheduler.scheduleEvent(event);
 
+                  // Add default reactions to the message for new events
+                  if (!isUpdate) {
+                    await addDefaultReactionsToMessage(message, interaction.guildId!);
+                  }
+
                   // Create success embed
-                  const successEmbed = new EmbedBuilder()
+                  const embed = new EmbedBuilder()
                     .setColor(0x00ae86)
                     .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
                     .setDescription(
@@ -1080,7 +1099,7 @@ async function handleInteractiveWatchCommand(
                     .addFields(
                       {
                         name: '📝 Message',
-                        value: `[Jump to message](https://discord.com/channels/${event.guildId}/${event.channelId}/${event.messageId})`,
+                        value: `[Jump to message](https://discord.com/channels/${interaction.guildId}/${selectedMessage.channelId}/${selectedMessage.messageId})`,
                         inline: false,
                       },
                       { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
@@ -1091,38 +1110,42 @@ async function handleInteractiveWatchCommand(
                       },
                     );
 
+                  // Add reaction count field for updates
                   if (isUpdate && event.usersWhoReacted.length > 0) {
-                    successEmbed.addFields({
+                    embed.addFields({
                       name: '👥 Current Reactions',
                       value: `${event.usersWhoReacted.length} users have reacted`,
                       inline: true,
                     });
                   }
 
-                  successEmbed
-                    .setFooter({ text: 'Users who react to the message will be tracked automatically' })
+                  embed
+                    .setFooter({
+                      text: 'Users who react to the message will be tracked automatically',
+                    })
                     .setTimestamp();
 
                   await timeSelectInteraction.editReply({
-                    embeds: [successEmbed],
+                    embeds: [embed],
                     components: [],
                   });
 
                   logger.info(
-                    `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag} (interactive mode)`,
+                    `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag}`,
                   );
-
                 } catch (messageError) {
-                  logger.error(`Error fetching message: ${messageError}`);
+                  logger.error(
+                    `Error creating event for message ${selectedMessage.messageId}:`,
+                    messageError,
+                  );
                   await timeSelectInteraction.editReply({
                     content: '❌ Could not access the selected message. It may have been deleted.',
                     components: [],
                     embeds: [],
                   });
                 }
-
               } catch (error) {
-                logger.error(`Error in time selection: ${error}`);
+                logger.error('Error in time selection:', error);
                 await timeSelectInteraction.editReply({
                   content: '❌ An error occurred while setting up the watch. Please try again.',
                   components: [],
@@ -1131,7 +1154,7 @@ async function handleInteractiveWatchCommand(
               }
             });
 
-            timeCollector.on('end', async (collected) => {
+            timeCollector.on('end', async collected => {
               if (collected.size === 0) {
                 try {
                   await selectInteraction.editReply({
@@ -1140,14 +1163,13 @@ async function handleInteractiveWatchCommand(
                     embeds: [],
                   });
                 } catch (error) {
-                  logger.debug('Could not update message after time selection timeout:', error);
+                  logger.debug('Could not edit reply after time selection timeout:', error);
                 }
               }
             });
           }
-
         } catch (error) {
-          logger.error(`Error in message selection: ${error}`);
+          logger.error('Error in message selection:', error);
           await selectInteraction.editReply({
             content: '❌ An error occurred while processing your selection. Please try again.',
             components: [],
@@ -1156,7 +1178,7 @@ async function handleInteractiveWatchCommand(
         }
       });
 
-      collector.on('end', async (collected) => {
+      collector.on('end', async collected => {
         if (collected.size === 0) {
           try {
             await interaction.editReply({
@@ -1165,56 +1187,44 @@ async function handleInteractiveWatchCommand(
               embeds: [],
             });
           } catch (error) {
-            logger.debug('Could not update message after message selection timeout:', error);
+            logger.debug('Could not edit reply after message selection timeout:', error);
           }
         }
       });
     }
 
+    logger.info(
+      `Interactive watch command executed by ${interaction.user.tag} - ${selectableMessages.length} messages available`,
+    );
   } catch (error) {
-    logger.error(`Error in interactive watch command: ${error}`);
-
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '❌ An error occurred while setting up the interactive watch. Please try again.',
-        flags: MessageFlags.Ephemeral,
-      });
-    } else {
-      await interaction.followUp({
-        content: '❌ An error occurred while setting up the interactive watch. Please try again.',
-        flags: MessageFlags.Ephemeral,
-      });
-    }
+    logger.error('Error in interactive watch command:', error);
+    await interaction.reply({
+      content: '❌ An error occurred while setting up the interactive watch. Please try again.',
+      flags: MessageFlags.Ephemeral,
+    });
   }
 }
 
 /**
- * Add default reactions to a message based on guild configuration
+ * Add default reactions to a message
  */
 async function addDefaultReactionsToMessage(message: any, guildId: string): Promise<void> {
   try {
-    // Get guild configuration
-    const configManager = new GuildConfigManager();
-    const guildConfig = await configManager.getGuildConfig(guildId);
-
-    // Get default reactions (fallback to standard reactions if none configured)
-    const defaultReactions = guildConfig?.defaultReactions || ['✅', '❌', '❓'];
-
-    // Add each reaction to the message
-    for (const reaction of defaultReactions) {
+    // Add common reaction emojis
+    const reactions = ['✅', '❌', '👍', '👎'];
+    for (const reaction of reactions) {
       try {
         await message.react(reaction);
-        // Small delay to avoid rate limits
+        // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (reactionError) {
-        logger.warn(`Could not add reaction ${reaction} to message ${message.id}: ${reactionError}`);
-        // Continue with next reaction even if one fails
+      } catch (error) {
+        logger.debug(`Could not add reaction ${reaction} to message:`, error);
+        // Continue with other reactions even if one fails
       }
     }
-
-    logger.info(`Added ${defaultReactions.length} default reactions to message ${message.id} in guild ${guildId}`);
-    logger.debug(`Reactions added: ${defaultReactions.join(', ')}`);
+    logger.debug(`Added default reactions to message ${message.id} in guild ${guildId}`);
   } catch (error) {
-    logger.error(`Error adding default reactions to message ${message?.id}: ${error}`);
+    logger.warn('Error adding default reactions:', error);
+    // Don't throw - this is not critical for the main functionality
   }
 }

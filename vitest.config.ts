@@ -5,6 +5,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: ['./src/tests/setup.ts'],
+    // Charge le fichier .env.test pour les tests
+    env: {
+      NODE_ENV: 'test',
+      DATABASE_PATH: ':memory:',
+      DATABASE_NAME: ':memory:',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

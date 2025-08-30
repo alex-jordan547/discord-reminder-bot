@@ -51,8 +51,14 @@ class SimpleDatabaseManager implements DatabaseInterface {
   private db: Database.Database | null = null;
   private dbPath: string;
 
-  constructor(dbPath: string = 'discord_bot.db') {
-    this.dbPath = dbPath;
+  constructor(dbPath?: string) {
+    // Utilise les variables d'environnement en priorité, puis le paramètre, puis le défaut
+    this.dbPath = dbPath || process.env.DATABASE_PATH || 'discord_bot.db';
+
+    // Log crucial pour voir quel chemin est utilisé
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`🔍 TEST MODE: Database path = ${this.dbPath}`);
+    }
   }
 
   async connect(): Promise<void> {
@@ -118,6 +124,13 @@ class SimpleDatabaseManager implements DatabaseInterface {
 let databaseInstance: SimpleDatabaseManager | null = null;
 
 export function getDatabase(): SimpleDatabaseManager {
+  // En mode test, utilise toujours DATABASE_PATH depuis les variables d'environnement
+  if (process.env.NODE_ENV === 'test') {
+    // Crée une nouvelle instance à chaque fois en mode test pour respecter DATABASE_PATH
+    return new SimpleDatabaseManager();
+  }
+
+  // En mode normal, utilise le singleton
   if (!databaseInstance) {
     databaseInstance = new SimpleDatabaseManager();
   }
@@ -385,12 +398,16 @@ export class SqliteStorage {
       }
 
       // Handle description field - convert null to undefined
-      logger.debug(`Description value from database: ${row.description} (type: ${typeof row.description})`);
+      logger.debug(
+        `Description value from database: ${row.description} (type: ${typeof row.description})`,
+      );
       if (row.description === null) {
         row.description = undefined;
         logger.debug('Converted null description to undefined');
       }
-      logger.debug(`Description value after processing: ${row.description} (type: ${typeof row.description})`);
+      logger.debug(
+        `Description value after processing: ${row.description} (type: ${typeof row.description})`,
+      );
 
       logger.debug(`Event retrieved successfully: ${messageId} - ${row.title}`);
       return Event.fromDict(row);
