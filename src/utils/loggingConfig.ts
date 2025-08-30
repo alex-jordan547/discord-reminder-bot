@@ -80,11 +80,23 @@ function shouldUseColors(): boolean {
 }
 
 /**
+ * Custom error serializer for better error logging
+ */
+function errorSerializer(error: Error): Record<string, unknown> {
+  return {
+    type: error.constructor.name,
+    message: error.message,
+    stack: error.stack,
+    ...(error.cause && { cause: error.cause }),
+  };
+}
+
+/**
  * Custom formatter for colorized console output
  */
 function createColoredFormatter(useColors: boolean): (obj: Record<string, unknown>) => string {
   return (obj: Record<string, unknown>): string => {
-    const { level, time, name, msg, ...extra } = obj;
+    const { level, time, name, msg, err, error, ...extra } = obj;
 
     // Type assertion for pino log object properties
     const pinoLevel = level as number;
@@ -109,6 +121,53 @@ function createColoredFormatter(useColors: boolean): (obj: Record<string, unknow
     // Format level name
     const levelName = logLevel.padEnd(8);
 
+    // Handle error objects specially - check both err/error fields and extra fields
+    let errorObj = err || error;
+
+    // Also check if there's an Error object in the extra fields (this happens when you do logger.error('msg', errorObject))
+    if (!errorObj) {
+      for (const [key, value] of Object.entries(extra)) {
+        if (
+          value instanceof Error ||
+          (typeof value === 'object' && value && 'message' in value && 'stack' in value)
+        ) {
+          errorObj = value;
+          // Remove it from extra so it's not displayed twice
+          delete extra[key];
+          break;
+        }
+      }
+    }
+
+    let errorMessage = '';
+    if (errorObj && typeof errorObj === 'object') {
+      if (errorObj.message && errorObj.stack) {
+        // It's an Error object
+        errorMessage = `\n  Error: ${errorObj.message}`;
+        if (useColors) {
+          errorMessage = chalk.red(errorMessage);
+        }
+
+        // Add stack trace on new lines, indented
+        if (errorObj.stack && typeof errorObj.stack === 'string') {
+          const stackLines = errorObj.stack.split('\n').slice(1); // Skip first line (it's the message)
+          stackLines.forEach(line => {
+            errorMessage += `\n    ${line}`;
+          });
+          if (useColors) {
+            // Apply dim style to stack trace lines
+            errorMessage = errorMessage.replace(/(\n {4}.+)/g, match => chalk.dim(match));
+          }
+        }
+      } else {
+        // It's some other object
+        errorMessage = `\n  ${JSON.stringify(errorObj, null, 2).split('\n').join('\n  ')}`;
+        if (useColors) {
+          errorMessage = chalk.yellow(errorMessage);
+        }
+      }
+    }
+
     if (useColors) {
       // Get colors for this level
       const levelColor = LEVEL_COLORS[logLevel];
@@ -124,10 +183,20 @@ function createColoredFormatter(useColors: boolean): (obj: Record<string, unknow
       // Construct the formatted message with colored components
       let formatted = `${coloredTimestamp}${separator}${coloredLevel}${separator}${coloredLogger}${separator}${coloredMessage}`;
 
-      // Add extra fields if present
+      // Add error information if present
+      if (errorMessage) {
+        formatted += errorMessage;
+      }
+
+      // Add extra fields if present (excluding error fields we already handled)
       if (Object.keys(extra).length > 0) {
         const extraStr = Object.entries(extra)
-          .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+          .map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              return `${key}=${JSON.stringify(value, null, 2).split('\n').join('\n    ')}`;
+            }
+            return `${key}=${JSON.stringify(value)}`;
+          })
           .join(' ');
         formatted += ` ${chalk.dim(extraStr)}`;
       }
@@ -138,10 +207,20 @@ function createColoredFormatter(useColors: boolean): (obj: Record<string, unknow
       const emoji = LEVEL_EMOJIS[logLevel];
       let formatted = `${timestamp} | ${emoji} ${levelName} | ${loggerName} | ${pinoMsg}`;
 
+      // Add error information if present
+      if (errorMessage) {
+        formatted += errorMessage;
+      }
+
       // Add extra fields if present
       if (Object.keys(extra).length > 0) {
         const extraStr = Object.entries(extra)
-          .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+          .map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              return `${key}=${JSON.stringify(value, null, 2)}`;
+            }
+            return `${key}=${JSON.stringify(value)}`;
+          })
           .join(' ');
         formatted += ` ${extraStr}`;
       }
@@ -177,6 +256,11 @@ export function setupLogging(options: {
     base: null,
     level: pinoLevel,
     name: 'discord-reminder-bot',
+    // Add error serializer to handle Error objects properly
+    serializers: {
+      err: errorSerializer,
+      error: errorSerializer,
+    },
   };
 
   // Create streams
@@ -303,6 +387,32 @@ export function testColorizedLogging(logger: Logger): void {
   logger.fatal('🚨 CRITICAL - Maximum de visibilité');
 }
 
+/**
+ * Test function to demonstrate error logging
+ */
+export function testErrorLogging(logger: Logger): void {
+  // Test with a real Error object
+  const testError = new Error('This is a test error message');
+  testError.stack =
+    'Error: This is a test error message\n    at testErrorLogging (/path/to/file.ts:123:45)\n    at someFunction (/path/to/file.ts:67:89)';
+
+  logger.error('Error fetching selectable messages', testError);
+
+  // Test with error as named parameter (recommended)
+  logger.error('Error fetching selectable messages', { err: testError });
+
+  // Test with custom object
+  logger.error('Custom error object', { customData: { id: 123, status: 'failed' } });
+
+  // Test with multiple parameters
+  logger.error('Complex error scenario', {
+    err: testError,
+    userId: '12345',
+    operation: 'fetchMessages',
+    retryCount: 3,
+  });
+}
+
 // Default logger instance
 let defaultLogger: Logger | null = null;
 
@@ -321,11 +431,52 @@ export function getDefaultLogger(): Logger {
 }
 
 /**
- * Create a child logger with a specific name
+ * Create a child logger with a specific name and error handling wrapper
  */
 export function createLogger(name: string): Logger {
   const parentLogger = getDefaultLogger();
-  return parentLogger.child({ name });
+  const childLogger = parentLogger.child({ name });
+
+  // Create a wrapper that handles Error objects properly
+  const wrappedLogger = Object.create(childLogger);
+
+  // Override the error method to handle Error objects as second parameter
+  wrappedLogger.error = function (messageOrObj: any, ...args: any[]) {
+    // If second argument is an Error object, put it in the err field
+    if (args.length > 0 && args[0] instanceof Error) {
+      const error = args[0];
+      const additionalData = args.length > 1 ? args[1] : {};
+      return childLogger.error({ err: error, ...additionalData }, messageOrObj);
+    }
+    // If second argument is an object with error data
+    else if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
+      return childLogger.error(args[0], messageOrObj);
+    }
+    // Otherwise, use normal Pino behavior
+    else {
+      return childLogger.error(messageOrObj, ...args);
+    }
+  };
+
+  // Override other log levels to maintain consistency
+  ['debug', 'info', 'warn', 'fatal'].forEach(level => {
+    wrappedLogger[level] = function (messageOrObj: any, ...args: any[]) {
+      if (args.length > 0 && args[0] instanceof Error) {
+        const error = args[0];
+        const additionalData = args.length > 1 ? args[1] : {};
+        return (childLogger as any)[level]({ err: error, ...additionalData }, messageOrObj);
+      } else if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
+        return (childLogger as any)[level](args[0], messageOrObj);
+      } else {
+        return (childLogger as any)[level](messageOrObj, ...args);
+      }
+    };
+  });
+
+  // Preserve other properties and methods
+  Object.setPrototypeOf(wrappedLogger, childLogger);
+
+  return wrappedLogger as Logger;
 }
 
 export default getDefaultLogger;
