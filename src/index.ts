@@ -36,7 +36,7 @@ async function gracefulShutdown(signal: string, client?: any, server?: any): Pro
 
     // Close logging system properly
     await closeLogging();
-    console.log('✅ Logging system closed');
+    // console.log('✅ Logging system closed');
 
     process.exit(0);
   } catch (error) {

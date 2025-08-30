@@ -104,7 +104,12 @@ export class Event extends BaseModel<EventData> {
       this.channelId = data.channelId;
       this.guildId = data.guildId;
       this.title = data.title;
-      this.description = data.description;
+      // Handle description field - convert null to undefined
+      if (data.description === null) {
+        this.description = undefined;
+      } else {
+        this.description = data.description;
+      }
       this.intervalMinutes = data.intervalMinutes;
       this.isPaused = data.isPaused;
       this.lastRemindedAt = data.lastReminder ? new Date(data.lastReminder) : null;
@@ -150,6 +155,11 @@ export class Event extends BaseModel<EventData> {
     // Validate title
     errors.push(...validateNonEmptyString(this.title, 'title', 100));
 
+    // Handle description field - convert null to undefined and validate
+    if (this.description === null) {
+      this.description = undefined;
+    }
+    
     // Validate description (optional but if present, check length)
     if (this.description !== undefined) {
       if (typeof this.description !== 'string') {
@@ -231,12 +241,20 @@ export class Event extends BaseModel<EventData> {
    * Create Event from Python-style dictionary format
    */
   static fromDict(data: Record<string, any>): Event {
-    return new Event({
+    // Handle description field - convert null to undefined
+    let descriptionValue = data.description;
+    if (descriptionValue === null) {
+      descriptionValue = undefined;
+    }
+    
+    // Also handle the case where description comes from database as null
+    // in the data object passed to the constructor
+    const eventData = {
       messageId: String(data.message_id || data.messageId),
       channelId: String(data.channel_id || data.channelId),
       guildId: String(data.guild_id || data.guildId),
       title: String(data.title),
-      description: data.description,
+      description: descriptionValue,
       intervalMinutes: Number(data.interval_minutes || data.intervalMinutes || 60),
       isPaused: Boolean(data.is_paused || data.isPaused || false),
       lastReminder: new Date(data.last_reminder || data.lastReminder || Date.now()),
@@ -247,7 +265,14 @@ export class Event extends BaseModel<EventData> {
           : [],
       createdAt: new Date(data.created_at || data.createdAt || Date.now()),
       updatedAt: new Date(data.updated_at || data.updatedAt || Date.now()),
-    });
+    };
+    
+    // Ensure description is undefined if it was null
+    if (eventData.description === null) {
+      eventData.description = undefined;
+    }
+    
+    return new Event(eventData);
   }
 
   /**

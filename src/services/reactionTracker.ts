@@ -11,6 +11,8 @@
 import { MessageReaction, User } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 import { EventManager } from './eventManager';
+import { GuildConfig } from '@/models/GuildConfig';
+import { Settings } from '@/config/settings';
 
 const logger = createLogger('reaction-tracker');
 
@@ -27,11 +29,25 @@ export class ReactionTracker {
     this.eventManager = eventManager;
   }
 
+  /**
+   * Récupère dynamiquement les réactions valides pour un message (via guildConfig ou fallback)
+   */
+  private async getValidReactionsForEvent(messageId: string): Promise<string[]> {
+    const event = await this.eventManager.getEvent(messageId);
+    if (!event || !event.guildId) return [...Settings.DEFAULT_REACTIONS];
+    const config = await GuildConfig.findByGuildId(event.guildId);
+    if (config && Array.isArray(config.defaultReactions) && config.defaultReactions.length > 0) {
+      return [...config.defaultReactions];
+    }
+    return [...Settings.DEFAULT_REACTIONS];
+  }
+
   /** Handle when a user adds a reaction to a message */
   async handleReactionAdd(reaction: MessageReaction, user: User): Promise<void> {
     try {
       const messageId = reaction.message.id;
-
+      const validReactions = await this.getValidReactionsForEvent(messageId);
+      if (!validReactions.includes(reaction.emoji.name)) return;
       // Vérifier si le message est suivi
       const event = await this.eventManager.getEvent(messageId);
       if (!event) return;
@@ -62,6 +78,8 @@ export class ReactionTracker {
   async handleReactionRemove(reaction: MessageReaction, user: User): Promise<void> {
     try {
       const messageId = reaction.message.id;
+      const validReactions = await this.getValidReactionsForEvent(messageId);
+      if (!validReactions.includes(reaction.emoji.name)) return;
 
       const event = await this.eventManager.getEvent(messageId);
       if (!event) return;

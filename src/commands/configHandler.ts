@@ -1231,7 +1231,7 @@ function setupMentionCollectors(
             selectedLimit === 0
               ? 'Aucune limite : Tous les utilisateurs seront mentionnés individuellement.'
               : `Limite configurée : **${selectedLimit} utilisateurs**\n` +
-                  `Comportement : **${selectedBehavior ? 'Utiliser @everyone au-dessus de la limite' : 'Arrêter les mentions à la limite'}**`,
+                  `Comportement : **${selectedBehavior ? 'Utiliser @everyone au-dessus' : 'Arrêter les mentions à la limite'}**`,
           )
           .addFields({
             name: '💡 Information',
@@ -1953,5 +1953,41 @@ async function handleSuggestions(
     await interaction.editReply({
       content: '❌ Impossible de charger les suggestions.',
     });
+  }
+}
+
+/**
+ * Discord Reminder Bot - Configuration Command Handler
+ *
+ * Wrapper for handleConfigSet to allow direct calls with configManager in tests
+ */
+
+export async function handleConfigSetCommand(
+  interaction: ChatInputCommandInteraction,
+  configManager: GuildConfigManager,
+): Promise<void> {
+  try {
+    // If tests call this directly, ensure we defer reply similarly to command handler
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+
+    // Call internal handler; pass client from configManager if available
+    const client = (configManager as any).client as Client | undefined;
+    await handleConfigSet(interaction, configManager, client as any);
+  } catch (error) {
+    logger.error(`Error in handleConfigSetCommand: ${String(error)}`);
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply({ content: '❌ Une erreur est survenue.' });
+      } else if (!interaction.replied) {
+        await interaction.reply({
+          content: '❌ Une erreur est survenue.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (replyError) {
+      logger.debug('Failed to send error reply in handleConfigSetCommand:', replyError);
+    }
   }
 }

@@ -106,7 +106,7 @@ function testLogging(): void {
  * Main test function
  */
 export function runSetupTests(): void {
-  console.log('\n=== Discord Reminder Bot - TypeScript Setup Tests ===\n');
+  // console.log('\n=== Discord Reminder Bot - TypeScript Setup Tests ===\n');
 
   try {
     // Initialize logging
@@ -118,12 +118,12 @@ export function runSetupTests(): void {
 
     // Run tests
     testConfiguration();
-    console.log(''); // Add spacing
+    // console.log(''); // Add spacing
     testFeatureFlags();
-    console.log(''); // Add spacing
+    // console.log(''); // Add spacing
     testLogging();
 
-    console.log('\n=== All setup tests completed successfully! ===\n');
+    // console.log('\n=== All setup tests completed successfully! ===\n');
   } catch (error) {
     console.error('❌ Setup test failed:', error);
     process.exit(1);

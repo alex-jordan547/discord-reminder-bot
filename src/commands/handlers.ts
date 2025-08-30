@@ -29,14 +29,6 @@ import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Event as EventModel } from '@/models';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import {
-  getSelectableMessages,
-  createMessageSelectMenu,
-  createMessageSelectionEmbed,
-  createTimeSelectMenu,
-  createTimeSelectionEmbed,
-  MessageSelectionOption,
-} from '@/utils/messageSelector';
 
 const logger = createLogger('handlers');
 
@@ -197,6 +189,11 @@ export async function handleWatchCommand(
       // Schedule reminders
       const reminderScheduler = client.reminderScheduler;
       await reminderScheduler.scheduleEvent(event);
+
+      // Add default reactions to the message for new events
+      if (!isUpdate) {
+        await addDefaultReactionsToMessage(message, interaction.guildId!);
+      }
 
       // Create success embed with appropriate title and description
       const embed = new EmbedBuilder()
@@ -1176,7 +1173,7 @@ async function handleInteractiveWatchCommand(
 
   } catch (error) {
     logger.error(`Error in interactive watch command: ${error}`);
-    
+
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: '❌ An error occurred while setting up the interactive watch. Please try again.',
@@ -1188,5 +1185,36 @@ async function handleInteractiveWatchCommand(
         flags: MessageFlags.Ephemeral,
       });
     }
+  }
+}
+
+/**
+ * Add default reactions to a message based on guild configuration
+ */
+async function addDefaultReactionsToMessage(message: any, guildId: string): Promise<void> {
+  try {
+    // Get guild configuration
+    const configManager = new GuildConfigManager();
+    const guildConfig = await configManager.getGuildConfig(guildId);
+
+    // Get default reactions (fallback to standard reactions if none configured)
+    const defaultReactions = guildConfig?.defaultReactions || ['✅', '❌', '❓'];
+
+    // Add each reaction to the message
+    for (const reaction of defaultReactions) {
+      try {
+        await message.react(reaction);
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (reactionError) {
+        logger.warn(`Could not add reaction ${reaction} to message ${message.id}: ${reactionError}`);
+        // Continue with next reaction even if one fails
+      }
+    }
+
+    logger.info(`Added ${defaultReactions.length} default reactions to message ${message.id} in guild ${guildId}`);
+    logger.debug(`Reactions added: ${defaultReactions.join(', ')}`);
+  } catch (error) {
+    logger.error(`Error adding default reactions to message ${message?.id}: ${error}`);
   }
 }

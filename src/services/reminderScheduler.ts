@@ -45,6 +45,11 @@ export class ReminderScheduler {
   private status: SchedulerStatus;
   private guildConfigManager: GuildConfigManager;
 
+  // Protection against infinite loops
+  private failedReminders: Map<string, { count: number; lastAttempt: Date }> = new Map();
+  private readonly MAX_FAILED_ATTEMPTS = 5;
+  private readonly FAILED_REMINDER_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+
   constructor(client: Client, eventManager: EventManager) {
     this.client = client;
     this.eventManager = eventManager;
@@ -328,11 +333,26 @@ export class ReminderScheduler {
 
     for (const event of overdueEvents) {
       try {
+        // Check if this event is in cooldown due to repeated failures
+        if (this.isEventInFailureCooldown(event.messageId)) {
+          logger.warn(`Event ${event.messageId} is in failure cooldown, skipping reminder`);
+          continue;
+        }
+
         const count = await this.sendReminder(event);
         totalReminded += count;
 
         // Mark event as reminded
-        await this.eventManager.markEventReminded(event.messageId);
+        const marked = await this.eventManager.markEventReminded(event.messageId);
+
+        if (marked) {
+          // Success - clear any failure tracking
+          this.clearFailureTracking(event.messageId);
+        } else {
+          // Failed to mark as reminded - track failure
+          this.trackFailedReminder(event.messageId);
+          logger.error(`Failed to mark event ${event.messageId} as reminded - tracking failure`);
+        }
 
         // Add delay between reminders to respect rate limits
         if (overdueEvents.length > 1) {
@@ -340,6 +360,7 @@ export class ReminderScheduler {
         }
       } catch (error) {
         logger.error(`Failed to send overdue reminder for event ${event.messageId}: ${error}`);
+        this.trackFailedReminder(event.messageId);
       }
     }
 
@@ -432,11 +453,14 @@ export class ReminderScheduler {
       const totalAccessibleUsers = await this.getTotalAccessibleUsers(channel);
       const reactedCount = event.getReactionCount();
 
+      // Build reaction instruction text using guild-configured reactions
+      const configuredReactions = guildConfig.defaultReactions || ['✅', '❌', '❓'];
+      const reactionText = this.buildReactionInstructionText([...configuredReactions]);
+
       const embed = new EmbedBuilder()
         .setTitle(`🔔 Rappel: ${event.title.substring(0, Settings.MAX_TITLE_LENGTH || 100)}`)
         .setDescription(
-          "**Merci de mettre votre disponibilité pour l'évènement!**\n" +
-            'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)',
+          "**Merci de mettre votre disponibilité pour l'évènement!**\n" + reactionText,
         )
         .setColor(0xffa500) // Orange color like in Python
         .addFields(
@@ -514,13 +538,18 @@ export class ReminderScheduler {
    */
   private async updateEventReactions(event: Event, message: any): Promise<void> {
     try {
-      // Collect users who have reacted with standard emojis
+      // Collect users who have reacted with configured emojis (guild-specific or defaults)
       const reactedUsers: string[] = [];
-      const standardEmojis = ['✅', '❌', '❓'];
+
+      // Récupérer les réactions valides depuis la configuration de la guilde
+      const guildCfg = await this.getGuildConfig(event.guildId);
+      const validEmojis = Array.isArray(guildCfg.defaultReactions)
+        ? guildCfg.defaultReactions
+        : ['✅', '❌', '❓'];
 
       for (const reaction of message.reactions.cache.values()) {
         const emojiName = reaction.emoji.name || reaction.emoji.toString();
-        if (standardEmojis.includes(emojiName)) {
+        if (validEmojis.includes(emojiName)) {
           const users = await reaction.users.fetch();
           for (const user of users.values()) {
             if (!user.bot && !reactedUsers.includes(user.id)) {
@@ -535,7 +564,7 @@ export class ReminderScheduler {
       if (success) {
         event.usersWhoReacted = reactedUsers; // Update local object too
         logger.debug(
-          `Updated reactions for event ${event.messageId}: ${reactedUsers.length} users reacted`,
+          `Updated reactions for event ${event.messageId}: ${reactedUsers.length} users reacted (using config: ${validEmojis.join(',')})`,
         );
       } else {
         logger.error(`Failed to save updated reactions for event ${event.messageId}`);
@@ -572,6 +601,7 @@ export class ReminderScheduler {
         autoDeleteDelayHours: config?.getAutoDeleteDelayHours() ?? Settings.AUTO_DELETE_DELAY_HOURS,
         delayBetweenRemindersMs:
           config?.delayBetweenRemindersMs ?? Settings.DELAY_BETWEEN_REMINDERS,
+        defaultReactions: config?.defaultReactions ?? Settings.DEFAULT_REACTIONS,
       };
     } catch (error) {
       logger.error(`Error getting guild config for ${guildId}, using defaults:`, error);
@@ -580,6 +610,7 @@ export class ReminderScheduler {
         autoDeleteEnabled: Settings.AUTO_DELETE_REMINDERS,
         autoDeleteDelayHours: Settings.AUTO_DELETE_DELAY_HOURS,
         delayBetweenRemindersMs: Settings.DELAY_BETWEEN_REMINDERS,
+        defaultReactions: Settings.DEFAULT_REACTIONS,
       };
     }
   }
@@ -711,6 +742,150 @@ export class ReminderScheduler {
     } catch (error) {
       logger.error(`Error getting missing users for channel ${channel.id}: ${error}`);
       return [];
+    }
+  }
+
+  /**
+   * Build reaction instruction text based on configured reactions
+   */
+  private buildReactionInstructionText(reactions: string[]): string {
+    if (reactions.length === 0) {
+      return 'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)';
+    }
+
+    // Handle specific preset configurations with known meanings
+    const reactionMeanings = this.getReactionMeanings(reactions);
+
+    if (reactionMeanings) {
+      // Use preset meanings
+      const instructionParts = reactions.map((reaction, index) => {
+        const meaning = reactionMeanings[index] || 'réaction';
+        return `${reaction} (${meaning})`;
+      });
+
+      if (instructionParts.length === 2) {
+        return `Réagissez avec ${instructionParts.join(' ou ')}`;
+      } else if (instructionParts.length === 3) {
+        return `Réagissez avec ${instructionParts[0]}, ${instructionParts[1]} ou ${instructionParts[2]}`;
+      } else {
+        return `Réagissez avec ${instructionParts.slice(0, -1).join(', ')} ou ${instructionParts[instructionParts.length - 1]}`;
+      }
+    } else {
+      // Generic text for custom reactions without preset meanings
+      if (reactions.length === 2) {
+        return `Réagissez avec ${reactions.join(' ou ')}`;
+      } else if (reactions.length === 3) {
+        return `Réagissez avec ${reactions[0]}, ${reactions[1]} ou ${reactions[2]}`;
+      } else {
+        return `Réagissez avec ${reactions.slice(0, -1).join(', ')} ou ${reactions[reactions.length - 1]}`;
+      }
+    }
+  }
+
+  /**
+   * Get predefined meanings for common reaction presets
+   */
+  private getReactionMeanings(reactions: string[]): string[] | null {
+    const reactionString = reactions.join(',');
+
+    // Default reactions
+    if (reactionString === '✅,❌,❓') {
+      return ['dispo', 'pas dispo', 'incertain'];
+    }
+
+    // Gaming preset
+    if (reactionString === '🎮,⏰,❌') {
+      return ['partant', 'en retard', 'absent'];
+    }
+
+    // Simple yes/no
+    if (reactionString === '✅,❌') {
+      return ['oui', 'non'];
+    }
+
+    // Thumbs up/down
+    if (reactionString === '👍,👎') {
+      return ["j'aime", "j'aime pas"];
+    }
+
+    // Like/dislike/neutral/love
+    if (reactionString === '👍,👎,🤷,❤️') {
+      return ["j'aime", "j'aime pas", 'indifférent', 'adoré'];
+    }
+
+    // Traffic light system
+    if (reactionString === '🟢,🔴,🟡') {
+      return ['go', 'stop', 'attention'];
+    }
+
+    return null; // No predefined meanings found
+  }
+
+  /**
+   * Check if an event is in failure cooldown
+   */
+  private isEventInFailureCooldown(messageId: string): boolean {
+    const failure = this.failedReminders.get(messageId);
+    if (!failure) return false;
+
+    const now = new Date();
+    const timeSinceLastAttempt = now.getTime() - failure.lastAttempt.getTime();
+
+    // If exceeded max attempts and still in cooldown period
+    if (
+      failure.count >= this.MAX_FAILED_ATTEMPTS &&
+      timeSinceLastAttempt < this.FAILED_REMINDER_COOLDOWN
+    ) {
+      return true;
+    }
+
+    // If cooldown period has passed, reset the counter
+    if (
+      failure.count >= this.MAX_FAILED_ATTEMPTS &&
+      timeSinceLastAttempt >= this.FAILED_REMINDER_COOLDOWN
+    ) {
+      logger.info(`Event ${messageId} cooldown period expired, resetting failure count`);
+      this.failedReminders.delete(messageId);
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Track a failed reminder attempt
+   */
+  private trackFailedReminder(messageId: string): void {
+    const now = new Date();
+    const failure = this.failedReminders.get(messageId);
+
+    if (failure) {
+      failure.count++;
+      failure.lastAttempt = now;
+    } else {
+      this.failedReminders.set(messageId, { count: 1, lastAttempt: now });
+    }
+
+    const currentFailure = this.failedReminders.get(messageId)!;
+    logger.warn(
+      `Event ${messageId} failure count: ${currentFailure.count}/${this.MAX_FAILED_ATTEMPTS}`,
+    );
+
+    if (currentFailure.count >= this.MAX_FAILED_ATTEMPTS) {
+      logger.error(
+        `Event ${messageId} reached max failure count (${this.MAX_FAILED_ATTEMPTS}), ` +
+          `entering ${this.FAILED_REMINDER_COOLDOWN / 1000}s cooldown`,
+      );
+    }
+  }
+
+  /**
+   * Clear failure tracking for an event
+   */
+  private clearFailureTracking(messageId: string): void {
+    if (this.failedReminders.has(messageId)) {
+      logger.debug(`Clearing failure tracking for event ${messageId} after successful operation`);
+      this.failedReminders.delete(messageId);
     }
   }
 
