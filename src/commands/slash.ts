@@ -34,7 +34,7 @@ const watchCommand: SlashCommand = {
     .setName('watch')
     .setDescription('Watch a message for reactions and send reminders')
     .addStringOption(option =>
-      option.setName('link').setDescription('Discord message link to watch').setRequired(true),
+      option.setName('link').setDescription('Discord message link to watch').setRequired(false),
     )
     .addIntegerOption(option =>
       option
@@ -116,7 +116,7 @@ const helpCommand: SlashCommand = {
         {
           name: '📝 /watch',
           value:
-            'Watch a message for reactions and send automatic reminders\n`/watch link:<message_link> [interval:<minutes>]`',
+            'Watch a message for reactions and send automatic reminders\n`/watch [link:<message_link>] [interval:<minutes>]`\n💡 *Run without link to choose from recent messages*',
           inline: false,
         },
         {

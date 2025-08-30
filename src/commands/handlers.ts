@@ -29,6 +29,14 @@ import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Event as EventModel } from '@/models';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
+import {
+  getSelectableMessages,
+  createMessageSelectMenu,
+  createMessageSelectionEmbed,
+  createTimeSelectMenu,
+  createTimeSelectionEmbed,
+  MessageSelectionOption,
+} from '@/utils/messageSelector';
 
 const logger = createLogger('handlers');
 
@@ -48,6 +56,11 @@ export async function handleWatchCommand(
   client: DiscordBotClient,
 ): Promise<void> {
   const messageLink = interaction.options.get('link')?.value as string;
+
+  // New enhanced functionality: Handle interactive mode when no link is provided
+  if (!messageLink) {
+    return await handleInteractiveWatchCommand(interaction, client);
+  }
 
   try {
     // Validate permissions
@@ -838,5 +851,342 @@ export async function handleRemindNowCommand(
       content: '❌ An error occurred while preparing the reminder menu. Please try again.',
       flags: MessageFlags.Ephemeral,
     });
+  }
+}
+
+/**
+ * Handle the interactive /watch command when no link is provided
+ */
+async function handleInteractiveWatchCommand(
+  interaction: ChatInputCommandInteraction,
+  client: DiscordBotClient,
+): Promise<void> {
+  try {
+    // Validate permissions
+    if (!interaction.guild || !interaction.member) {
+      await interaction.reply({
+        content: '❌ This command can only be used in servers.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Get guild-specific configuration for permission checking
+    const storage = new SqliteStorage();
+    const guildConfigManager = new GuildConfigManager(client, storage);
+    const guildConfig = await guildConfigManager.getGuildConfig(interaction.guild.id);
+
+    const member = interaction.member as GuildMember;
+    if (!hasGuildAdminRole(member, guildConfig?.adminRoleNames)) {
+      await interaction.reply({
+        content: '❌ You need administrator permissions to use this command.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Ensure we're in a text channel
+    if (!interaction.channel || interaction.channel.type !== 0) { // 0 = GUILD_TEXT
+      await interaction.reply({
+        content: '❌ This command can only be used in text channels.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const channel = interaction.channel as TextChannel;
+
+    // Get selectable messages from the channel
+    let selectableMessages: MessageSelectionOption[];
+    try {
+      selectableMessages = await getSelectableMessages(channel, 10);
+    } catch (error) {
+      logger.error('Error fetching selectable messages:', error);
+      await interaction.reply({
+        content: '❌ Could not fetch messages from this channel. Please check my permissions.',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Check if we have any suitable messages
+    if (selectableMessages.length === 0) {
+      await interaction.reply({
+        content: '❌ No suitable messages found in this channel. The channel needs at least one user message (not bot or system messages).',
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Create the message selection UI
+    const selectMenu = createMessageSelectMenu(
+      selectableMessages,
+      `watch_message_select_${interaction.user.id}`,
+    );
+    const embed = createMessageSelectionEmbed(selectableMessages.length);
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      flags: MessageFlags.Ephemeral,
+    });
+
+    // Set up collector for message selection
+    const filter = (selectInteraction: any) =>
+      selectInteraction.customId === `watch_message_select_${interaction.user.id}` &&
+      selectInteraction.user.id === interaction.user.id;
+
+    const collector = interaction.channel?.createMessageComponentCollector({
+      filter,
+      time: 300000, // 5 minutes
+      max: 1,
+    });
+
+    if (collector) {
+      collector.on('collect', async (selectInteraction) => {
+        try {
+          await selectInteraction.deferUpdate();
+
+          const selectedMessageId = selectInteraction.values[0];
+          const selectedMessage = selectableMessages.find(m => m.messageId === selectedMessageId);
+
+          if (!selectedMessage) {
+            await selectInteraction.editReply({
+              content: '❌ Selected message not found.',
+              components: [],
+              embeds: [],
+            });
+            return;
+          }
+
+          // Show time selection interface
+          const timeSelectMenu = createTimeSelectMenu(`watch_time_select_${interaction.user.id}`);
+          const timeEmbed = createTimeSelectionEmbed(selectedMessage);
+          const timeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(timeSelectMenu);
+
+          await selectInteraction.editReply({
+            embeds: [timeEmbed],
+            components: [timeRow],
+          });
+
+          // Set up collector for time selection
+          const timeFilter = (timeSelectInteraction: any) =>
+            timeSelectInteraction.customId === `watch_time_select_${interaction.user.id}` &&
+            timeSelectInteraction.user.id === interaction.user.id;
+
+          const timeCollector = interaction.channel?.createMessageComponentCollector({
+            filter: timeFilter,
+            time: 300000, // 5 minutes
+            max: 1,
+          });
+
+          if (timeCollector) {
+            timeCollector.on('collect', async (timeSelectInteraction) => {
+              try {
+                await timeSelectInteraction.deferUpdate();
+
+                const intervalMinutes = parseInt(timeSelectInteraction.values[0]);
+
+                // Validate interval
+                const minInterval = Settings.is_test_mode() ? 1 : 5;
+                const maxInterval = Settings.is_test_mode() ? 10080 : 1440;
+
+                if (intervalMinutes < minInterval || intervalMinutes > maxInterval) {
+                  await timeSelectInteraction.editReply({
+                    content: `❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`,
+                    components: [],
+                    embeds: [],
+                  });
+                  return;
+                }
+
+                // Fetch the actual Discord message to validate it still exists
+                try {
+                  const message = await channel.messages.fetch(selectedMessage.messageId);
+                  if (!message) {
+                    await timeSelectInteraction.editReply({
+                      content: '❌ The selected message was deleted.',
+                      components: [],
+                      embeds: [],
+                    });
+                    return;
+                  }
+
+                  // Check bot permissions
+                  if (!validatePermissions(channel, client.user!)) {
+                    await timeSelectInteraction.editReply({
+                      content: '❌ I do not have permission to read/send messages in this channel.',
+                      components: [],
+                      embeds: [],
+                    });
+                    return;
+                  }
+
+                  // Check if event already exists
+                  const eventManager = client.eventManager;
+                  const existingEvent = await eventManager.getEvent(selectedMessage.messageId);
+
+                  let event: EventModel;
+                  let isUpdate = false;
+
+                  if (existingEvent) {
+                    // Update existing event
+                    isUpdate = true;
+                    logger.info(
+                      `Updating existing watch for message ${selectedMessage.messageId} - preserving ${existingEvent.usersWhoReacted.length} reactions`,
+                    );
+
+                    event = (await eventManager.createEvent({
+                      messageId: selectedMessage.messageId,
+                      channelId: selectedMessage.channelId,
+                      guildId: interaction.guildId!,
+                      title: selectedMessage.content.substring(0, 100) || 'Unnamed Event',
+                      intervalMinutes,
+                      lastRemindedAt: existingEvent.lastRemindedAt,
+                      isPaused: false,
+                      usersWhoReacted: existingEvent.usersWhoReacted,
+                      createdAt: existingEvent.createdAt,
+                      updatedAt: createTimezoneAwareDate(),
+                    })) as EventModel;
+                  } else {
+                    // Create new event
+                    logger.info(`Creating new watch for message ${selectedMessage.messageId}`);
+
+                    event = (await eventManager.createEvent({
+                      messageId: selectedMessage.messageId,
+                      channelId: selectedMessage.channelId,
+                      guildId: interaction.guildId!,
+                      title: selectedMessage.content.substring(0, 100) || 'Unnamed Event',
+                      intervalMinutes,
+                      lastRemindedAt: null,
+                      isPaused: false,
+                      usersWhoReacted: [],
+                      createdAt: createTimezoneAwareDate(),
+                      updatedAt: createTimezoneAwareDate(),
+                    })) as EventModel;
+                  }
+
+                  // Schedule reminders
+                  const reminderScheduler = client.reminderScheduler;
+                  await reminderScheduler.scheduleEvent(event);
+
+                  // Create success embed
+                  const successEmbed = new EmbedBuilder()
+                    .setColor(0x00ae86)
+                    .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
+                    .setDescription(
+                      isUpdate
+                        ? `Updated watch settings - preserved ${event.usersWhoReacted.length} existing reactions!`
+                        : `Now watching the message for reactions!`,
+                    )
+                    .addFields(
+                      {
+                        name: '📝 Message',
+                        value: `[Jump to message](https://discord.com/channels/${event.guildId}/${event.channelId}/${event.messageId})`,
+                        inline: false,
+                      },
+                      { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
+                      {
+                        name: '🔔 Next Reminder',
+                        value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`,
+                        inline: true,
+                      },
+                    );
+
+                  if (isUpdate && event.usersWhoReacted.length > 0) {
+                    successEmbed.addFields({
+                      name: '👥 Current Reactions',
+                      value: `${event.usersWhoReacted.length} users have reacted`,
+                      inline: true,
+                    });
+                  }
+
+                  successEmbed
+                    .setFooter({ text: 'Users who react to the message will be tracked automatically' })
+                    .setTimestamp();
+
+                  await timeSelectInteraction.editReply({
+                    embeds: [successEmbed],
+                    components: [],
+                  });
+
+                  logger.info(
+                    `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag} (interactive mode)`,
+                  );
+
+                } catch (messageError) {
+                  logger.error(`Error fetching message: ${messageError}`);
+                  await timeSelectInteraction.editReply({
+                    content: '❌ Could not access the selected message. It may have been deleted.',
+                    components: [],
+                    embeds: [],
+                  });
+                }
+
+              } catch (error) {
+                logger.error(`Error in time selection: ${error}`);
+                await timeSelectInteraction.editReply({
+                  content: '❌ An error occurred while setting up the watch. Please try again.',
+                  components: [],
+                  embeds: [],
+                });
+              }
+            });
+
+            timeCollector.on('end', async (collected) => {
+              if (collected.size === 0) {
+                try {
+                  await selectInteraction.editReply({
+                    content: '⏰ Time selection timed out. Please run the command again.',
+                    components: [],
+                    embeds: [],
+                  });
+                } catch (error) {
+                  logger.debug('Could not update message after time selection timeout:', error);
+                }
+              }
+            });
+          }
+
+        } catch (error) {
+          logger.error(`Error in message selection: ${error}`);
+          await selectInteraction.editReply({
+            content: '❌ An error occurred while processing your selection. Please try again.',
+            components: [],
+            embeds: [],
+          });
+        }
+      });
+
+      collector.on('end', async (collected) => {
+        if (collected.size === 0) {
+          try {
+            await interaction.editReply({
+              content: '⏰ Message selection timed out. Please run the command again.',
+              components: [],
+              embeds: [],
+            });
+          } catch (error) {
+            logger.debug('Could not update message after message selection timeout:', error);
+          }
+        }
+      });
+    }
+
+  } catch (error) {
+    logger.error(`Error in interactive watch command: ${error}`);
+    
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred while setting up the interactive watch. Please try again.',
+        flags: MessageFlags.Ephemeral,
+      });
+    } else {
+      await interaction.followUp({
+        content: '❌ An error occurred while setting up the interactive watch. Please try again.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 }
