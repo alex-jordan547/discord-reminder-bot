@@ -87,7 +87,9 @@ function errorSerializer(error: Error): Record<string, unknown> {
     type: error.constructor.name,
     message: error.message,
     stack: error.stack,
-    ...(error.cause && { cause: error.cause }),
+    ...(error.cause && typeof error.cause === 'object' && error.cause !== null
+      ? { cause: error.cause }
+      : {}),
   };
 }
 
@@ -141,17 +143,17 @@ function createColoredFormatter(useColors: boolean): (obj: Record<string, unknow
 
     let errorMessage = '';
     if (errorObj && typeof errorObj === 'object') {
-      if (errorObj.message && errorObj.stack) {
+      if ((errorObj as any).message && (errorObj as any).stack) {
         // It's an Error object
-        errorMessage = `\n  Error: ${errorObj.message}`;
+        errorMessage = `\n  Error: ${(errorObj as any).message}`;
         if (useColors) {
           errorMessage = chalk.red(errorMessage);
         }
 
         // Add stack trace on new lines, indented
-        if (errorObj.stack && typeof errorObj.stack === 'string') {
-          const stackLines = errorObj.stack.split('\n').slice(1); // Skip first line (it's the message)
-          stackLines.forEach(line => {
+        if ((errorObj as any).stack && typeof (errorObj as any).stack === 'string') {
+          const stackLines = (errorObj as any).stack.split('\n').slice(1); // Skip first line (it's the message)
+          stackLines.forEach((line: string) => {
             errorMessage += `\n    ${line}`;
           });
           if (useColors) {
@@ -309,7 +311,7 @@ export function setupLogging(options: {
       });
 
       // Handle destination errors
-      fileDestination.on('error', err => {
+      (fileDestination as any).on('error', (err: any) => {
         console.warn('File logging error:', err.message);
       });
 
@@ -351,7 +353,7 @@ export function closeLogging(): Promise<void> {
   return new Promise(resolve => {
     if (fileDestination) {
       // Close the file destination properly
-      fileDestination.end(() => {
+      (fileDestination as any).end(() => {
         fileDestination = null;
         resolve();
       });
@@ -480,3 +482,55 @@ export function createLogger(name: string): Logger {
 }
 
 export default getDefaultLogger;
+
+/**
+ * Serialize error objects for structured logging
+ */
+export function serializeError(error: Error): Record<string, any> {
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+    ...(error.cause && typeof error.cause === 'object' && error.cause !== null
+      ? { cause: error.cause }
+      : {}),
+  };
+}
+
+/**
+ * Format error objects for logging
+ */
+export function formatErrorForLogging(errorObj: any): string {
+  let errorMessage = '';
+
+  // Type guard for error objects
+  if (errorObj && typeof errorObj === 'object') {
+    if ('message' in errorObj && 'stack' in errorObj) {
+      const error = errorObj as Error;
+      errorMessage = `\n  Error: ${error.message}`;
+
+      // Log relevant properties
+      if ('code' in errorObj) errorMessage += `\n  Code: ${(errorObj as any).code}`;
+      if ('path' in errorObj) errorMessage += `\n  Path: ${(errorObj as any).path}`;
+      if ('errno' in errorObj) errorMessage += `\n  Errno: ${(errorObj as any).errno}`;
+
+      // Format stack trace
+      if (error.stack && typeof error.stack === 'string') {
+        const stackLines = error.stack.split('\n').slice(1); // Skip first line (it's the message)
+        stackLines.forEach((line: string) => {
+          if (line.trim()) {
+            errorMessage += `\n    ${line.trim()}`;
+          }
+        });
+      }
+    } else {
+      // Generic object
+      errorMessage = `\n  Object: ${JSON.stringify(errorObj, null, 2)}`;
+    }
+  } else {
+    // Primitive or other type
+    errorMessage = `\n  Value: ${String(errorObj)}`;
+  }
+
+  return errorMessage;
+}

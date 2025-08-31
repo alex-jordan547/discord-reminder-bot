@@ -1,6 +1,6 @@
 /**
  * Simplified Reaction Configuration Integration Tests
- * 
+ *
  * Focused tests for core reaction configuration functionality
  * with simplified mocking to avoid Discord.js Collection issues
  */
@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { ReactionTracker } from '@/services/reactionTracker';
 import { EventManager } from '@/services/eventManager';
+import type { SqliteStorage } from '@/persistence/sqliteStorage';
 
 // Mock logging
 vi.mock('@/utils/loggingConfig', () => ({
@@ -21,15 +22,32 @@ vi.mock('@/utils/loggingConfig', () => ({
 }));
 
 // Mock storage
-vi.mock('@/persistence/sqliteStorage', () => ({
-  SqliteStorage: vi.fn(() => ({
-    initialize: vi.fn(),
+export const createMockSqliteStorage = (): SqliteStorage => {
+  return {
+    initialize: vi.fn().mockResolvedValue(true),
     saveGuildConfig: vi.fn().mockResolvedValue({ success: true }),
     getGuildConfig: vi.fn().mockResolvedValue(null),
-    touchGuildConfig: vi.fn().mockResolvedValue(true),
+    touchGuildConfig: vi.fn().mockResolvedValue({ success: true }),
     deleteGuildConfig: vi.fn().mockResolvedValue({ success: true }),
-  })),
-}));
+    // Add other required methods with proper types
+    saveEvent: vi.fn().mockResolvedValue({ success: true }),
+    getEvent: vi.fn().mockResolvedValue(null),
+    getAllEvents: vi.fn().mockResolvedValue({ success: true, events: [] }),
+    deleteEvent: vi.fn().mockResolvedValue({ success: true }),
+    close: vi.fn(),
+    isInitialized: true,
+    db: null as any,
+    createTables: vi.fn(),
+    createIndexes: vi.fn(),
+    saveUser: vi.fn().mockResolvedValue({ success: true }),
+    getUser: vi.fn().mockResolvedValue(null),
+    getAllUsers: vi.fn().mockResolvedValue({ success: true, users: [] }),
+    deleteUser: vi.fn().mockResolvedValue({ success: true }),
+    vacuum: vi.fn().mockResolvedValue({ success: true }),
+    getStats: vi.fn().mockResolvedValue({ success: true, stats: {} }),
+    backup: vi.fn().mockResolvedValue({ success: true }),
+  } as SqliteStorage;
+};
 
 // Mock GuildConfig
 vi.mock('@/models/GuildConfig', () => ({
@@ -56,9 +74,9 @@ describe('Reaction Configuration Integration Tests', () => {
                 cache: {
                   get: vi.fn().mockReturnValue({
                     roles: { cache: new Map() },
-                    permissions: { has: vi.fn().mockReturnValue(true) }
-                  })
-                }
+                    permissions: { has: vi.fn().mockReturnValue(true) },
+                  }),
+                },
               },
               channels: {
                 cache: {
@@ -70,11 +88,11 @@ describe('Reaction Configuration Integration Tests', () => {
                         type: 'text',
                         position: 0,
                         canSend: true,
-                        isDefault: true
-                      }
-                    ])
-                  })
-                }
+                        isDefault: true,
+                      },
+                    ]),
+                  }),
+                },
               },
               roles: {
                 cache: {
@@ -87,24 +105,18 @@ describe('Reaction Configuration Integration Tests', () => {
                         position: 10,
                         managed: false,
                         isAdmin: true,
-                        isDefault: false
-                      }
-                    ])
-                  })
-                }
-              }
-            })
-          }
-        }
+                        isDefault: false,
+                      },
+                    ]),
+                  }),
+                },
+              },
+            }),
+          },
+        },
       };
 
-      const mockStorage = {
-        initialize: vi.fn(),
-        saveGuildConfig: vi.fn().mockResolvedValue({ success: true }),
-        getGuildConfig: vi.fn().mockResolvedValue(null),
-        touchGuildConfig: vi.fn(),
-        deleteGuildConfig: vi.fn().mockResolvedValue({ success: true }),
-      };
+      const mockStorage = createMockSqliteStorage();
 
       configManager = new GuildConfigManager(mockClient as any, mockStorage as any);
     });
@@ -150,7 +162,7 @@ describe('Reaction Configuration Integration Tests', () => {
         expect(validation.valid).toBe(true);
       });
 
-      // Invalid intervals  
+      // Invalid intervals
       const invalidIntervals = [0, -1, 10081, 999999];
       invalidIntervals.forEach(interval => {
         const validation = configManager.validateConfig({ defaultIntervalMinutes: interval });
@@ -200,7 +212,7 @@ describe('Reaction Configuration Integration Tests', () => {
       // Since the getValidReactionsForEvent method depends on GuildConfig.findByGuildId,
       // let's test the fallback to default reactions instead
       const validReactions = await reactionTracker.getValidReactionsForEvent('msg-123');
-      
+
       // Should fall back to Settings.DEFAULT_REACTIONS
       expect(validReactions).toBeDefined();
       expect(Array.isArray(validReactions)).toBe(true);
@@ -219,21 +231,20 @@ describe('Reaction Configuration Integration Tests', () => {
         message: { id: 'msg-123' },
         emoji: { name: '✅' },
       };
-      
+
       const mockUser = {
         id: 'user-123',
         tag: 'TestUser#1234',
       };
 
       // Mock the getValidReactionsForEvent to return reactions that include ✅
-      vi.spyOn(reactionTracker, 'getValidReactionsForEvent')
-        .mockResolvedValue(['✅', '❌', '❓']);
+      vi.spyOn(reactionTracker, 'getValidReactionsForEvent').mockResolvedValue(['✅', '❌', '❓']);
 
       await reactionTracker.handleReactionAdd(mockReaction as any, mockUser as any);
 
       expect(mockEventManager.updateUserReactions).toHaveBeenCalledWith(
         'msg-123',
-        expect.arrayContaining(['user-123'])
+        expect.arrayContaining(['user-123']),
       );
     });
 
@@ -241,7 +252,7 @@ describe('Reaction Configuration Integration Tests', () => {
       // Setup event
       mockEventManager.getEvent.mockResolvedValue({
         messageId: 'msg-123',
-        guildId: 'guild-123', 
+        guildId: 'guild-123',
         usersWhoReacted: [],
       });
 
@@ -256,8 +267,7 @@ describe('Reaction Configuration Integration Tests', () => {
       };
 
       // Mock valid reactions that don't include 👍
-      vi.spyOn(reactionTracker, 'getValidReactionsForEvent')
-        .mockResolvedValue(['✅', '❌']);
+      vi.spyOn(reactionTracker, 'getValidReactionsForEvent').mockResolvedValue(['✅', '❌']);
 
       await reactionTracker.handleReactionAdd(mockReaction as any, mockUser as any);
 
@@ -286,7 +296,7 @@ describe('Reaction Configuration Integration Tests', () => {
 
       expect(mockEventManager.updateUserReactions).toHaveBeenCalledWith(
         'msg-123',
-        [] // User should be removed
+        [], // User should be removed
       );
     });
 
@@ -308,8 +318,7 @@ describe('Reaction Configuration Integration Tests', () => {
         tag: 'TestUser#1234',
       };
 
-      vi.spyOn(reactionTracker, 'getValidReactionsForEvent')
-        .mockResolvedValue(['✅', '❌']);
+      vi.spyOn(reactionTracker, 'getValidReactionsForEvent').mockResolvedValue(['✅', '❌']);
 
       await reactionTracker.handleReactionAdd(mockReaction as any, mockUser as any);
 
@@ -328,8 +337,8 @@ describe('Reaction Configuration Integration Tests', () => {
         guilds: {
           cache: {
             get: vi.fn().mockReturnValue(null), // Guild not found
-          }
-        }
+          },
+        },
       };
 
       mockStorage = {
@@ -384,9 +393,9 @@ describe('Reaction Configuration Integration Tests', () => {
               id: 'guild-123',
               name: 'Gaming Guild',
               memberCount: 150,
-            })
-          }
-        }
+            }),
+          },
+        },
       };
 
       const mockStorage = {
@@ -458,9 +467,9 @@ describe('Reaction Configuration Integration Tests', () => {
             get: vi.fn().mockReturnValue({
               id: 'guild-123',
               name: 'Test Guild',
-            })
-          }
-        }
+            }),
+          },
+        },
       };
 
       mockStorage = {
@@ -474,7 +483,7 @@ describe('Reaction Configuration Integration Tests', () => {
       configManager = new GuildConfigManager(mockClient as any, mockStorage);
     });
 
-    // Note: updateGuildConfig requires an existing config - this is tested indirectly 
+    // Note: updateGuildConfig requires an existing config - this is tested indirectly
     // through other integration tests where configs exist and are updated.
 
     it('should handle configuration retrieval', async () => {
@@ -487,7 +496,7 @@ describe('Reaction Configuration Integration Tests', () => {
       mockStorage.getGuildConfig.mockResolvedValue(savedConfig);
 
       const config = await configManager.getGuildConfig('guild-123');
-      
+
       expect(mockStorage.getGuildConfig).toHaveBeenCalledWith('guild-123');
     });
 

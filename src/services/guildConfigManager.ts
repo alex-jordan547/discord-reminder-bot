@@ -173,9 +173,13 @@ export class GuildConfigManager {
    */
   async deleteGuildConfig(guildId: string): Promise<boolean> {
     try {
+      if (!this.storage) {
+        logger.error('Storage not initialized');
+        return false;
+      }
       const result = await this.storage.deleteGuildConfig(guildId);
 
-      if (result.success) {
+      if (result?.success) {
         this.configCache.delete(guildId);
         logger.info(`Guild configuration deleted for ${guildId}`);
         return true;
@@ -193,13 +197,21 @@ export class GuildConfigManager {
    */
   async getGuildChannels(guildId: string): Promise<ChannelOption[]> {
     try {
+      if (!this.client) {
+        logger.error('Client not initialized');
+        return [];
+      }
       const guild = this.client.guilds.cache.get(guildId);
       if (!guild) {
         logger.error(`Guild ${guildId} not found`);
         return [];
       }
 
-      const botMember = guild.members.cache.get(this.client.user!.id);
+      if (!this.client.user) {
+        logger.error('Bot user not available');
+        return [];
+      }
+      const botMember = guild.members.cache.get(this.client.user.id);
       if (!botMember) {
         logger.error(`Bot member not found in guild ${guildId}`);
         return [];
@@ -238,6 +250,10 @@ export class GuildConfigManager {
    */
   async getGuildRoles(guildId: string): Promise<RoleOption[]> {
     try {
+      if (!this.client) {
+        logger.error('Client not initialized');
+        return [];
+      }
       const guild = this.client.guilds.cache.get(guildId);
       if (!guild) {
         logger.error(`Guild ${guildId} not found`);
@@ -286,6 +302,10 @@ export class GuildConfigManager {
    */
   async getSuggestedConfig(guildId: string): Promise<Partial<GuildConfigData>> {
     try {
+      if (!this.client) {
+        logger.error('Client not initialized');
+        return {};
+      }
       const guild = this.client.guilds.cache.get(guildId);
       if (!guild) {
         return {};

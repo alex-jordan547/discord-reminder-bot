@@ -18,7 +18,19 @@ import {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ComponentType,
   MessageFlags,
+  Message,
+  TextChannel,
+  DMChannel,
+  PartialDMChannel,
+  NewsChannel,
+  ThreadChannel,
+  VoiceChannel,
+  StageChannel,
+  ForumChannel,
+  MediaChannel,
+  Collection,
   ChannelType,
 } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
@@ -335,7 +347,7 @@ function setupChannelCollector(
         let channelId: string | null = null;
         let channelName = 'Canal original';
 
-        if (selectedValue !== 'original_channel') {
+        if (selectedValue && selectedValue !== 'original_channel') {
           channelId = selectedValue;
           const channel = client.channels.cache.get(selectedValue);
           if (channel && channel.type === ChannelType.GuildText) {
@@ -686,7 +698,9 @@ function setupIntervalCollector(
         await selectInteraction.deferUpdate();
 
         if (!selectInteraction.isStringSelectMenu()) return;
-        const selectedValue = parseInt(selectInteraction.values[0]);
+        const firstValue = selectInteraction.values[0];
+        if (!firstValue) return;
+        const selectedValue = parseInt(firstValue);
 
         // Validate interval
         if (selectedValue < 5 || selectedValue > 10080) {
@@ -994,7 +1008,9 @@ function setupDeleteDelayCollector(
         await selectInteraction.deferUpdate();
 
         if (!selectInteraction.isStringSelectMenu()) return;
-        const selectedValue = parseFloat(selectInteraction.values[0]);
+        const firstValue = selectInteraction.values[0];
+        if (!firstValue) return;
+        const selectedValue = parseFloat(firstValue);
 
         // Validate delay
         if (selectedValue < 0.5 || selectedValue > 1440) {
@@ -1264,7 +1280,9 @@ function setupMentionCollectors(
       try {
         await selectInteraction.deferUpdate();
         if (!selectInteraction.isStringSelectMenu()) return;
-        selectedLimit = parseInt(selectInteraction.values[0]);
+        const firstValue = selectInteraction.values[0];
+        if (!firstValue) return;
+        selectedLimit = parseInt(firstValue);
 
         await selectInteraction.editReply({
           content: `✅ Limite sélectionnée : **${selectedLimit === 0 ? 'Aucune limite' : selectedLimit + ' utilisateurs'}**. Maintenant choisissez le comportement.`,
@@ -1359,12 +1377,15 @@ async function handleReactionsSelection(
     .setCustomId(`config_reactions_preset_select_${interaction.user.id}`)
     .setPlaceholder('Choisir un modèle de réactions...')
     .addOptions([
-      ...reactionPresets.map((preset, index) => ({
-        label: preset.name,
-        description: `${preset.reactions.join(' ')} - ${preset.description}`,
-        value: index.toString(),
-        emoji: preset.reactions[0],
-      })),
+      ...reactionPresets.map((preset, index) => {
+        const firstReaction = preset.reactions[0];
+        return {
+          label: preset.name,
+          description: `${preset.reactions.join(' ')} - ${preset.description}`,
+          value: index.toString(),
+          ...(firstReaction && { emoji: firstReaction }),
+        };
+      }),
       {
         label: '🎨 Configuration personnalisée',
         description: 'Créer votre propre ensemble de réactions',
@@ -1441,6 +1462,7 @@ function setupReactionsCollector(
           await handleCustomReactionsInput(selectInteraction, configManager);
         } else {
           // Use preset
+          if (!selectedValue) return;
           const presetIndex = parseInt(selectedValue);
           const selectedPreset = reactionPresets[presetIndex];
 
@@ -1539,15 +1561,26 @@ async function handleCustomReactionsInput(
   });
 
   // Setup message collector for custom input
-  const messageFilter = (m: any) => m.author.id === interaction.user.id;
-  const messageCollector = interaction.channel?.createMessageCollector({
+  const messageFilter = (m: Message) => m.author.id === interaction.user.id;
+
+  // Type guard to ensure channel supports message collection
+  const channel = interaction.channel;
+  if (!channel || !('createMessageCollector' in channel)) {
+    await interaction.editReply({
+      content: '❌ Impossible de créer un collecteur de messages dans ce type de canal.',
+      embeds: [],
+    });
+    return;
+  }
+
+  const messageCollector = channel.createMessageCollector({
     filter: messageFilter,
     time: 120000, // 2 minutes
     max: 1,
   });
 
   if (messageCollector) {
-    messageCollector.on('collect', async message => {
+    messageCollector.on('collect', async (message: Message) => {
       try {
         const input = message.content.trim();
 
@@ -1560,13 +1593,13 @@ async function handleCustomReactionsInput(
         }
 
         // Parse reactions from input
-        const reactions = input.split(/\s+/).filter(r => r.length > 0);
+        const reactions = input.split(/\s+/).filter((r: string) => r.length > 0);
 
         // Validate reactions
         if (reactions.length < 2 || reactions.length > 10) {
           await message.reply({
             content: '❌ Veuillez fournir entre 2 et 10 réactions. Réessayez.',
-            flags: MessageFlags.Ephemeral,
+            flags: MessageFlags.Ephemeral as any,
           });
           return;
         }
@@ -1606,7 +1639,7 @@ async function handleCustomReactionsInput(
         } else {
           await message.reply({
             content: '❌ Erreur lors de la sauvegarde des réactions personnalisées.',
-            flags: MessageFlags.Ephemeral,
+            flags: MessageFlags.Ephemeral as any,
           });
         }
       } catch (error) {
@@ -1614,17 +1647,18 @@ async function handleCustomReactionsInput(
       }
     });
 
-    messageCollector.on('end', async collected => {
+    messageCollector.on('end', (collected, reason) => {
       if (collected.size === 0) {
-        try {
-          await interaction.editReply({
+        // Handle async operations in a fire-and-forget manner
+        interaction
+          .editReply({
             content:
               '⏰ Temps écoulé pour la configuration personnalisée. Utilisez `/config set default_reactions` pour réessayer.',
             embeds: [],
+          })
+          .catch(error => {
+            logger.debug('Could not update expired custom reactions:', error);
           });
-        } catch (error) {
-          logger.debug('Could not update expired custom reactions:', error);
-        }
       }
     });
   }
@@ -1658,12 +1692,15 @@ async function handleTimezoneSelection(
     .setCustomId(`config_timezone_select_${interaction.user.id}`)
     .setPlaceholder('Choisir le fuseau horaire...')
     .addOptions(
-      timezoneOptions.map(tz => ({
-        label: tz.name,
-        description: `${tz.value} (${tz.offset})`,
-        value: tz.value,
-        emoji: tz.name.split(' ')[0],
-      })),
+      timezoneOptions.map(tz => {
+        const emojiPart = tz.name.split(' ')[0];
+        return {
+          label: tz.name,
+          description: `${tz.value} (${tz.offset})`,
+          value: tz.value,
+          ...(emojiPart && { emoji: emojiPart }),
+        };
+      }),
     );
 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
@@ -1738,6 +1775,7 @@ function setupTimezoneCollector(
 
         if (!selectInteraction.isStringSelectMenu()) return;
         const selectedTimezone = selectInteraction.values[0];
+        if (!selectedTimezone) return;
         const selectedOption = timezoneOptions.find(tz => tz.value === selectedTimezone);
 
         if (!selectedOption) {

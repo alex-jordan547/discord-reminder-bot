@@ -49,7 +49,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
           return { success: true };
         } catch (error) {
           console.error('Mock SqliteStorage saveEvent error:', error);
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 
@@ -66,6 +66,9 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
           }
 
           const event = result[0];
+          if (!event) {
+            return { success: false, error: 'Event not found' };
+          }
 
           // Convertit null en undefined pour la description comme le fait le vrai SqliteStorage
           return {
@@ -77,7 +80,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
             },
           };
         } catch (error) {
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 
@@ -93,7 +96,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
             })),
           };
         } catch (error) {
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 
@@ -102,7 +105,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
           await testDb.db.delete(events).where(eq(events.messageId, messageId));
           return { success: true };
         } catch (error) {
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 
@@ -131,7 +134,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
 
           return { success: true };
         } catch (error) {
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 
@@ -147,7 +150,7 @@ export function createSqliteStorageMock(testDb: TestDatabaseInstance) {
             ? { success: true, user: result[0] }
             : { success: false, error: 'User not found' };
         } catch (error) {
-          return { success: false, error: error.message };
+          return { success: false, error: (error as Error).message };
         }
       },
 

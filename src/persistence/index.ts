@@ -10,23 +10,20 @@ const logger = createLogger('persistence');
 
 export {
   DatabaseManager,
-  type DatabaseConfig,
-  type DatabaseInfo,
   db as databaseManager,
-} from './database.js';
+  schema,
+  eq,
+  and,
+  or,
+  not,
+  isNull,
+  isNotNull,
+  like,
+  desc,
+  asc,
+} from '../db/index.js';
 
-export {
-  eventRepo,
-  userRepo,
-  guildRepo,
-  guildConfigRepo,
-  reminderLogRepo,
-  EventRepository,
-  UserRepository,
-  GuildRepository,
-  GuildConfigRepository,
-  ReminderLogRepository,
-} from './database.js';
+export { SqliteStorage } from './sqliteStorage.js';
 
 // Legacy compatibility - create a simple storage interface that uses Drizzle repos
 import { eventRepo } from './database.js';

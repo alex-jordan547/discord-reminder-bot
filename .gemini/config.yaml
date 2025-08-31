@@ -4,29 +4,29 @@
 # Fonctionnalités de révision de code activées
 code_review:
   enabled: true
-  
+
   # Vérifications spécifiques au projet
   checks:
     # Sécurité et gestion des erreurs (requis par les spécifications)
     error_handling: true
     exception_handling: true
     security_vulnerabilities: true
-    
+
     # Concurrence et thread safety (spécification critique)
     concurrency_safety: true
     race_conditions: true
     thread_safety: true
-    
+
     # Qualité de code Python
     code_style: true
     type_hints: true
     docstrings: true
     performance: true
-    
+
     # Spécifique Discord.py
     async_await_patterns: true
     discord_api_best_practices: true
-    
+
     # Architecture modulaire
     module_structure: true
     import_organization: true
@@ -35,74 +35,74 @@ code_review:
 # Fichiers et dossiers à ignorer
 ignore_patterns:
   # Fichiers de développement
-  - "**/__pycache__/**"
-  - "**/*.pyc"
-  - "**/*.pyo"
-  - "**/.pytest_cache/**"
-  - "**/venv/**"
-  - "**/.venv/**"
-  - "**/env/**"
-  - "**/.env"
-  
+  - '**/__pycache__/**'
+  - '**/*.pyc'
+  - '**/*.pyo'
+  - '**/.pytest_cache/**'
+  - '**/venv/**'
+  - '**/.venv/**'
+  - '**/env/**'
+  - '**/.env'
+
   # Fichiers de sauvegarde et temporaires
-  - "**/*_backup.py"
-  - "**/*_original.py"
-  - "**/*_unused.py"
-  - "**/.DS_Store"
-  - "**/Thumbs.db"
-  
+  - '**/*_backup.py'
+  - '**/*_original.py'
+  - '**/*_unused.py'
+  - '**/.DS_Store'
+  - '**/Thumbs.db'
+
   # Build et distribution
-  - "**/build/**"
-  - "**/dist/**"
-  - "**/*.egg-info/**"
-  
+  - '**/build/**'
+  - '**/dist/**'
+  - '**/*.egg-info/**'
+
   # IDE et éditeurs
-  - "**/.vscode/**"
-  - "**/.idea/**"
-  - "**/*.swp"
-  - "**/*.swo"
-  
+  - '**/.vscode/**'
+  - '**/.idea/**'
+  - '**/*.swp'
+  - '**/*.swo'
+
   # Docker et logs
-  - "**/logs/**"
-  - "**/data/**"
-  - "**/.dockerignore"
-  - "**/docker-compose.override.yml"
-  
+  - '**/logs/**'
+  - '**/data/**'
+  - '**/.dockerignore'
+  - '**/docker-compose.override.yml'
+
   # Documentation générée
-  - "**/docs/_build/**"
-  - "**/site/**"
+  - '**/docs/_build/**'
+  - '**/site/**'
 
 # Fichiers à examiner en priorité
 priority_files:
-  - "bot.py"
-  - "commands/**/*.py"
-  - "models/**/*.py"
-  - "persistence/**/*.py"
-  - "utils/**/*.py"
-  - "config/**/*.py"
+  - 'bot.py'
+  - 'commands/**/*.py'
+  - 'models/**/*.py'
+  - 'persistence/**/*.py'
+  - 'utils/**/*.py'
+  - 'config/**/*.py'
 
 # Configuration spécifique Python
 language_settings:
   python:
     # Version Python utilisée
-    version: "3.11+"
-    
+    version: '3.11+'
+
     # Frameworks et bibliothèques principales
     frameworks:
-      - "discord.py"
-      - "asyncio"
-      
+      - 'discord.py'
+      - 'asyncio'
+
     # Standards de code
-    style_guide: "PEP 8"
+    style_guide: 'PEP 8'
     max_line_length: 88
-    
+
     # Vérifications spécifiques
     checks:
-      - "async/await correctness"
-      - "exception handling completeness"
-      - "type annotation coverage"
-      - "discord.py API usage"
-      - "thread safety in persistence operations"
+      - 'async/await correctness'
+      - 'exception handling completeness'
+      - 'type annotation coverage'
+      - 'discord.py API usage'
+      - 'thread safety in persistence operations'
 
 # Seuils de qualité
 quality_thresholds:
@@ -110,7 +110,7 @@ quality_thresholds:
   error_handling_coverage: 90
   type_annotation_coverage: 80
   docstring_coverage: 70
-  
+
   # Complexité
   max_cyclomatic_complexity: 10
   max_function_length: 50
@@ -119,30 +119,30 @@ quality_thresholds:
 # Priorités de révision selon les spécifications du projet
 review_priorities:
   critical:
-    - "Discord API error handling and recovery"
-    - "Thread safety in persistence operations"
-    - "Race condition prevention"
-    - "Security vulnerabilities"
-  
+    - 'Discord API error handling and recovery'
+    - 'Thread safety in persistence operations'
+    - 'Race condition prevention'
+    - 'Security vulnerabilities'
+
   high:
-    - "Async/await pattern correctness"
-    - "Exception handling completeness"
-    - "Performance bottlenecks"
-    - "Memory leaks"
-  
+    - 'Async/await pattern correctness'
+    - 'Exception handling completeness'
+    - 'Performance bottlenecks'
+    - 'Memory leaks'
+
   medium:
-    - "Code style compliance"
-    - "Type annotations"
-    - "Documentation quality"
-    - "Module organization"
-  
+    - 'Code style compliance'
+    - 'Type annotations'
+    - 'Documentation quality'
+    - 'Module organization'
+
   low:
-    - "Minor style issues"
-    - "Comment improvements"
-    - "Variable naming"
+    - 'Minor style issues'
+    - 'Comment improvements'
+    - 'Variable naming'
 
 # Messages personnalisés pour les règles critiques
 custom_messages:
-  thread_safety: "⚠️ CRITIQUE: Toutes les opérations de persistance doivent être thread-safe selon les spécifications du projet"
+  thread_safety: '⚠️ CRITIQUE: Toutes les opérations de persistance doivent être thread-safe selon les spécifications du projet'
   error_recovery: "⚠️ CRITIQUE: Le bot doit implémenter des mécanismes de récupération d'erreur pour les échecs de l'API Discord"
-  race_conditions: "⚠️ CRITIQUE: Protéger contre les race conditions avec des mécanismes de verrouillage appropriés"
+  race_conditions: '⚠️ CRITIQUE: Protéger contre les race conditions avec des mécanismes de verrouillage appropriés'

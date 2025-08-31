@@ -109,6 +109,10 @@ export function checkRateLimit(
 ): { allowed: boolean; retryAfter?: number; isBlocked?: boolean } {
   const rateLimitConfig =
     config || RATE_LIMIT_CONFIGS[action] || RATE_LIMIT_CONFIGS['command_execution'];
+
+  if (!rateLimitConfig) {
+    throw new Error(`Rate limit configuration not found for action: ${action}`);
+  }
   const key = `${userId}:${action}`;
   const now = Date.now();
 
@@ -212,7 +216,11 @@ export function validateSecurityContext(context: SecurityContext): PermissionRes
   if (recentActivities.length > 10) {
     const intervals = [];
     for (let i = 1; i < Math.min(recentActivities.length, 10); i++) {
-      intervals.push(recentActivities[i].timestamp - recentActivities[i - 1].timestamp);
+      const current = recentActivities[i];
+      const previous = recentActivities[i - 1];
+      if (current && previous) {
+        intervals.push(current.timestamp - previous.timestamp);
+      }
     }
 
     // Check if intervals are suspiciously regular (±100ms)
@@ -272,14 +280,19 @@ export function checkPermissionSecure(
   action: string,
   context?: Partial<SecurityContext>,
 ): PermissionResult {
+  const guildId = member.guild?.id;
+  if (!guildId) {
+    return { allowed: false, reason: 'Guild not found' };
+  }
+
   const securityContext: SecurityContext = {
     userId: member.id,
-    guildId: member.guild?.id,
-    channelId: context?.channelId,
+    guildId,
     action,
     timestamp: Date.now(),
-    ipAddress: context?.ipAddress,
-    userAgent: context?.userAgent,
+    ...(context?.channelId && { channelId: context.channelId }),
+    ...(context?.ipAddress && { ipAddress: context.ipAddress }),
+    ...(context?.userAgent && { userAgent: context.userAgent }),
   };
 
   // Security validation
@@ -295,7 +308,7 @@ export function checkPermissionSecure(
       allowed: false,
       reason: rateLimitResult.isBlocked ? 'User temporarily blocked' : 'Rate limit exceeded',
       rateLimited: true,
-      retryAfter: rateLimitResult.retryAfter,
+      ...(rateLimitResult.retryAfter !== undefined && { retryAfter: rateLimitResult.retryAfter }),
     };
   }
 
@@ -469,7 +482,7 @@ export function getPermissionInfo(
   const info = {
     isAdmin: hasAdminRole(member),
     canManageEvents: canManageEvents(member),
-    canViewEvents: canViewEvents(member),
+    canViewEvents: canViewEvents(),
   };
 
   if (channel) {
@@ -548,7 +561,7 @@ export async function validateBotPermissionsSecure(
 
     for (const permission of permissions) {
       if (!botMember.permissions.has(permission)) {
-        missingPermissions.push(formatPermissionName(permission));
+        missingPermissions.push(formatPermissionName(permission.toString()));
       }
     }
 
@@ -603,21 +616,8 @@ export function validateBotGuildPermissions(member: GuildMember): {
 /**
  * Format permission names for user-friendly display
  */
-export function formatPermissionName(permission: bigint): string {
-  const permissionNames: { [key: string]: string } = {
-    [PermissionFlagsBits.ViewChannel.toString()]: 'View Channel',
-    [PermissionFlagsBits.SendMessages.toString()]: 'Send Messages',
-    [PermissionFlagsBits.EmbedLinks.toString()]: 'Embed Links',
-    [PermissionFlagsBits.ReadMessageHistory.toString()]: 'Read Message History',
-    [PermissionFlagsBits.AddReactions.toString()]: 'Add Reactions',
-    [PermissionFlagsBits.UseExternalEmojis.toString()]: 'Use External Emojis',
-    [PermissionFlagsBits.Administrator.toString()]: 'Administrator',
-    [PermissionFlagsBits.ManageGuild.toString()]: 'Manage Server',
-    [PermissionFlagsBits.ManageChannels.toString()]: 'Manage Channels',
-    [PermissionFlagsBits.ManageRoles.toString()]: 'Manage Roles',
-  };
-
-  return permissionNames[permission.toString()] || `Unknown Permission (${permission})`;
+function formatPermissionName(permission: string): string {
+  return permission.replace(/_/g, ' ').toLowerCase();
 }
 
 /**
@@ -629,7 +629,7 @@ export function generatePermissionReport(member: GuildMember, channel?: GuildCha
   report.push(`Permission Report for ${member.user.tag}:`);
   report.push(`- Is Admin: ${hasAdminRole(member)}`);
   report.push(`- Can Manage Events: ${canManageEvents(member)}`);
-  report.push(`- Can View Events: ${canViewEvents(member)}`);
+  report.push(`- Can View Events: ${canViewEvents()}`);
 
   if (channel) {
     report.push(`\nChannel Permissions (${channel.name}):`);
@@ -646,6 +646,13 @@ export function generatePermissionReport(member: GuildMember, channel?: GuildCha
   report.push(`User Roles: ${member.roles.cache.map(r => r.name).join(', ')}`);
 
   return report.join('\n');
+}
+
+/**
+ * Generate missing permissions formatting
+ */
+export function formatMissingPermissions(missingPermissions: string[]): string {
+  return `Missing guild permissions: ${missingPermissions.map(formatPermissionName).join(', ')}`;
 }
 
 /**

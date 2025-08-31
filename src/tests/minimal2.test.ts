@@ -18,24 +18,24 @@ describe('Minimal Event Description Test 2', () => {
       false,
       ['123456789012345678', '987654321098765432'],
       new Date(),
-      new Date()
+      new Date(),
     );
-    
+
     // Set description to null directly
     event.description = null;
-    
+
     // Check that the event description is null before validation
     expect(event.description).toBeNull();
-    
+
     // Call validate method
     const errors = event.validate();
-    
+
     // Check that the event description is now undefined after validation
     expect(event.description).toBeUndefined();
-    
+
     // Check that there are no validation errors
     expect(errors).toHaveLength(0);
-    
+
     expect(event.isValid()).toBe(true);
   });
 });

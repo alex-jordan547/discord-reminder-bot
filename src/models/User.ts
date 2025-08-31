@@ -154,7 +154,7 @@ export class User extends BaseModel {
   /**
    * String representation for debugging
    */
-  toString(): string {
+  override toString(): string {
     return `User(${this.userId}, "${this.username}", Guild:${this.guildId})`;
   }
 }

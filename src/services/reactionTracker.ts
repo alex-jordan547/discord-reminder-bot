@@ -47,7 +47,7 @@ export class ReactionTracker {
     try {
       const messageId = reaction.message.id;
       const validReactions = await this.getValidReactionsForEvent(messageId);
-      if (!validReactions.includes(reaction.emoji.name)) return;
+      if (!validReactions.includes(reaction.emoji.name || '')) return;
       // Vérifier si le message est suivi
       const event = await this.eventManager.getEvent(messageId);
       if (!event) return;
@@ -79,7 +79,7 @@ export class ReactionTracker {
     try {
       const messageId = reaction.message.id;
       const validReactions = await this.getValidReactionsForEvent(messageId);
-      if (!validReactions.includes(reaction.emoji.name)) return;
+      if (!validReactions.includes(reaction.emoji.name || '')) return;
 
       const event = await this.eventManager.getEvent(messageId);
       if (!event) return;

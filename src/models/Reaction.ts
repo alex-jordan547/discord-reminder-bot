@@ -146,7 +146,7 @@ export class Reaction extends BaseModel {
   /**
    * String representation for debugging
    */
-  toString(): string {
+  override toString(): string {
     return `Reaction(${this.userId}, "${this.emoji}", Event:${this.eventMessageId})`;
   }
 }

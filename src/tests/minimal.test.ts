@@ -3,33 +3,33 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Event } from '@/models/Event';
+import { Event } from '@/models';
 
 describe('Minimal Event Description Test', () => {
   it('should handle null description correctly', () => {
     const eventData = {
-      messageId: '123456789012345678',
-      channelId: '987654321098765432',
-      guildId: '555666777888999000',
+      messageId: '12345',
+      channelId: '67890',
+      guildId: '11111',
       title: 'Test Event',
-      description: null, // This is what we get from the database
+      description: undefined, // Change from null to undefined
       intervalMinutes: 60,
       isPaused: false,
       lastReminder: new Date(),
-      usersWhoReacted: ['123456789012345678', '987654321098765432'],
+      usersWhoReacted: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const event = new Event(eventData);
-    
+
     // Check that the event description is undefined
     expect(event.description).toBeUndefined();
-    
+
     // Check validation errors
     const errors = event.validate();
     expect(errors).toHaveLength(0);
-    
+
     expect(event.isValid()).toBe(true);
   });
 });

@@ -2,9 +2,9 @@
  * Test for Event description field handling fix
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { Event } from '@/models/Event';
+import { Event } from '@/models';
 
 describe('Event Description Field Handling', () => {
   let storage: SqliteStorage;
@@ -22,7 +22,7 @@ describe('Event Description Field Handling', () => {
       channelId: '987654321098765432',
       guildId: '555666777888999000',
       title: 'Test Event',
-      description: undefined, // This should be handled correctly
+      description: undefined, // Change from null to undefined
       intervalMinutes: 60,
       isPaused: false,
       lastReminder: new Date(),
@@ -32,23 +32,25 @@ describe('Event Description Field Handling', () => {
     };
 
     const event = new Event(eventData);
-    
+
     // Check validation errors
     const errors = event.validate();
     expect(errors).toHaveLength(0);
-    
+
     // Save the event
     const saveResult = await storage.saveEvent(event);
     expect(saveResult.success).toBe(true);
 
     // Check what's actually stored in the database
-    const row = await (storage as any).db.get('SELECT * FROM events WHERE message_id = ?', [eventData.messageId]);
+    const row = await (storage as any).db.get('SELECT * FROM events WHERE message_id = ?', [
+      eventData.messageId,
+    ]);
     expect(row.description).toBeNull();
 
     // Retrieve the event
     const retrievedEvent = await storage.getEvent(eventData.messageId);
     expect(retrievedEvent).toBeDefined();
-    
+
     // Check that the retrieved event is valid
     expect(retrievedEvent!.isValid()).toBe(true);
     expect(retrievedEvent!.messageId).toBe(eventData.messageId);
@@ -73,7 +75,7 @@ describe('Event Description Field Handling', () => {
     };
 
     const event = new Event(eventData);
-    
+
     // Check validation errors
     const errors = event.validate();
     expect(errors).toHaveLength(0);
@@ -83,15 +85,17 @@ describe('Event Description Field Handling', () => {
     expect(saveResult.success).toBe(true);
 
     // Check what's actually stored in the database
-    const row = await (storage as any).db.get('SELECT * FROM events WHERE message_id = ?', [eventData.messageId]);
+    const row = await (storage as any).db.get('SELECT * FROM events WHERE message_id = ?', [
+      eventData.messageId,
+    ]);
     expect(row.description).toBeNull();
 
     // Simulate the issue where description is null
     row.description = null;
-    
+
     // Parse the row using Event.fromDict (this should handle null correctly now)
     const parsedEvent = Event.fromDict(row);
-    
+
     // Check that the parsed event is valid
     expect(parsedEvent.isValid()).toBe(true);
     expect(parsedEvent.description).toBeUndefined();
@@ -114,7 +118,7 @@ describe('Event Description Field Handling', () => {
     };
 
     const event = new Event(eventData);
-    
+
     // Check validation errors
     const errors = event.validate();
     expect(errors).toHaveLength(0);
@@ -149,11 +153,7 @@ describe('Event Description Field Handling', () => {
     };
 
     const event = new Event(eventData);
-    
-    // Check validation errors
-    const errors = event.validate();
-    // console.log('Validation errors:', errors);
-    
+
     expect(event.isValid()).toBe(true);
     expect(event.description).toBeUndefined();
   });
@@ -170,13 +170,9 @@ describe('Event Description Field Handling', () => {
       false,
       ['123456789012345678', '987654321098765432'],
       new Date(),
-      new Date()
+      new Date(),
     );
-    
-    // Check validation errors
-    const errors = event.validate();
-    // console.log('Validation errors:', errors);
-    
+
     expect(event.isValid()).toBe(true);
     expect(event.description).toBeUndefined();
   });

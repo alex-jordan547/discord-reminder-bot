@@ -5,13 +5,13 @@
  * serialization, validation, and timezone handling capabilities.
  */
 
-import { 
-  BaseModel, 
-  type BaseModelData, 
-  type ModelValidationError, 
-  validateDiscordId, 
+import {
+  BaseModel,
+  type BaseModelData,
+  type ModelValidationError,
+  validateDiscordId,
   validateNonEmptyString,
-  validateInterval
+  validateInterval,
 } from './BaseModel';
 
 export interface EventData extends BaseModelData {
@@ -105,9 +105,7 @@ export class Event extends BaseModel<EventData> {
       this.guildId = data.guildId;
       this.title = data.title;
       // Handle description field - convert null to undefined
-      if (data.description === null) {
-        this.description = undefined;
-      } else {
+      if (data.description !== null && data.description !== undefined) {
         this.description = data.description;
       }
       this.intervalMinutes = data.intervalMinutes;
@@ -121,7 +119,6 @@ export class Event extends BaseModel<EventData> {
         channelId: channelId!,
         guildId: guildId!,
         title: title!,
-        description: undefined,
         intervalMinutes: intervalMinutes!,
         isPaused: isPaused!,
         lastReminder: lastRemindedAt || new Date(),
@@ -155,17 +152,20 @@ export class Event extends BaseModel<EventData> {
     // Validate title
     errors.push(...validateNonEmptyString(this.title, 'title', 100));
 
-    // Handle description field - convert null to undefined and validate
+    // Handle description field - validate if present
     if (this.description === null) {
-      this.description = undefined;
+      delete this.description;
     }
-    
+
     // Validate description (optional but if present, check length)
     if (this.description !== undefined) {
       if (typeof this.description !== 'string') {
         errors.push({ field: 'description', message: 'Description must be a string' });
       } else if (this.description.length > 1000) {
-        errors.push({ field: 'description', message: 'Description must be 1000 characters or less' });
+        errors.push({
+          field: 'description',
+          message: 'Description must be 1000 characters or less',
+        });
       }
     }
 
@@ -189,9 +189,9 @@ export class Event extends BaseModel<EventData> {
       // Validate each user ID in the array
       this.usersWhoReacted.forEach((userId, index) => {
         if (typeof userId !== 'string') {
-          errors.push({ 
-            field: `usersWhoReacted[${index}]`, 
-            message: 'User ID must be a string' 
+          errors.push({
+            field: `usersWhoReacted[${index}]`,
+            message: 'User ID must be a string',
           });
         } else {
           const userIdErrors = validateDiscordId(userId, `usersWhoReacted[${index}]`);
@@ -220,9 +220,9 @@ export class Event extends BaseModel<EventData> {
     }
 
     if (this.lastRemindedAt && this.createdAt && this.lastRemindedAt < this.createdAt) {
-      errors.push({ 
-        field: 'lastRemindedAt', 
-        message: 'lastRemindedAt cannot be before createdAt' 
+      errors.push({
+        field: 'lastRemindedAt',
+        message: 'lastRemindedAt cannot be before createdAt',
       });
     }
 
@@ -246,7 +246,7 @@ export class Event extends BaseModel<EventData> {
     if (descriptionValue === null) {
       descriptionValue = undefined;
     }
-    
+
     // Also handle the case where description comes from database as null
     // in the data object passed to the constructor
     const eventData = {
@@ -266,12 +266,12 @@ export class Event extends BaseModel<EventData> {
       createdAt: new Date(data.created_at || data.createdAt || Date.now()),
       updatedAt: new Date(data.updated_at || data.updatedAt || Date.now()),
     };
-    
+
     // Ensure description is undefined if it was null
     if (eventData.description === null) {
       eventData.description = undefined;
     }
-    
+
     return new Event(eventData);
   }
 

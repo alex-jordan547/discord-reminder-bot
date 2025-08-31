@@ -13,6 +13,9 @@ import { BaseModel, type ModelValidationError } from './BaseModel';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Settings } from '@/config/settings';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
+import { createLogger } from '@/utils/loggingConfig';
+
+const logger = createLogger('guild-config');
 
 /**
  * Guild-specific configuration settings
@@ -150,7 +153,7 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   /**
    * Mark configuration as recently used
    */
-  touch(): void {
+  override touch(): void {
     this.data.lastUsedAt = createTimezoneAwareDate();
   }
 
@@ -366,33 +369,24 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   }
 
   /**
+   * Create from storage data - alias for fromJSON for legacy compatibility
+   */
+  static fromStorageData(data: any): GuildConfig {
+    return GuildConfig.fromJSON(data);
+  }
+
+  /**
    * Récupère la configuration d'une guilde à partir de son guildId
    */
   static async findByGuildId(guildId: string): Promise<GuildConfig | null> {
     const storage = new SqliteStorage();
-    await storage.initialize?.();
-    const row = await storage.get('SELECT * FROM guild_configs WHERE guild_id = ?', [guildId]);
-    if (!row) return null;
-    return new GuildConfig({
-      guildId: row.guild_id,
-      guildName: row.guild_name,
-      reminderChannelId: row.reminder_channel_id,
-      reminderChannelName: row.reminder_channel_name,
-      adminRoleIds: row.admin_role_ids ? JSON.parse(row.admin_role_ids) : [],
-      adminRoleNames: row.admin_role_names ? JSON.parse(row.admin_role_names) : [],
-      defaultIntervalMinutes: row.default_interval_minutes,
-      autoDeleteEnabled: !!row.auto_delete_enabled,
-      autoDeleteDelayMinutes: row.auto_delete_delay_minutes,
-      delayBetweenRemindersMs: row.delay_between_reminders_ms,
-      maxMentionsPerReminder: row.max_mentions_per_reminder,
-      useEveryoneAboveLimit: !!row.use_everyone_above_limit,
-      defaultReactions: row.default_reactions
-        ? JSON.parse(row.default_reactions)
-        : [...Settings.DEFAULT_REACTIONS],
-      timezone: row.timezone,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      lastUsedAt: row.last_used_at,
-    });
+    await storage.initialize();
+
+    const row = await storage.getGuildConfig(guildId);
+    if (!row) {
+      return null;
+    }
+
+    return GuildConfig.fromStorageData(row);
   }
 }

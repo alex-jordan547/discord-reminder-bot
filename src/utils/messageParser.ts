@@ -56,11 +56,20 @@ export function parseMessageLink(link: string): ParsedMessageLink | null {
 
   const [, guildId, channelId, messageId] = match;
 
-  if (!isValidSnowflake(guildId) || !isValidSnowflake(channelId) || !isValidSnowflake(messageId)) {
+  if (
+    !guildId ||
+    !channelId ||
+    !messageId ||
+    !isValidSnowflake(guildId) ||
+    !isValidSnowflake(channelId) ||
+    !isValidSnowflake(messageId)
+  ) {
     logger.warn(`Invalid Discord ID format in link: ${trimmedLink}`);
-    logger.warn(
-      `IDs found - Guild: ${guildId} (${guildId.length}), Channel: ${channelId} (${channelId.length}), Message: ${messageId} (${messageId.length})`,
-    );
+    if (guildId && channelId && messageId) {
+      logger.warn(
+        `IDs found - Guild: ${guildId} (${guildId.length}), Channel: ${channelId} (${channelId.length}), Message: ${messageId} (${messageId.length})`,
+      );
+    }
     return null;
   }
 

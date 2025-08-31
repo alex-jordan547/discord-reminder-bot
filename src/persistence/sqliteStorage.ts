@@ -190,7 +190,7 @@ export class SqliteStorage {
               updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
           `,
-          params: [],
+          params: [] as any[],
         },
 
         // Guild configurations table
@@ -216,7 +216,7 @@ export class SqliteStorage {
               last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
           `,
-          params: [],
+          params: [] as any[],
         },
       ];
 
@@ -239,25 +239,25 @@ export class SqliteStorage {
         // Event indexes - optimized for common queries
         {
           sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused ON events(guild_id, is_paused)',
-          params: [],
+          params: [] as any[],
         },
         {
           sql: 'CREATE INDEX IF NOT EXISTS idx_events_reminder_interval ON events(last_reminder, interval_minutes)',
-          params: [],
+          params: [] as any[],
         },
         {
           sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_created ON events(guild_id, created_at)',
-          params: [],
+          params: [] as any[],
         },
         {
           sql: 'CREATE INDEX IF NOT EXISTS idx_events_guild_paused_reminder ON events(guild_id, is_paused, last_reminder)',
-          params: [],
+          params: [] as any[],
         },
 
         // Guild config indexes
         {
           sql: 'CREATE INDEX IF NOT EXISTS idx_guild_configs_last_used ON guild_configs(last_used_at)',
-          params: [],
+          params: [] as any[],
         },
       ];
 

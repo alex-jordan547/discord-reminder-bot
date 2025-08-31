@@ -38,17 +38,21 @@ export class ReminderLog extends BaseModel {
     super(data);
     this.eventMessageId = data.eventMessageId;
     this.scheduledAt = new Date(data.scheduledAt);
-    this.sentAt = data.sentAt ? new Date(data.sentAt) : undefined;
+    if (data.sentAt) {
+      this.sentAt = new Date(data.sentAt);
+    }
     this.usersNotified = data.usersNotified;
     this.status = data.status;
-    this.errorMessage = data.errorMessage;
+    if (data.errorMessage !== undefined) {
+      this.errorMessage = data.errorMessage;
+    }
   }
 
   /**
    * Create ReminderLog from Python-style dictionary format
    */
   static fromDict(data: Record<string, any>): ReminderLog {
-    return new ReminderLog({
+    const eventData: ReminderLogData = {
       eventMessageId: String(
         data.event_message_id ||
           data.eventMessageId ||
@@ -56,13 +60,18 @@ export class ReminderLog extends BaseModel {
           data.event?.messageId,
       ),
       scheduledAt: new Date(data.scheduled_at || data.scheduledAt),
-      sentAt: data.sent_at || data.sentAt ? new Date(data.sent_at || data.sentAt) : undefined,
       usersNotified: Number(data.users_notified || data.usersNotified || 0),
       status: (data.status as ReminderStatus) || 'pending',
-      errorMessage: data.error_message || data.errorMessage,
       createdAt: new Date(data.created_at || data.createdAt || Date.now()),
       updatedAt: new Date(data.updated_at || data.updatedAt || Date.now()),
-    });
+    };
+    if (data.sent_at || data.sentAt) {
+      eventData.sentAt = new Date(data.sent_at || data.sentAt);
+    }
+    if (data.error_message || data.errorMessage) {
+      eventData.errorMessage = data.error_message || data.errorMessage;
+    }
+    return new ReminderLog(eventData);
   }
 
   /**
@@ -85,16 +94,21 @@ export class ReminderLog extends BaseModel {
    * Serialize to JSON format (TypeScript conventions)
    */
   toJSON(): ReminderLogData & Record<string, any> {
-    return {
+    const result: ReminderLogData & Record<string, any> = {
       eventMessageId: this.eventMessageId,
       scheduledAt: this.scheduledAt,
-      sentAt: this.sentAt,
       usersNotified: this.usersNotified,
       status: this.status,
-      errorMessage: this.errorMessage,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
+    if (this.sentAt) {
+      result.sentAt = this.sentAt;
+    }
+    if (this.errorMessage !== undefined) {
+      result.errorMessage = this.errorMessage;
+    }
+    return result;
   }
 
   /**
@@ -104,7 +118,7 @@ export class ReminderLog extends BaseModel {
     this.status = 'sent';
     this.sentAt = new Date();
     this.usersNotified = usersNotified;
-    this.errorMessage = undefined;
+    delete this.errorMessage;
     this.touch();
   }
 
@@ -122,8 +136,8 @@ export class ReminderLog extends BaseModel {
    */
   resetToPending(): void {
     this.status = 'pending';
-    this.sentAt = undefined;
-    this.errorMessage = undefined;
+    delete this.sentAt;
+    delete this.errorMessage;
     this.touch();
   }
 
@@ -243,7 +257,7 @@ export class ReminderLog extends BaseModel {
   /**
    * String representation for debugging
    */
-  toString(): string {
+  override toString(): string {
     return `ReminderLog(Event:${this.eventMessageId}, ${this.status}, ${this.usersNotified} users)`;
   }
 }

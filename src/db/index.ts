@@ -192,7 +192,7 @@ export class DatabaseManager {
   /**
    * Execute a transaction with automatic rollback on error
    */
-  async transaction<T>(callback: (tx: ReturnType<typeof drizzle>) => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
     const database = await this.connect();
     return database.transaction(callback);
   }
@@ -218,15 +218,20 @@ export class DatabaseManager {
       }
     }
 
-    return {
+    const result: DatabaseInfo = {
       databasePath,
       databaseExists,
       databaseName,
-      databaseSizeBytes,
-      databaseSizeMB,
       isConnected: this.sqlite !== null,
       isReady: this.isInitialized,
     };
+    if (databaseSizeBytes !== undefined) {
+      result.databaseSizeBytes = databaseSizeBytes;
+    }
+    if (databaseSizeMB !== undefined) {
+      result.databaseSizeMB = databaseSizeMB;
+    }
+    return result;
   }
 
   /**

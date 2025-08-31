@@ -1,13 +1,24 @@
 /**
  * Test for Issue #48 - Reaction configuration bug fix
- * 
+ *
  * This test validates that the core functionality works:
  * - ReminderScheduler uses guild configuration for reactions
  * - Different reaction presets generate appropriate text
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { DiscordBotClient } from '@/types/BotClient';
 import { ReminderScheduler } from '@/services/reminderScheduler';
+import { EventManager } from '@/services/eventManager';
+
+// Mock client with proper typing
+const mockClient = {
+  user: { id: 'test-bot-id' },
+  // Add other required properties as needed
+} as DiscordBotClient;
+
+// Create proper EventManager mock
+const mockEventManager = new EventManager(mockClient as any);
 
 // Mock dependencies
 vi.mock('@/utils/loggingConfig', () => ({
@@ -21,10 +32,8 @@ vi.mock('@/utils/loggingConfig', () => ({
 
 describe('Issue #48 - Custom Reactions Configuration Bug', () => {
   let reminderScheduler: ReminderScheduler;
-  
+
   beforeEach(() => {
-    const mockClient = { user: { id: 'bot-id' } };
-    const mockEventManager = {};
     reminderScheduler = new ReminderScheduler(mockClient, mockEventManager);
   });
 
@@ -41,7 +50,7 @@ describe('Issue #48 - Custom Reactions Configuration Bug', () => {
 
     it('should generate correct text for simple custom reactions', () => {
       const result = (reminderScheduler as any).buildReactionInstructionText(['👍', '👎']);
-      expect(result).toBe('Réagissez avec 👍 (j\'aime) ou 👎 (j\'aime pas)');
+      expect(result).toBe("Réagissez avec 👍 (j'aime) ou 👎 (j'aime pas)");
     });
 
     it('should generate correct text for traffic light system', () => {
@@ -64,24 +73,24 @@ describe('Issue #48 - Custom Reactions Configuration Bug', () => {
     it('validates that the fix addresses the original bug', () => {
       // BEFORE FIX: All reminders would show ✅❌❓ regardless of configuration
       // AFTER FIX: Reminders now use guildConfig.defaultReactions dynamically
-      
+
       // Test demonstrates different configurations produce different texts
       const scenarios = [
         {
           name: 'Default configuration',
           reactions: ['✅', '❌', '❓'],
-          expected: 'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)'
+          expected: 'Réagissez avec ✅ (dispo), ❌ (pas dispo) ou ❓ (incertain)',
         },
         {
-          name: 'Gaming event configuration', 
+          name: 'Gaming event configuration',
           reactions: ['🎮', '⏰', '❌'],
-          expected: 'Réagissez avec 🎮 (partant), ⏰ (en retard) ou ❌ (absent)'
+          expected: 'Réagissez avec 🎮 (partant), ⏰ (en retard) ou ❌ (absent)',
         },
         {
           name: 'General event configuration',
           reactions: ['👍', '👎', '🤷', '❤️'],
-          expected: 'Réagissez avec 👍 (j\'aime), 👎 (j\'aime pas), 🤷 (indifférent) ou ❤️ (adoré)'
-        }
+          expected: "Réagissez avec 👍 (j'aime), 👎 (j'aime pas), 🤷 (indifférent) ou ❤️ (adoré)",
+        },
       ];
 
       for (const scenario of scenarios) {

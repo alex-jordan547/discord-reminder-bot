@@ -15,8 +15,10 @@ import {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  ButtonStyle,
+  ComponentType,
   MessageFlags,
-  StringSelectMenuInteraction,
+  Message,
 } from 'discord.js';
 import { DiscordBotClient } from '@/types/BotClient';
 import { Settings } from '@/config/settings';
@@ -370,6 +372,14 @@ export async function handleUnwatchCommand(
 
       if (selectInteraction && selectInteraction.isStringSelectMenu()) {
         const selectedMessageId = selectInteraction.values[0];
+        if (!selectedMessageId) {
+          await selectInteraction.update({
+            content: '❌ No event selected.',
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
         const selectedEvent = events.find(e => e.messageId === selectedMessageId);
 
         if (!selectedEvent) {
@@ -381,8 +391,17 @@ export async function handleUnwatchCommand(
           return;
         }
 
-        // Remove the event
-        const removed = await eventManager.removeEvent(selectedMessageId, interaction.guildId!);
+        // Remove the event - ensure guildId is not undefined
+        if (!interaction.guildId) {
+          await selectInteraction.update({
+            content: '❌ Guild ID is missing.',
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
+
+        const removed = await eventManager.removeEvent(selectedMessageId, interaction.guildId);
 
         if (removed) {
           // Cancel scheduled reminders
@@ -501,6 +520,8 @@ export async function handleListCommand(
     const maxFields = Math.min(events.length, 25);
     for (let i = 0; i < maxFields; i++) {
       const event = events[i];
+      if (!event) continue;
+
       const nextReminder = event.lastRemindedAt
         ? new Date(event.lastRemindedAt.getTime() + event.intervalMinutes * 60 * 1000)
         : new Date(Date.now() + event.intervalMinutes * 60 * 1000);
@@ -742,6 +763,14 @@ export async function handleRemindNowCommand(
         try {
           await selectInteraction.deferReply({ flags: MessageFlags.Ephemeral });
 
+          // Type guard to ensure we have a string select menu interaction
+          if (!selectInteraction.isStringSelectMenu()) {
+            await selectInteraction.editReply({
+              content: "❌ Type d'interaction invalide.",
+            });
+            return;
+          }
+
           const selectedMessageId = selectInteraction.values[0];
           const selectedEvent = events.find(event => event.messageId === selectedMessageId);
 
@@ -957,7 +986,7 @@ async function handleInteractiveWatchCommand(
         try {
           await selectInteraction.deferUpdate();
 
-          const selectedMessageId = selectInteraction.values[0];
+          const selectedMessageId = (selectInteraction as any).values?.[0];
           const selectedMessage = selectableMessages.find(m => m.messageId === selectedMessageId);
 
           if (!selectedMessage) {
@@ -997,7 +1026,17 @@ async function handleInteractiveWatchCommand(
               try {
                 await timeSelectInteraction.deferUpdate();
 
-                const intervalMinutes = parseInt(timeSelectInteraction.values[0]);
+                // Type guard to ensure we have a string select menu interaction
+                if (!timeSelectInteraction.isStringSelectMenu()) {
+                  await timeSelectInteraction.editReply({
+                    content: "❌ Type d'interaction invalide.",
+                  });
+                  return;
+                }
+
+                const firstValue = timeSelectInteraction.values[0];
+                if (!firstValue) return;
+                const intervalMinutes = parseInt(firstValue);
 
                 // Validate interval
                 const minInterval = Settings.is_test_mode() ? 1 : 5;
@@ -1042,7 +1081,7 @@ async function handleInteractiveWatchCommand(
                   let isUpdate = false;
 
                   if (existingEvent) {
-                    // Update existing event
+                    // Update existing event - preserve reactions and creation date
                     isUpdate = true;
                     logger.info(
                       `Updating existing watch for message ${selectedMessage.messageId} - preserving ${existingEvent.usersWhoReacted.length} reactions`,
@@ -1052,12 +1091,12 @@ async function handleInteractiveWatchCommand(
                       messageId: selectedMessage.messageId,
                       channelId: selectedMessage.channelId,
                       guildId: interaction.guildId!,
-                      title: selectedMessage.content.substring(0, 100) || 'Unnamed Event',
+                      title: message.content.substring(0, 100) || 'Unnamed Event',
                       intervalMinutes,
-                      lastRemindedAt: existingEvent.lastRemindedAt,
-                      isPaused: false,
-                      usersWhoReacted: existingEvent.usersWhoReacted,
-                      createdAt: existingEvent.createdAt,
+                      lastRemindedAt: existingEvent.lastRemindedAt, // Preserve last reminder time
+                      isPaused: false, // Reset pause state when user updates
+                      usersWhoReacted: existingEvent.usersWhoReacted, // Preserve existing reactions
+                      createdAt: existingEvent.createdAt, // Preserve original creation date
                       updatedAt: createTimezoneAwareDate(),
                     })) as EventModel;
                   } else {
@@ -1068,7 +1107,7 @@ async function handleInteractiveWatchCommand(
                       messageId: selectedMessage.messageId,
                       channelId: selectedMessage.channelId,
                       guildId: interaction.guildId!,
-                      title: selectedMessage.content.substring(0, 100) || 'Unnamed Event',
+                      title: message.content.substring(0, 100) || 'Unnamed Event',
                       intervalMinutes,
                       lastRemindedAt: null,
                       isPaused: false,
@@ -1087,7 +1126,7 @@ async function handleInteractiveWatchCommand(
                     await addDefaultReactionsToMessage(message, interaction.guildId!);
                   }
 
-                  // Create success embed
+                  // Create success embed with appropriate title and description
                   const embed = new EmbedBuilder()
                     .setColor(0x00ae86)
                     .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
@@ -1125,106 +1164,83 @@ async function handleInteractiveWatchCommand(
                     })
                     .setTimestamp();
 
-                  await timeSelectInteraction.editReply({
-                    embeds: [embed],
-                    components: [],
-                  });
-
+                  await timeSelectInteraction.editReply({ embeds: [embed] });
                   logger.info(
                     `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag}`,
                   );
-                } catch (messageError) {
-                  logger.error(
-                    `Error creating event for message ${selectedMessage.messageId}:`,
-                    messageError,
-                  );
+                } catch (error) {
+                  logger.error(`Error fetching message: ${error}`);
                   await timeSelectInteraction.editReply({
-                    content: '❌ Could not access the selected message. It may have been deleted.',
-                    components: [],
-                    embeds: [],
+                    content:
+                      '❌ Could not access the specified message. Check the link and my permissions.',
                   });
                 }
               } catch (error) {
-                logger.error('Error in time selection:', error);
+                logger.error(`Error in watch command: ${error}`);
                 await timeSelectInteraction.editReply({
                   content: '❌ An error occurred while setting up the watch. Please try again.',
-                  components: [],
-                  embeds: [],
                 });
               }
             });
 
-            timeCollector.on('end', async collected => {
-              if (collected.size === 0) {
-                try {
-                  await selectInteraction.editReply({
-                    content: '⏰ Time selection timed out. Please run the command again.',
-                    components: [],
-                    embeds: [],
-                  });
-                } catch (error) {
-                  logger.debug('Could not edit reply after time selection timeout:', error);
-                }
-              }
-            });
+            logger.info(
+              `Watch command interactive flow completed for ${interaction.user.tag} - message: ${selectedMessage.messageId}`,
+            );
           }
         } catch (error) {
-          logger.error('Error in message selection:', error);
+          logger.error(`Error in watch command interactive flow: ${error}`);
           await selectInteraction.editReply({
-            content: '❌ An error occurred while processing your selection. Please try again.',
+            content: '❌ An error occurred while processing your request. Please try again.',
             components: [],
             embeds: [],
           });
         }
       });
-
-      collector.on('end', async collected => {
-        if (collected.size === 0) {
-          try {
-            await interaction.editReply({
-              content: '⏰ Message selection timed out. Please run the command again.',
-              components: [],
-              embeds: [],
-            });
-          } catch (error) {
-            logger.debug('Could not edit reply after message selection timeout:', error);
-          }
-        }
-      });
     }
-
-    logger.info(
-      `Interactive watch command executed by ${interaction.user.tag} - ${selectableMessages.length} messages available`,
-    );
   } catch (error) {
-    logger.error('Error in interactive watch command:', error);
+    logger.error(`Unexpected error in watch command: ${error}`);
     await interaction.reply({
-      content: '❌ An error occurred while setting up the interactive watch. Please try again.',
+      content: '❌ An unexpected error occurred. Please try again.',
       flags: MessageFlags.Ephemeral,
     });
   }
 }
 
 /**
- * Add default reactions to a message
+ * Add default reactions to a message based on guild configuration
  */
-async function addDefaultReactionsToMessage(message: any, guildId: string): Promise<void> {
+async function addDefaultReactionsToMessage(message: Message, guildId: string): Promise<void> {
   try {
-    // Add common reaction emojis
-    const reactions = ['✅', '❌', '👍', '👎'];
+    // Get guild configuration to determine default reactions
+    const client = message.client as DiscordBotClient;
+
+    // Create a new storage and guild config manager instance
+    const storage = new SqliteStorage();
+    const configManager = new GuildConfigManager(client, storage);
+
+    const guildConfig = await configManager.getGuildConfig(guildId);
+    const reactions = guildConfig?.defaultReactions || Settings.DEFAULT_REACTIONS;
+
     for (const reaction of reactions) {
       try {
         await message.react(reaction);
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        logger.debug(`Could not add reaction ${reaction} to message:`, error);
-        // Continue with other reactions even if one fails
+        logger.warn(`Failed to add reaction ${reaction}: ${error}`);
       }
     }
-    logger.debug(`Added default reactions to message ${message.id} in guild ${guildId}`);
   } catch (error) {
-    logger.warn('Error adding default reactions:', error);
-    // Don't throw - this is not critical for the main functionality
+    logger.error(`Error adding default reactions: ${error}`);
+    // Fallback to default reactions from settings if config manager fails
+    const defaultReactions = Settings.DEFAULT_REACTIONS;
+    for (const reaction of defaultReactions) {
+      try {
+        await message.react(reaction);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (reactionError) {
+        logger.warn(`Failed to add fallback reaction ${reaction}: ${reactionError}`);
+      }
+    }
   }
 }

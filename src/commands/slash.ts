@@ -20,6 +20,13 @@ import {
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
 import { DiscordBotClient, SlashCommand } from '@/types/BotClient';
+import {
+  handleWatchCommand,
+  handleUnwatchCommand,
+  handleListCommand,
+  handleStatusCommand,
+  handleRemindNowCommand,
+} from './handlers';
 
 const logger = createLogger('slash-commands');
 
@@ -57,7 +64,7 @@ const watchCommand: SlashCommand = {
     ),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleWatchCommand } = await import('./handlers');
-    await handleWatchCommand(interaction, client);
+    await handleWatchCommand(interaction, client as DiscordBotClient);
   },
 };
 
@@ -70,7 +77,7 @@ const unwatchCommand: SlashCommand = {
     .setDescription('Stop watching a message for reactions (choose from available events)'),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleUnwatchCommand } = await import('./handlers');
-    await handleUnwatchCommand(interaction, client);
+    await handleUnwatchCommand(interaction, client as DiscordBotClient);
   },
 };
 
@@ -83,7 +90,7 @@ const listCommand: SlashCommand = {
     .setDescription('List all watched events in this server'),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleListCommand } = await import('./handlers');
-    await handleListCommand(interaction, client);
+    await handleListCommand(interaction, client as DiscordBotClient);
   },
 };
 
@@ -96,7 +103,7 @@ const statusCommand: SlashCommand = {
     .setDescription('Show bot status and statistics'),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleStatusCommand } = await import('./handlers');
-    await handleStatusCommand(interaction, client);
+    await handleStatusCommand(interaction, client as DiscordBotClient);
   },
 };
 
@@ -167,7 +174,7 @@ const remindNowCommand: SlashCommand = {
     ),
   execute: async (interaction: ChatInputCommandInteraction, client: Client) => {
     const { handleRemindNowCommand } = await import('./handlers');
-    await handleRemindNowCommand(interaction, client);
+    await handleRemindNowCommand(interaction, client as DiscordBotClient);
   },
 };
 
@@ -238,7 +245,31 @@ export function setupSlashCommands(client: DiscordBotClient): void {
       }
 
       try {
-        await command.execute(interaction, client);
+        switch (interaction.commandName) {
+          case 'watch':
+            await handleWatchCommand(interaction, client as DiscordBotClient);
+            break;
+
+          case 'unwatch':
+            await handleUnwatchCommand(interaction, client as DiscordBotClient);
+            break;
+
+          case 'list':
+            await handleListCommand(interaction, client as DiscordBotClient);
+            break;
+
+          case 'status':
+            await handleStatusCommand(interaction, client as DiscordBotClient);
+            break;
+
+          case 'remind_now':
+            await handleRemindNowCommand(interaction, client as DiscordBotClient);
+            break;
+
+          default:
+            logger.warn(`Unhandled command: ${interaction.commandName}`);
+        }
+
         logger.info(`Command ${interaction.commandName} executed by ${interaction.user.tag}`);
       } catch (error) {
         logger.error(`Error executing command ${interaction.commandName}: ${error}`);
