@@ -292,7 +292,8 @@ export async function handleUnwatchCommand(
     });
 
     // Handle the select menu interaction
-    const filter = (i: MessageComponentInteraction) => i.customId === 'unwatch_select' && i.user.id === interaction.user.id;
+    const filter = (i: MessageComponentInteraction) =>
+      i.customId === 'unwatch_select' && i.user.id === interaction.user.id;
 
     try {
       const selectInteraction = await interaction
@@ -1008,7 +1009,9 @@ async function handleMessageSelection(
       try {
         await selectInteraction.deferUpdate();
 
-        const selectedMessageId = selectInteraction.isStringSelectMenu() ? selectInteraction.values[0] : undefined;
+        const selectedMessageId = selectInteraction.isStringSelectMenu()
+          ? selectInteraction.values[0]
+          : undefined;
         const selectedMessage = selectableMessages.find(m => m.messageId === selectedMessageId);
 
         if (!selectedMessage) {

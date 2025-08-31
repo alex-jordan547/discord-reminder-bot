@@ -55,7 +55,9 @@ describe('Watch Command Helper Functions', () => {
       expect(embed.data.description).toBe('Now watching the message for reactions!');
       expect(embed.data.color).toBe(0x00ae86);
       expect(embed.data.fields).toHaveLength(3);
-      expect(embed.data.footer?.text).toBe('Users who react to the message will be tracked automatically');
+      expect(embed.data.footer?.text).toBe(
+        'Users who react to the message will be tracked automatically',
+      );
     });
 
     it('should create proper embed structure for updated events with reactions', () => {
@@ -78,7 +80,9 @@ describe('Watch Command Helper Functions', () => {
       const embed = new EmbedBuilder()
         .setColor(0x00ae86)
         .setTitle('🔄 Event Watch Updated')
-        .setDescription(`Updated watch settings - preserved ${mockEvent.usersWhoReacted.length} existing reactions!`)
+        .setDescription(
+          `Updated watch settings - preserved ${mockEvent.usersWhoReacted.length} existing reactions!`,
+        )
         .addFields(
           {
             name: '📝 Message',
@@ -102,10 +106,12 @@ describe('Watch Command Helper Functions', () => {
 
       // Verify the update structure
       expect(embed.data.title).toBe('🔄 Event Watch Updated');
-      expect(embed.data.description).toBe('Updated watch settings - preserved 3 existing reactions!');
+      expect(embed.data.description).toBe(
+        'Updated watch settings - preserved 3 existing reactions!',
+      );
       expect(embed.data.color).toBe(0x00ae86);
       expect(embed.data.fields).toHaveLength(4); // Includes reaction count field
-      
+
       // Check that the reaction count field exists
       const reactionField = embed.data.fields?.find(field => field.name === '👥 Current Reactions');
       expect(reactionField).toBeDefined();
@@ -132,7 +138,9 @@ describe('Watch Command Helper Functions', () => {
       const embed = new EmbedBuilder()
         .setColor(0x00ae86)
         .setTitle('🔄 Event Watch Updated')
-        .setDescription(`Updated watch settings - preserved ${mockEvent.usersWhoReacted.length} existing reactions!`)
+        .setDescription(
+          `Updated watch settings - preserved ${mockEvent.usersWhoReacted.length} existing reactions!`,
+        )
         .addFields(
           {
             name: '📝 Message',
@@ -151,10 +159,12 @@ describe('Watch Command Helper Functions', () => {
 
       // Verify the structure without reaction count field
       expect(embed.data.title).toBe('🔄 Event Watch Updated');
-      expect(embed.data.description).toBe('Updated watch settings - preserved 0 existing reactions!');
+      expect(embed.data.description).toBe(
+        'Updated watch settings - preserved 0 existing reactions!',
+      );
       expect(embed.data.color).toBe(0x00ae86);
       expect(embed.data.fields).toHaveLength(3); // No reaction count field for 0 reactions
-      
+
       // Check that the reaction count field doesn't exist
       const reactionField = embed.data.fields?.find(field => field.name === '👥 Current Reactions');
       expect(reactionField).toBeUndefined();
@@ -182,14 +192,18 @@ describe('Watch Command Helper Functions', () => {
       validFormats.forEach(link => {
         // Test that the link format would be recognized as valid
         // This tests the parsing logic indirectly
-        expect(link).toMatch(/^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/channels\/\d+\/\d+\/\d+$/);
+        expect(link).toMatch(
+          /^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/channels\/\d+\/\d+\/\d+$/,
+        );
       });
     });
 
     it('should identify invalid Discord message link formats', () => {
       invalidFormats.forEach(link => {
         // Test that the link format would be recognized as invalid
-        expect(link).not.toMatch(/^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/channels\/\d{17,19}\/\d{17,19}\/\d{17,19}$/);
+        expect(link).not.toMatch(
+          /^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/channels\/\d{17,19}\/\d{17,19}\/\d{17,19}$/,
+        );
       });
     });
   });
@@ -202,10 +216,10 @@ describe('Watch Command Helper Functions', () => {
       // Valid intervals
       expect(15).toBeGreaterThanOrEqual(productionMin);
       expect(15).toBeLessThanOrEqual(productionMax);
-      
+
       expect(60).toBeGreaterThanOrEqual(productionMin);
       expect(60).toBeLessThanOrEqual(productionMax);
-      
+
       expect(1440).toBeGreaterThanOrEqual(productionMin);
       expect(1440).toBeLessThanOrEqual(productionMax);
 
@@ -221,10 +235,10 @@ describe('Watch Command Helper Functions', () => {
       // Valid test intervals
       expect(1).toBeGreaterThanOrEqual(testMin);
       expect(1).toBeLessThanOrEqual(testMax);
-      
+
       expect(2).toBeGreaterThanOrEqual(testMin);
       expect(2).toBeLessThanOrEqual(testMax);
-      
+
       expect(10080).toBeGreaterThanOrEqual(testMin);
       expect(10080).toBeLessThanOrEqual(testMax);
 
@@ -259,7 +273,7 @@ describe('Watch Command Helper Functions', () => {
       // Expected preserved data
       const shouldPreserve = [
         'messageId',
-        'channelId', 
+        'channelId',
         'guildId',
         'usersWhoReacted',
         'createdAt',
@@ -274,7 +288,7 @@ describe('Watch Command Helper Functions', () => {
       expect(updateData.intervalMinutes).toBe(120);
       expect(updateData.isPaused).toBe(false);
       expect(updateData.updatedAt).toBeInstanceOf(Date);
-      
+
       // Verify preserved data structure integrity
       expect(existingEventData.usersWhoReacted).toHaveLength(3);
       expect(existingEventData.createdAt).toEqual(new Date('2023-01-01T10:00:00Z'));
@@ -289,7 +303,7 @@ describe('Watch Command Helper Functions', () => {
       const defaultIntervalMinutes = defaultIntervalHours * 60;
 
       expect(defaultIntervalMinutes).toBe(1440); // 24 hours in minutes
-      
+
       // Test custom guild defaults
       const customGuildDefault = 180; // 3 hours
       expect(customGuildDefault).toBe(3 * 60);
@@ -300,12 +314,12 @@ describe('Watch Command Helper Functions', () => {
     it('should handle default reactions configuration', () => {
       // Test default reactions structure
       const defaultReactions = ['✅', '❌', '⏰'];
-      
+
       expect(defaultReactions).toBeInstanceOf(Array);
       expect(defaultReactions.length).toBeGreaterThan(0);
       expect(defaultReactions).toContain('✅');
       expect(defaultReactions).toContain('❌');
-      
+
       // Test guild-specific reactions
       const guildReactions = ['👍', '👎'];
       expect(guildReactions).toBeInstanceOf(Array);

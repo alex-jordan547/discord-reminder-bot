@@ -75,8 +75,25 @@ function shouldUseColors(): boolean {
     return Settings.LOG_COLORS;
   }
 
-  // Check if stdout is a TTY (terminal)
-  return Boolean(process.stdout.isTTY);
+  // Check if stdout is a TTY (terminal) - simplified for Vite compatibility
+  // In development with Vite, default to false to avoid process.stdout issues
+  if (process.env.NODE_ENV === 'development') {
+    return false;
+  }
+
+  // In production or other environments, use safe access
+  try {
+    if (
+      typeof process !== 'undefined' &&
+      process.stdout &&
+      typeof process.stdout.isTTY === 'boolean'
+    ) {
+      return process.stdout.isTTY;
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -279,7 +296,7 @@ export function setupLogging(options: {
           const formatted = createColoredFormatter(useColors)(logObj);
           process.stdout.write(formatted + '\n');
         } catch (err) {
-          logger.error('Failed to parse log chunk for console output:', err);
+          console.error('Failed to parse log chunk for console output:', err);
           // Fallback to raw output if parsing fails
           process.stdout.write(chunk);
         }
@@ -332,17 +349,19 @@ export function setupLogging(options: {
   const discordLogger = logger.child({ name: 'discord' });
   discordLogger.level = 'warn';
 
-  // Log the logging configuration
-  logger.info('=' + '='.repeat(48) + '=');
-  logger.info('Discord Reminder Bot - Logging Initialized');
-  logger.info(`Log Level: ${logLevel}`);
-  logger.info('Console Logging: Enabled');
-  logger.info(`Colors: ${useColors ? 'Enabled' : 'Disabled'}`);
-  logger.info(`File Logging: ${logToFile ? 'Enabled' : 'Disabled'}`);
-  if (logToFile && logFilePath) {
-    logger.info(`Log File: ${logFilePath}`);
-  }
-  logger.info('=' + '='.repeat(48) + '=');
+  // Log the logging configuration using setTimeout to avoid recursion issues
+  setTimeout(() => {
+    logger.info('=' + '='.repeat(48) + '=');
+    logger.info('Discord Reminder Bot - Logging Initialized');
+    logger.info(`Log Level: ${logLevel}`);
+    logger.info('Console Logging: Enabled');
+    logger.info(`Colors: ${useColors ? 'Enabled' : 'Disabled'}`);
+    logger.info(`File Logging: ${logToFile ? 'Enabled' : 'Disabled'}`);
+    if (logToFile && logFilePath) {
+      logger.info(`Log File: ${logFilePath}`);
+    }
+    logger.info('=' + '='.repeat(48) + '=');
+  }, 0);
 
   return logger;
 }

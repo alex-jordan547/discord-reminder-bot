@@ -1,320 +1,250 @@
-# CLAUDE.md - Guide de développement Discord Reminder Bot
+# CLAUDE.md - Discord Reminder Bot Development Guide
 
-Ce fichier fournit des instructions spécifiques à Claude pour travailler avec ce projet de bot Discord.
+This file provides essential development guidance for Claude Code instances working with the Discord Reminder Bot TypeScript codebase.
 
-## 🚀 Commandes de développement essentielles
+## 🚀 Essential Commands
 
-### Développement local (RECOMMANDÉ)
+### Development & Testing
 ```bash
-# Configuration initiale (une seule fois)
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pip install audioop-lts  # Nécessaire pour Python 3.13
+# Core development workflow
+yarn dev                    # Run development server with hot reload
+yarn build                  # Production build via Vite
+yarn test                   # Run Vitest test suite
+yarn test:watch             # Run tests in watch mode
+yarn test:coverage          # Generate test coverage report
 
-# Lancement simple du bot en développement
-./run_dev.sh
+# Code quality & validation
+yarn lint                   # ESLint validation
+yarn lint:fix              # Auto-fix ESLint issues
+yarn lint:strict           # Lint with zero warnings allowed
+yarn format                # Format code with Prettier
+yarn format:check          # Check if code is properly formatted
+yarn type-check            # TypeScript type checking
+yarn type-check:strict     # Strict TypeScript checking
+yarn quality:all           # Run all quality checks (lint + format + type-check + coverage)
 
-# Ou manuellement
-source venv/bin/activate && python bot.py
+# Database operations
+yarn db:generate           # Generate Drizzle schema
+yarn db:migrate           # Run database migrations
+yarn db:push              # Push schema changes
+yarn db:studio            # Launch Drizzle Studio GUI
+yarn db:drop              # Drop database tables (destructive)
 
-# Arrêt : Ctrl+C dans le terminal
+# Docker workflows
+yarn docker:build         # Build Docker image
+yarn docker:run           # Run via docker-compose
+yarn docker:dev           # Development with Docker
+
+# Security & audit
+yarn security:audit       # Security audit
+yarn security:fix         # Auto-fix security issues
 ```
 
-### Docker (pour production/test d'intégration)
+### Production Operations
 ```bash
-# Développement avec reconstruction
-docker-compose up --build
-
-# Production (détaché)
-docker-compose up -d
-
-# Arrêt
-docker-compose down
-
-# Logs
-docker-compose logs --tail=50 discord-reminder-bot
+yarn start                 # Start production server (requires built files)
+yarn clean                # Remove dist directory
+yarn preview              # Preview production build
 ```
 
-### Tests et validation
-```bash
-# Tests de formatage
-python test_formatting.py
+## 🏗️ Architecture Overview
 
-# Tests de planification dynamique
-python test_dynamic_scheduling.py
+This is a **TypeScript Discord bot** that migrated from Python, focusing on event reminder management with reaction tracking.
 
-# Tests du mode veille
-python test_sleep_mode.py
+### Core Technology Stack
+- **Runtime**: Node.js >=18.0.0, ESNext modules with strict TypeScript
+- **Discord**: Discord.js v14 with comprehensive intents
+- **Database**: Drizzle ORM + better-sqlite3 with auto-migration from legacy JSON
+- **Build**: Vite with custom configuration, preserving modules
+- **Testing**: Vitest with coverage, organized unit/integration structure
+- **Validation**: Zod schemas for environment and data validation
+- **Logging**: Pino with structured logging and optional colorization
 
-# Vérification des imports
-python verify_imports.py
-
-# Tests d'intégration avec pytest
-pytest tests/
-
-# Test des logs colorisés - Colorisation COMPLÈTE (temporaire)
-FORCE_COLOR=1 python -c "
-import logging
-from utils.logging_config import setup_logging
-setup_logging('DEBUG', False)
-logger = logging.getLogger('test_complet')
-logger.debug('🔧 DEBUG - Timestamp, niveau, logger et message colorisés')
-logger.info('ℹ️ INFO - Hiérarchie visuelle parfaite avec couleurs')
-logger.warning('⚠️ WARNING - Structure complète colorisée')
-logger.error('❌ ERROR - Détection instantanée des erreurs')
-logger.critical('🚨 CRITICAL - Maximum de visibilité')
-"
+### Project Structure
 ```
-
-## ⚙️ Configuration de développement
-
-### Fichier .env pour tests rapides
-```env
-DISCORD_TOKEN=your_token_here
-TEST_MODE=true
-REMINDER_INTERVAL_HOURS=0.0167  # 1 minute
-LOG_LEVEL=DEBUG
-LOG_TO_FILE=true
-ADMIN_ROLES=Admin,Moderateur,Coach
-USE_SEPARATE_REMINDER_CHANNEL=false
-```
-
-### Prérequis Python
-- **Python 3.13** : Nécessite `audioop-lts` pour compatibilité discord.py
-- **Python 3.12** : Fonctionne nativement sans packages supplémentaires
-- **Environnement virtuel** : Obligatoire pour éviter les conflits système
-
-## 🏗️ Architecture modulaire (version actuelle)
-
-### Structure des dossiers
-```
-├── bot.py                     # Point d'entrée principal
-├── commands/
-│   ├── handlers.py           # Logique métier des commandes
-│   └── slash_commands.py     # Commandes slash Discord
+src/
+├── index.ts                 # Main entry point with graceful shutdown
+├── bot.ts                   # Discord client setup and event handlers
 ├── config/
-│   └── settings.py          # Configuration centralisée
-├── models/
-│   └── reminder.py          # Modèle Event
-├── persistence/
-│   └── storage.py           # Persistance JSON
-├── utils/
-│   ├── logging_config.py    # Configuration des logs
-│   ├── message_parser.py    # Analyse des liens Discord
-│   ├── permissions.py       # Gestion des permissions
-│   └── error_recovery.py    # Système de récupération d'erreurs
-├── tests/
-│   └── test_error_recovery.py # Tests unitaires récupération d'erreurs
-├── data/                    # Données persistantes
-└── logs/                    # Logs de l'application
+│   ├── settings.ts          # Centralized Zod-validated configuration
+│   └── featureFlags.ts      # Feature flag management system
+├── db/
+│   ├── index.ts             # Database connection and initialization
+│   └── schema.ts            # Drizzle ORM table definitions
+├── models/                  # Domain models with comprehensive validation
+│   ├── BaseModel.ts         # Abstract base with common functionality
+│   ├── Event.ts             # Core event model with business logic
+│   ├── Guild.ts             # Guild/server configuration
+│   ├── User.ts              # User tracking across servers
+│   └── [Reaction|GuildConfig|ReminderLog].ts
+├── services/                # Business logic services
+│   ├── eventManager.ts      # Event lifecycle management
+│   ├── reminderScheduler.ts # Dynamic scheduling with ±5s precision
+│   ├── reactionTracker.ts   # Real-time reaction monitoring
+│   └── guildConfigManager.ts # Per-guild configuration
+├── commands/                # Discord command handling
+│   ├── slash.ts             # Modern slash command setup
+│   ├── handlers.ts          # Command business logic (refactored for DRY)
+│   └── configHandler.ts     # Configuration management commands
+├── persistence/             # Data layer
+│   ├── index.ts             # Storage abstraction
+│   └── sqliteStorage.ts     # SQLite implementation with migrations
+├── server/                  # Optional Fastify REST API
+│   └── fastifyServer.ts     # Health checks and management endpoints
+├── utils/                   # Utilities and helpers
+│   ├── loggingConfig.ts     # Structured logging with color support
+│   ├── permissions.ts       # Role-based access control
+│   ├── validation.ts        # Input validation utilities
+│   ├── messageParser.ts     # Discord message link parsing
+│   └── errorRecovery.ts     # Retry logic with exponential backoff
+└── types/                   # TypeScript type definitions
+    └── BotClient.ts         # Extended Discord client with services
 ```
 
-### Composants principaux
+## 🔧 Key Development Concepts
 
-**1. Classe Event** (`models/reminder.py`)
-- Structure de données centrale pour l'état des évènements
-- Sérialisation JSON avec `to_dict()`/`from_dict()`
-- Calcul intelligent des rappels avec `is_reminder_due()`
-- Gestion des permissions de canal
+### 1. **Strict TypeScript Configuration**
+- `exactOptionalPropertyTypes: true` - Distinguish `undefined` from optional properties
+- `noUncheckedIndexedAccess: true` - Array/object access returns `T | undefined`
+- Path aliases: `@/*` and `#/*` both resolve to `src/*`
+- ES modules with `.ts` extensions in imports
 
-**2. Système de planification dynamique** (`commands/handlers.py`)
-- `schedule_next_reminder_check()` : Planification précise au timestamp
-- `check_reminders_dynamic()` : Vérification des rappels avec replanification
-- **Mode veille intelligent** : 0 vérification quand aucun évènement surveillé
-- **Précision** : ±5 secondes au lieu de ±30 secondes
+### 2. **Database Architecture (SQLite + Drizzle ORM)**
+- **Primary Tables**: `events`, `users`, `guilds`, `guild_configs`, `reactions`, `reminder_logs`
+- **Key Features**: Foreign key constraints, proper indexing, timestamp columns
+- **Migration Strategy**: Auto-migrate from legacy JSON with backup/rollback support
+- **Schema Location**: `src/db/schema.ts` with exported TypeScript types
 
-**3. Configuration centralisée** (`config/settings.py`)
-- Classe `Settings` avec validation automatique
-- Support TEST_MODE pour intervalles flexibles (1-10080 min)
-- Gestion des rôles administrateurs et permissions
+### 3. **Event Model System**
+- **Central Entity**: `Event` class in `src/models/Event.ts`
+- **Dual Constructor**: Supports both object data and individual parameters
+- **Validation**: Comprehensive validation with detailed error reporting
+- **Serialization**: Multiple formats (toDict, toJSON, fromDict) for compatibility
+- **Business Logic**: Built-in methods for reminder timing, reaction counting, status reporting
 
-**4. Persistance** (`persistence/storage.py`)
-- Stockage JSON thread-safe
-- Gestion des erreurs avec dégradation gracieuse
-- Auto-sauvegarde sur changements d'état
+### 4. **Service Architecture**
+- **EventManager**: CRUD operations and business rules
+- **ReminderScheduler**: Dynamic scheduling system with smart sleep mode
+- **ReactionTracker**: Real-time Discord reaction event handling  
+- **GuildConfigManager**: Per-server configuration management
+- **Dependency Injection**: Services attached to extended Discord client
 
-## 🔄 Flux de données principal
+### 5. **Configuration System**
+- **File**: `src/config/settings.ts` with Zod validation
+- **Environment Variables**: Comprehensive schema with defaults and type coercion
+- **Key Features**: Test mode detection, interval validation, display formatting
+- **Multi-Environment**: Development/production/test configuration support
 
-### 1. Surveillance d'un événement
+## 🧪 Testing Approach
+
+### Test Organization
 ```
-Commande !watch → parse_message_link() → Event() → 
-scan réactions existantes → save_events() → reschedule_reminders()
-```
-
-### 2. Suivi des réactions
-```
-Événement Discord → on_reaction_add/remove → 
-update users_who_reacted → save_events()
-```
-
-### 3. Rappels automatiques
-```
-schedule_next_reminder_check() → sleep(temps_calculé) → 
-check_reminders_dynamic() → send_reminder() → reschedule_next()
-```
-
-## 🛠️ Fonctionnalités spéciales
-
-### Mode veille intelligent
-- **Activation** : Automatique quand aucun événement surveillé
-- **Performance** : Économie de 288 vérifications/jour
-- **Réactivation** : Instantanée lors d'ajout d'événement
-
-### Planification dynamique
-- **Précision** : Calcul au timestamp exact du prochain rappel
-- **Optimisation** : Pas de vérifications inutiles
-- **Fiabilité** : Élimination de la dérive temporelle
-
-### Gestion multi-serveur
-- Filtrage automatique par `guild_id`
-- Permissions par canal (view_channel + send_messages)
-- Canaux de rappels séparés optionnels
-
-## 📝 Variables d'environnement
-
-### Obligatoires
-- `DISCORD_TOKEN` : Token du bot Discord
-
-### Configuration des rappels
-- `REMINDER_INTERVAL_HOURS` : Intervalle par défaut (24)
-- `USE_SEPARATE_REMINDER_CHANNEL` : Canal séparé (false)
-- `REMINDER_CHANNEL_NAME` : Nom du canal (rappels-event)
-
-### Développement
-- `TEST_MODE` : Active le mode test (false)
-- `LOG_LEVEL` : Niveau de logs (INFO/DEBUG)
-- `LOG_TO_FILE` : Logs dans fichier (true)
-- `ADMIN_ROLES` : Rôles admin (Admin,Moderateur,Coach)
-
-## 🐛 Débogage et logs
-
-### Logs colorisés (NOUVEAU)
-**Colorisation complète** de tous les éléments pour une lecture optimale :
-
-#### 🎨 Couleurs par niveau :
-- **🔧 DEBUG** : Cyan - Niveau en gras + message colorisé
-- **ℹ️ INFO** : Vert - Niveau en gras + message colorisé
-- **⚠️ WARNING** : Jaune - Niveau en gras + message colorisé
-- **❌ ERROR** : Rouge - Niveau en gras + message colorisé
-- **🚨 CRITICAL** : Magenta - Niveau en gras + message colorisé
-
-#### 🏗️ Structure colorisée :
-- **🕐 Timestamp** : Gris foncé (discret)
-- **📍 Séparateurs** ` | ` : Gris foncé (structure subtile)
-- **📂 Nom du logger** : Gris clair (lisible sans distraire)
-
-**Résultat** : Hiérarchie visuelle parfaite pour une détection instantanée des erreurs !
-
-### Contrôle des couleurs
-```bash
-# Forcer l'activation des couleurs
-FORCE_COLOR=1 ./run_dev.sh
-
-# Désactiver les couleurs
-NO_COLOR=1 ./run_dev.sh
-
-# Configuration via .env (optionnel)
-LOG_COLORS=true    # ou false pour désactiver
+src/tests/
+├── unit/                    # Unit tests for individual components
+│   └── watchCommand.unit.test.ts  # Example: command handler logic
+├── integration/             # Integration tests for system interactions
+│   └── reactionConfigSimple.integration.test.ts
+├── persistence/             # Database and storage tests
+│   └── eventDescription.test.ts
+├── minimal.test.ts          # Focused debugging tests
+└── sqliteStorageMock.ts     # Test utilities and mocks
 ```
 
-### Logs en temps réel
-```bash
-# En développement local
-tail -f logs/bot_$(date +%Y%m%d).log
+### Testing Strategy
+- **Unit Tests**: Focus on individual class/function behavior
+- **Integration Tests**: Test service interactions and Discord API integration  
+- **Validation Tests**: Ensure strict TypeScript compliance and data integrity
+- **Mock Services**: Available in `src/services/__mocks__/` for isolation
 
-# Avec Docker
-docker-compose logs -f discord-reminder-bot
+### Key Test Files to Reference
+- `src/tests/minimal.test.ts` - Simple Event model validation patterns
+- `src/tests/unit/watchCommand.unit.test.ts` - Command handler testing approach
+- `src/tests/persistence/eventDescription.test.ts` - Database operation testing
+
+## 💡 Development Patterns
+
+### 1. **Error Handling Philosophy**
+```typescript
+// Preferred: Detailed validation with error collection
+const errors = event.validate();
+if (errors.length > 0) {
+    // Handle specific validation errors
+}
+
+// Legacy: Boolean validation (being phased out)
+if (!event.isValid()) {
+    // Generic handling
+}
 ```
 
-### Mode DEBUG
-Dans `.env` : `LOG_LEVEL=DEBUG` pour logs détaillés incluant :
-- Planification des rappels avec timestamps
-- Calculs d'intervalles
-- Permissions utilisateurs
-- État du mode veille
-
-## 🔒 Sécurité et bonnes pratiques
-
-### Thread-safety
-- Toutes les opérations de persistance sont protégées
-- Utilisation d'asyncio pour la concurrence
-- Pas de conditions de course sur les sauvegardes
-
-### Gestion d'erreurs
-- Reprise après erreur avec dégradation gracieuse
-- Messages d'erreur descriptifs pour l'utilisateur
-- Logging détaillé des exceptions
-
-### Rate limiting Discord
-- Limite de 50 mentions par rappel
-- Délai de 2s entre rappels multiples
-- Gestion des permissions 403/404
-
-## 🧪 Tests et validation
-
-### Configuration de test
-```env
-TEST_MODE=true
-REMINDER_INTERVAL_HOURS=0.0167  # 1 minute
-LOG_LEVEL=DEBUG
+### 2. **Async Service Patterns**
+```typescript
+// Services are attached to Discord client for DI
+client.eventManager.createEvent(eventData);
+await client.reminderScheduler.scheduleNext();
+await client.reactionTracker.handleReactionAdd(reaction, user);
 ```
 
-### Scénarios de test
-1. **Ajout/suppression** d'évènements
-2. **Réactions** en temps réel
-3. **Rappels automatiques** avec intervalles courts
-4. **Mode veille** sans évènements
-5. **Permissions** multi-serveur
+### 3. **Configuration Access**
+```typescript
+import { Settings } from '@/config/settings';
 
-## 🚀 Déploiement et CI/CD
-
-### Workflows GitHub Actions
-
-Le projet utilise un système CI/CD complet avec GitHub Actions :
-
-#### 🔍 **CI (Intégration Continue)** - `.github/workflows/ci.yml`
-- **Déclenchement** : Push et PR sur `main`/`develop`
-- **Tests multi-Python** : 3.11, 3.12, 3.13
-- **Qualité de code** : black, isort, flake8, mypy
-- **Sécurité** : bandit, safety
-- **Couverture** : pytest avec coverage et upload vers Codecov
-- **Docker** : Test de construction d'image
-
-#### 🚢 **CD (Déploiement Continu)** - `.github/workflows/cd.yml`
-- **Registry** : GitHub Container Registry (GHCR)
-- **Images multi-architecture** : linux/amd64, linux/arm64
-- **Déploiement** : Automatique sur push main, manuel via UI
-- **Environments** : staging, production avec protection
-- **Artefacts** : Package de déploiement pour VPS
-
-### Configuration du déploiement
-
-```bash
-# Image Docker automatiquement construite
-ghcr.io/alex-jordan547/discord-reminder-bot:latest
-
-# Déploiement sur VPS
-cd /opt/discord-bot
-./deploy.sh  # Script automatique fourni
+// Validated environment access
+Settings.TOKEN              // Discord bot token
+Settings.isTestMode()      // Test mode detection  
+Settings.validateIntervalMinutes(60)  // Input validation with clamping
 ```
 
-Voir `DEPLOYMENT.md` pour la configuration complète.
+### 4. **Database Operations**
+```typescript
+// Using Drizzle ORM with proper typing
+const storage = new SqliteStorage();
+const event = await storage.getEvent(messageId);
+const success = await storage.saveEvent(event);
+```
 
-## 📚 Références importantes
+## 🔍 Key Files for Understanding
 
-### Fichiers de configuration
-- `.env.example` : Template de configuration
-- `requirements.txt` : Dépendances Python
-- `docker-compose.yml` : Configuration Docker
-- `pyproject.toml` : Configuration dev tools (pytest, black, mypy)
-- `DEPLOYMENT.md` : Guide complet de déploiement CI/CD
+### Core Application Flow
+- `src/index.ts` - Application bootstrap with graceful shutdown
+- `src/bot.ts` - Discord client setup and event handlers
+- `src/commands/handlers.ts` - Recent refactoring eliminates duplication
 
-### Scripts utilitaires
-- `run_dev.sh` : Lancement développement
-- `test_*.py` : Scripts de validation
-- `fix_trailing_spaces.py` : Nettoyage formatage
+### Data Layer Understanding  
+- `src/models/Event.ts` - Complete business logic and validation patterns
+- `src/db/schema.ts` - Database structure with relationships and constraints
+- `src/persistence/sqliteStorage.ts` - Data access patterns
 
-### Documentation API
-- [discord.py 2.3.2](https://discordpy.readthedocs.io/)
-- [Python asyncio](https://docs.python.org/3/library/asyncio.html)
+### Configuration & Environment
+- `src/config/settings.ts` - All configuration logic with Zod validation
+- `package.json` scripts section - Available development commands
+
+### Recent Refactoring Context
+- Recent work focused on TypeScript strict mode compliance
+- Code deduplication in command handlers with improved type safety
+- Enhanced unit test coverage for watch command functionality
+- Event description field handling improved (null/undefined distinction)
+
+## 🚨 Important Development Notes
+
+### **TypeScript Strictness**
+- Code uses `exactOptionalPropertyTypes: true` - be careful with optional fields
+- Array access requires null checks due to `noUncheckedIndexedAccess: true`
+- Import paths use `@/` prefix consistently
+
+### **Database Migration Context**
+- System supports both SQLite (preferred) and JSON fallback
+- Auto-migration from legacy Python JSON format
+- Description field handling: `null` from DB converts to `undefined` in models
+
+### **Testing Considerations**
+- Test files show patterns for Discord ID validation (18+ digit strings)
+- Event validation is comprehensive - follow existing patterns
+- Mock services available for unit test isolation
+
+### **Build System**  
+- Vite configuration preserves module structure in output
+- External dependencies (Discord.js, better-sqlite3) not bundled
+- Development server uses nodemon for TypeScript execution
+
+This guide focuses on the architectural patterns and development workflows specific to this Discord bot codebase. The system emphasizes type safety, comprehensive validation, and modern TypeScript patterns while maintaining compatibility with Discord.js ecosystem requirements.
