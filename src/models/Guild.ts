@@ -90,8 +90,8 @@ export class Guild extends BaseModel {
   /**
    * Get a setting value with optional default
    */
-  getSetting<T = any>(key: string, defaultValue?: T): T {
-    return this.settings[key] !== undefined ? this.settings[key] : defaultValue;
+  getSetting<T>(key: string, defaultValue: T): T {
+    return this.settings[key] !== undefined ? (this.settings[key] as T) : defaultValue;
   }
 
   /**
@@ -158,7 +158,7 @@ export class Guild extends BaseModel {
   /**
    * String representation for debugging
    */
-  toString(): string {
+  override toString(): string {
     return `Guild(${this.guildId}, "${this.name}")`;
   }
 }

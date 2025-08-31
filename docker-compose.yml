@@ -10,53 +10,53 @@ services:
     environment:
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      
+
       # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
       - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
       - REMINDER_CHANNEL_NAME=${REMINDER_CHANNEL_NAME:-rappels-events}
-      
+
       # Auto-deletion Configuration
       - AUTO_DELETE_REMINDERS=${AUTO_DELETE_REMINDERS:-true}
       - AUTO_DELETE_DELAY_HOURS=${AUTO_DELETE_DELAY_HOURS:-1}
-      
+
       # Permission Configuration
       - ADMIN_ROLES=${ADMIN_ROLES:-Admin,Moderateur,Coach}
-      
+
       # Logging Configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_TO_FILE=${LOG_TO_FILE:-true}
       - LOG_COLORS=${LOG_COLORS:-false}
-      
+
       # Error Recovery Configuration
       - ERROR_RECOVERY_MAX_RETRIES=${ERROR_RECOVERY_MAX_RETRIES:-3}
       - ERROR_RECOVERY_BASE_DELAY=${ERROR_RECOVERY_BASE_DELAY:-1.5}
       - ERROR_RECOVERY_MAX_DELAY=${ERROR_RECOVERY_MAX_DELAY:-60}
       - ERROR_RECOVERY_ENABLE_STATS=${ERROR_RECOVERY_ENABLE_STATS:-true}
-      
+
       # Test Mode (optional)
       - TEST_MODE=${TEST_MODE:-false}
-      
+
     volumes:
       # Data persistence
       - ./data:/app/data
       # Logs persistence (optional)
       - ./logs:/app/logs
-    
+
     # Health check - verify basic imports work
     healthcheck:
-      test: ["CMD", "python", "-c", "import discord; import bot; print('Health check passed')"]
+      test: ['CMD', 'python', '-c', "import discord; import bot; print('Health check passed')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    
+
     networks:
       - bot-network
-    
+
     # Security - Use the app user created in Dockerfile
     # user: "1000:1000"  # Commented out to avoid permission issues on different systems
-    
+
     # Resource limits (optional, adjust as needed)
     deploy:
       resources:

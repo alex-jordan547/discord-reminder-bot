@@ -28,7 +28,7 @@ const envSchema = z.object({
   LOG_TO_FILE: z.coerce.boolean().default(true),
   LOG_COLORS: z.coerce.boolean().optional(),
   USE_SQLITE: z.coerce.boolean().default(false),
-  DATABASE_PATH: z.string().default('discord_bot.db'),
+  DATABASE_PATH: z.string().default(process.env.DATABASE_NAME || 'discord_bot.db'),
   AUTO_MIGRATE: z.coerce.boolean().default(true),
   BACKUP_JSON_ON_MIGRATION: z.coerce.boolean().default(true),
   ENABLE_FEATURE_FLAGS: z.coerce.boolean().default(true),

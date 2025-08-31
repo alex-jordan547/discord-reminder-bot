@@ -1,25 +1,50 @@
 import { defineConfig } from 'vitest/config';
-import path from 'path';
+import { resolve } from 'path';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
+  plugins: [
+    tsconfigPaths(),
+    nodePolyfills({
+      include: ['buffer', 'crypto', 'events', 'fs', 'path', 'stream', 'util'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
+  ],
+
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: ['./src/testSetup.ts'],
+    include: ['src/**/*.{test,spec}.{js,ts}'],
+    exclude: ['node_modules', 'dist', 'coverage'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', 'dist/', 'tests/', '**/*.d.ts'],
+      exclude: [
+        'node_modules/',
+        'dist/',
+        'coverage/',
+        '**/*.d.ts',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        'src/testSetup.ts',
+      ],
     },
   },
+
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@/config': path.resolve(__dirname, './src/config'),
-      '@/models': path.resolve(__dirname, './src/models'),
-      '@/utils': path.resolve(__dirname, './src/utils'),
-      '@/commands': path.resolve(__dirname, './src/commands'),
-      '@/persistence': path.resolve(__dirname, './src/persistence'),
-      '@/tests': path.resolve(__dirname, './tests'),
+      '@': resolve(__dirname, 'src'),
+      '#': resolve(__dirname, 'src'),
     },
+  },
+
+  define: {
+    'process.env.NODE_ENV': '"test"',
   },
 });

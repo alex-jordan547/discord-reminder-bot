@@ -118,7 +118,9 @@ export class EventRepository {
 
       const created = await this.getByMessageId(eventData.messageId);
       if (!created) {
-        throw new Error('Failed to create event');
+        const creationError = new Error(`Failed to create event: ${eventData.messageId}`);
+        logger.error(creationError.message);
+        throw creationError;
       }
 
       logger.info(`Successfully created event: ${eventData.title} (${eventData.messageId})`);
@@ -522,10 +524,15 @@ export class ReminderLogRepository {
       const database = await db.getDb();
       const result = await database.insert(schema.reminderLogs).values(logData).returning();
 
+      const createdLog = result[0];
+      if (!createdLog) {
+        throw new Error('Failed to create reminder log - no result returned');
+      }
+
       logger.info(
         `Successfully created reminder log: type=${logData.reminderType}, recipients=${logData.recipientCount}`,
       );
-      return result[0];
+      return createdLog;
     } catch (error) {
       logger.error(`Failed to create reminder log for event ${logData.messageId}:`, error);
       throw error;

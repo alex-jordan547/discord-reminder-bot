@@ -12,6 +12,12 @@ import * as schema from './schema.js';
 import { createLogger } from '@/utils/loggingConfig';
 import path from 'path';
 import { promises as fs } from 'fs';
+// Type for Node.js file system errors
+interface ErrnoException extends Error {
+  code?: string;
+  errno?: number;
+  path?: string;
+}
 
 const logger = createLogger('database');
 
@@ -84,6 +90,7 @@ export class DatabaseManager {
     try {
       require('fs').mkdirSync(dbDir, { recursive: true });
     } catch (error) {
+      logger.error(`Could not create database directory ${dbDir}:`, error);
       // Directory might already exist, that's okay
     }
 
@@ -168,7 +175,7 @@ export class DatabaseManager {
         migrate(drizzle(this.sqlite), { migrationsFolder });
         logger.info('Database migrations completed successfully');
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        if ((error as ErrnoException).code === 'ENOENT') {
           logger.info('No migrations folder found, skipping migrations');
         } else {
           throw error;
@@ -192,7 +199,7 @@ export class DatabaseManager {
   /**
    * Execute a transaction with automatic rollback on error
    */
-  async transaction<T>(callback: (tx: ReturnType<typeof drizzle>) => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (_tx: any) => Promise<T>): Promise<T> {
     const database = await this.connect();
     return database.transaction(callback);
   }
@@ -218,15 +225,20 @@ export class DatabaseManager {
       }
     }
 
-    return {
+    const result: DatabaseInfo = {
       databasePath,
       databaseExists,
       databaseName,
-      databaseSizeBytes,
-      databaseSizeMB,
       isConnected: this.sqlite !== null,
       isReady: this.isInitialized,
     };
+    if (databaseSizeBytes !== undefined) {
+      result.databaseSizeBytes = databaseSizeBytes;
+    }
+    if (databaseSizeMB !== undefined) {
+      result.databaseSizeMB = databaseSizeMB;
+    }
+    return result;
   }
 
   /**

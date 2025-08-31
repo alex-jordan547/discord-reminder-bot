@@ -10,6 +10,8 @@ import { Client, ClientOptions, Collection, ChatInputCommandInteraction } from '
 import { EventManager } from '@/services/eventManager';
 import { ReminderScheduler } from '@/services/reminderScheduler';
 import { ReactionTracker } from '@/services/reactionTracker';
+import { GuildConfigManager } from '@/services/guildConfigManager';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
 
 /**
  * Interface defining the services that will be attached to the bot client
@@ -18,6 +20,8 @@ export interface BotServices {
   eventManager: EventManager;
   reminderScheduler: ReminderScheduler;
   reactionTracker: ReactionTracker;
+  guildConfigManager: GuildConfigManager;
+  storage: SqliteStorage;
 }
 
 /**
@@ -48,6 +52,12 @@ export class DiscordBotClient extends Client {
   /** Reaction tracking service for monitoring user responses */
   public reactionTracker!: ReactionTracker;
 
+  /** Guild configuration management service for server-specific settings */
+  public guildConfigManager!: GuildConfigManager;
+
+  /** Database storage service for persistent data management */
+  public storage!: SqliteStorage;
+
   /** Collection of registered slash commands */
   public readonly commands = new Collection<string, SlashCommand>();
 
@@ -71,5 +81,7 @@ export class DiscordBotClient extends Client {
     this.eventManager = services.eventManager;
     this.reminderScheduler = services.reminderScheduler;
     this.reactionTracker = services.reactionTracker;
+    this.guildConfigManager = services.guildConfigManager;
+    this.storage = services.storage;
   }
 }

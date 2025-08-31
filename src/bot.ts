@@ -25,6 +25,8 @@ import { setupEventHandlers } from '@/commands/handlers';
 import { EventManager } from '@/services/eventManager';
 import { ReminderScheduler } from '@/services/reminderScheduler';
 import { ReactionTracker } from '@/services/reactionTracker';
+import { GuildConfigManager } from '@/services/guildConfigManager';
+import { SqliteStorage } from '@/persistence/sqliteStorage';
 import { DiscordBotClient, BotServices } from '@/types/BotClient';
 
 const logger = createLogger('bot.ts');
@@ -45,15 +47,19 @@ export async function createDiscordClient(): Promise<DiscordBotClient> {
   });
 
   // Initialize services with proper dependencies
+  const storage = new SqliteStorage();
   const eventManager = new EventManager();
   const reminderScheduler = new ReminderScheduler(client, eventManager);
   const reactionTracker = new ReactionTracker(eventManager);
+  const guildConfigManager = new GuildConfigManager(client, storage);
 
   // Attach services to client
   client.attachServices({
     eventManager,
     reminderScheduler,
     reactionTracker,
+    guildConfigManager,
+    storage,
   });
 
   // Bot ready event - called when bot is fully connected

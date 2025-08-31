@@ -275,8 +275,8 @@ export class CircuitBreaker {
       if (this.successes >= this.config.successThreshold) {
         this.state = CircuitBreakerState.CLOSED;
         this.failures = [];
-        this.lastFailure = undefined;
-        this.nextAttempt = undefined;
+        delete this.lastFailure;
+        delete this.nextAttempt;
         logger.info(`✅ Circuit breaker ${this.name} CLOSED after recovery`);
       }
     }
@@ -325,8 +325,8 @@ export class CircuitBreaker {
       state: this.state,
       failures: this.failures.length,
       successes: this.successes,
-      nextAttempt: this.nextAttempt,
-      lastFailure: this.lastFailure,
+      ...(this.nextAttempt && { nextAttempt: this.nextAttempt }),
+      ...(this.lastFailure && { lastFailure: this.lastFailure }),
     };
   }
 
@@ -444,7 +444,18 @@ export function withRetry<T extends any[], R>(
     descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>,
   ) {
     const originalMethod = descriptor.value!;
-    const config = { ...RETRY_CONFIGS[configName], ...customConfig };
+    const baseConfig = RETRY_CONFIGS[configName] || RETRY_CONFIGS['api_call']!;
+    const config: RetryConfig = {
+      maxAttempts: customConfig?.maxAttempts ?? baseConfig.maxAttempts,
+      baseDelay: customConfig?.baseDelay ?? baseConfig.baseDelay,
+      maxDelay: customConfig?.maxDelay ?? baseConfig.maxDelay,
+      backoffFactor: customConfig?.backoffFactor ?? baseConfig.backoffFactor,
+      jitterFactor: customConfig?.jitterFactor ?? baseConfig.jitterFactor,
+      ...(customConfig?.timeoutMs !== undefined ? { timeoutMs: customConfig.timeoutMs } : {}),
+      ...(baseConfig.timeoutMs !== undefined && customConfig?.timeoutMs === undefined
+        ? { timeoutMs: baseConfig.timeoutMs }
+        : {}),
+    };
     const circuitBreaker = getCircuitBreaker(configName);
 
     descriptor.value = async function (...args: T): Promise<R> {
@@ -538,7 +549,18 @@ export async function executeWithRetry<T>(
   configName: string = 'api_call',
   customConfig?: Partial<RetryConfig>,
 ): Promise<T> {
-  const config = { ...RETRY_CONFIGS[configName], ...customConfig };
+  const baseConfig = RETRY_CONFIGS[configName] || RETRY_CONFIGS['api_call']!;
+  const config: RetryConfig = {
+    maxAttempts: customConfig?.maxAttempts ?? baseConfig.maxAttempts,
+    baseDelay: customConfig?.baseDelay ?? baseConfig.baseDelay,
+    maxDelay: customConfig?.maxDelay ?? baseConfig.maxDelay,
+    backoffFactor: customConfig?.backoffFactor ?? baseConfig.backoffFactor,
+    jitterFactor: customConfig?.jitterFactor ?? baseConfig.jitterFactor,
+    ...(customConfig?.timeoutMs !== undefined ? { timeoutMs: customConfig.timeoutMs } : {}),
+    ...(baseConfig.timeoutMs !== undefined && customConfig?.timeoutMs === undefined
+      ? { timeoutMs: baseConfig.timeoutMs }
+      : {}),
+  };
   const circuitBreaker = getCircuitBreaker(configName);
   let lastError: Error | undefined;
 

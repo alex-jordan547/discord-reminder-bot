@@ -333,7 +333,7 @@ export async function createServer(): Promise<FastifyInstance> {
       const totalEvents = eventManager ? await eventManager.getTotalEventCount() : 0;
 
       // Gather guild statistics
-      const guilds = Array.from(client.guilds.cache.values()).map(guild => ({
+      const guilds = client.guilds.cache.map((guild: any) => ({
         id: guild.id,
         name: guild.name,
         memberCount: guild.memberCount,

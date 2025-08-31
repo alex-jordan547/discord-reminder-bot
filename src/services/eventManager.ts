@@ -194,29 +194,31 @@ export class EventManager {
     try {
       const now = new Date();
       logger.debug(`Marking event ${messageId} as reminded at ${now.toISOString()}`);
-      
+
       // Get the event and update it directly using proper setters
       const event = await this.getEvent(messageId);
       if (!event) {
         logger.error(`Event ${messageId} not found when trying to mark as reminded`);
         return false;
       }
-      
+
       // Use the proper setter instead of Object.assign
       event.lastReminder = now;
       event.updatedAt = new Date();
-      
+
       // Validate before saving
       if (!event.isValid()) {
         const errors = event.validate();
         logger.error(`Event ${messageId} validation failed:`, errors);
-        throw new Error(`Event validation failed: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`);
+        throw new Error(
+          `Event validation failed: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
+        );
       }
-      
+
       // Save the event
       await this.storage.saveEvent(event);
       this.events.set(messageId, event);
-      
+
       logger.debug(`Event ${messageId} marked as reminded: SUCCESS`);
       return true;
     } catch (error) {
