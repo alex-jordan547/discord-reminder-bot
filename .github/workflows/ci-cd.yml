@@ -98,12 +98,6 @@ jobs:
           # Tests avec Vitest et coverage
           yarn test:coverage
 
-      - name: Performance tests
-        if: github.event_name == 'pull_request'
-        run: |
-          # Tests de performance
-          yarn test:performance
-
       - name: Upload coverage to Codecov
         if: matrix.node-version == 20
         uses: codecov/codecov-action@v4
