@@ -279,6 +279,7 @@ export function setupLogging(options: {
           const formatted = createColoredFormatter(useColors)(logObj);
           process.stdout.write(formatted + '\n');
         } catch (err) {
+          logger.error('Failed to parse log chunk for console output:', err);
           // Fallback to raw output if parsing fails
           process.stdout.write(chunk);
         }

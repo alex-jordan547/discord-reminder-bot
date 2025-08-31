@@ -118,7 +118,8 @@ export class EventRepository {
 
       const created = await this.getByMessageId(eventData.messageId);
       if (!created) {
-        throw new Error('Failed to create event');
+        const creationError = new Error(`Failed to create event: ${eventData.messageId}`);
+        logger.error(creationError.message);
       }
 
       logger.info(`Successfully created event: ${eventData.title} (${eventData.messageId})`);

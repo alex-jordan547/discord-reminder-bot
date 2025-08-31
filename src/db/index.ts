@@ -12,6 +12,7 @@ import * as schema from './schema.js';
 import { createLogger } from '@/utils/loggingConfig';
 import path from 'path';
 import { promises as fs } from 'fs';
+import type { ErrnoException } from 'node';
 
 const logger = createLogger('database');
 
@@ -84,6 +85,7 @@ export class DatabaseManager {
     try {
       require('fs').mkdirSync(dbDir, { recursive: true });
     } catch (error) {
+      logger.error(`Could not create database directory ${dbDir}:`, error);
       // Directory might already exist, that's okay
     }
 
@@ -168,7 +170,7 @@ export class DatabaseManager {
         migrate(drizzle(this.sqlite), { migrationsFolder });
         logger.info('Database migrations completed successfully');
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        if ((error as ErrnoException).code === 'ENOENT') {
           logger.info('No migrations folder found, skipping migrations');
         } else {
           throw error;
@@ -192,7 +194,7 @@ export class DatabaseManager {
   /**
    * Execute a transaction with automatic rollback on error
    */
-  async transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (_tx: any) => Promise<T>): Promise<T> {
     const database = await this.connect();
     return database.transaction(callback);
   }

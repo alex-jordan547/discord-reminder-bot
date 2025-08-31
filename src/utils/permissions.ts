@@ -385,7 +385,7 @@ export function hasGuildAdminRole(member: GuildMember, guildAdminRoles?: string[
 /**
  * Check if a user has permission to use a specific command
  */
-export function canUseCommand(member: GuildMember, command: string): boolean {
+export function canUseCommand(member: GuildMember): boolean {
   try {
     // For now, all commands require admin role
     // This could be expanded to have different permission levels per command
@@ -669,6 +669,9 @@ export function getSecurityStats(): {
   // Count blocked users
   let blockedUsers = 0;
   for (const [key, entry] of rateLimitStore.entries()) {
+    logger.info(
+      `Rate limit entry for ${key}: count=${entry.count}, resetTime=${new Date(entry.resetTime).toISOString()}`,
+    );
     if (entry.count > 10 && entry.resetTime > now) {
       // Assuming blocked if exceeded limit
       blockedUsers++;
@@ -686,7 +689,7 @@ export function getSecurityStats(): {
   }
 
   const topSuspiciousUsers = Object.entries(userActivityCounts)
-    .filter(([_, count]) => count > 0)
+    .filter(([, count]) => count > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(([userId, activityCount]) => ({ userId, activityCount }));
