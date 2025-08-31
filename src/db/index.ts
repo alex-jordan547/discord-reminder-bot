@@ -12,7 +12,12 @@ import * as schema from './schema.js';
 import { createLogger } from '@/utils/loggingConfig';
 import path from 'path';
 import { promises as fs } from 'fs';
-import type { ErrnoException } from 'node';
+// Type for Node.js file system errors
+interface ErrnoException extends Error {
+  code?: string;
+  errno?: number;
+  path?: string;
+}
 
 const logger = createLogger('database');
 

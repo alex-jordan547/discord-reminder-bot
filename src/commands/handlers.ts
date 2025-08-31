@@ -19,6 +19,8 @@ import {
   ComponentType,
   MessageFlags,
   Message,
+  StringSelectMenuInteraction,
+  MessageComponentInteraction,
 } from 'discord.js';
 import { DiscordBotClient } from '@/types/BotClient';
 import { Settings } from '@/config/settings';
@@ -27,8 +29,6 @@ import { parseMessageLink, validateMessageLink } from '@/utils/messageParser';
 import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '@/utils/permissions';
 import { createTimezoneAwareDate } from '@/utils/dateUtils';
 import { Event as EventModel } from '@/models';
-import { GuildConfigManager } from '@/services/guildConfigManager';
-import { SqliteStorage } from '@/persistence/sqliteStorage';
 import {
   getSelectableMessages,
   createMessageSelectMenu,
@@ -73,9 +73,7 @@ export async function handleWatchCommand(
     }
 
     // Get guild-specific configuration
-    const storage = new SqliteStorage();
-    const guildConfigManager = new GuildConfigManager(client, storage);
-    const guildConfig = await guildConfigManager.getGuildConfig(interaction.guild.id);
+    const guildConfig = await client.guildConfigManager.getGuildConfig(interaction.guild.id);
 
     const intervalMinutes =
       (interaction.options.get('interval')?.value as number) ||
@@ -150,49 +148,15 @@ export async function handleWatchCommand(
         return;
       }
 
-      // Check if event already exists to preserve data
-      const eventManager = client.eventManager;
-      const existingEvent = await eventManager.getEvent(parsed.messageId);
-
-      let event: EventModel;
-      let isUpdate = false;
-
-      if (existingEvent) {
-        // Update existing event - preserve reactions and creation date
-        isUpdate = true;
-        logger.info(
-          `Updating existing watch for message ${parsed.messageId} - preserving ${existingEvent.usersWhoReacted.length} reactions`,
-        );
-
-        event = (await eventManager.createEvent({
-          messageId: parsed.messageId,
-          channelId: parsed.channelId,
-          guildId: interaction.guildId!,
-          title: message.content.substring(0, 100) || 'Unnamed Event',
-          intervalMinutes,
-          lastRemindedAt: existingEvent.lastRemindedAt, // Preserve last reminder time
-          isPaused: false, // Reset pause state when user updates
-          usersWhoReacted: existingEvent.usersWhoReacted, // Preserve existing reactions
-          createdAt: existingEvent.createdAt, // Preserve original creation date
-          updatedAt: createTimezoneAwareDate(),
-        })) as EventModel;
-      } else {
-        // Create new event
-        logger.info(`Creating new watch for message ${parsed.messageId}`);
-
-        event = (await eventManager.createEvent({
-          messageId: parsed.messageId,
-          channelId: parsed.channelId,
-          guildId: interaction.guildId!,
-          title: message.content.substring(0, 100) || 'Unnamed Event',
-          intervalMinutes,
-          lastRemindedAt: null,
-          isPaused: false,
-          usersWhoReacted: [],
-          createdAt: createTimezoneAwareDate(),
-          updatedAt: createTimezoneAwareDate(),
-        })) as EventModel;
-      }
+      // Create or update the event using the shared function
+      const { event, isUpdate } = await createOrUpdateEvent(
+        client,
+        parsed.messageId,
+        parsed.channelId,
+        interaction.guildId!,
+        message,
+        intervalMinutes,
+      );
 
       // Schedule reminders
       const reminderScheduler = client.reminderScheduler;
@@ -203,41 +167,15 @@ export async function handleWatchCommand(
         await addDefaultReactionsToMessage(message, interaction.guildId!);
       }
 
-      // Create success embed with appropriate title and description
-      const embed = new EmbedBuilder()
-        .setColor(0x00ae86)
-        .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
-        .setDescription(
-          isUpdate
-            ? `Updated watch settings - preserved ${event.usersWhoReacted.length} existing reactions!`
-            : `Now watching the message for reactions!`,
-        )
-        .addFields(
-          {
-            name: '📝 Message',
-            value: `[Jump to message](https://discord.com/channels/${interaction.guildId}/${parsed.channelId}/${parsed.messageId})`,
-            inline: false,
-          },
-          { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
-          {
-            name: '🔔 Next Reminder',
-            value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`,
-            inline: true,
-          },
-        );
-
-      // Add reaction count field for updates
-      if (isUpdate && event.usersWhoReacted.length > 0) {
-        embed.addFields({
-          name: '👥 Current Reactions',
-          value: `${event.usersWhoReacted.length} users have reacted`,
-          inline: true,
-        });
-      }
-
-      embed
-        .setFooter({ text: 'Users who react to the message will be tracked automatically' })
-        .setTimestamp();
+      // Create success embed using the shared function
+      const embed = createWatchSuccessEmbed(
+        event,
+        isUpdate,
+        intervalMinutes,
+        interaction.guildId!,
+        parsed.channelId,
+        parsed.messageId,
+      );
 
       await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       logger.info(
@@ -354,7 +292,7 @@ export async function handleUnwatchCommand(
     });
 
     // Handle the select menu interaction
-    const filter = (i: any) => i.customId === 'unwatch_select' && i.user.id === interaction.user.id;
+    const filter = (i: MessageComponentInteraction) => i.customId === 'unwatch_select' && i.user.id === interaction.user.id;
 
     try {
       const selectInteraction = await interaction
@@ -748,7 +686,7 @@ export async function handleRemindNowCommand(
     });
 
     // Set up a collector to handle the select menu interaction - simplified approach
-    const filter = (selectInteraction: any) =>
+    const filter = (selectInteraction: MessageComponentInteraction) =>
       selectInteraction.customId.startsWith('remind_now_select_') &&
       selectInteraction.user.id === interaction.user.id;
 
@@ -908,9 +846,7 @@ async function handleInteractiveWatchCommand(
     }
 
     // Get guild-specific configuration for permission checking
-    const storage = new SqliteStorage();
-    const guildConfigManager = new GuildConfigManager(client, storage);
-    const guildConfig = await guildConfigManager.getGuildConfig(interaction.guild.id);
+    const guildConfig = await client.guildConfigManager.getGuildConfig(interaction.guild.id);
 
     const member = interaction.member as GuildMember;
     if (!hasGuildAdminRole(member, guildConfig?.adminRoleNames)) {
@@ -970,233 +906,8 @@ async function handleInteractiveWatchCommand(
       flags: MessageFlags.Ephemeral,
     });
 
-    // Set up collector for message selection
-    const filter = (selectInteraction: any) =>
-      selectInteraction.customId === `watch_message_select_${interaction.user.id}` &&
-      selectInteraction.user.id === interaction.user.id;
-
-    const collector = interaction.channel?.createMessageComponentCollector({
-      filter,
-      time: 300000, // 5 minutes
-      max: 1,
-    });
-
-    if (collector) {
-      collector.on('collect', async selectInteraction => {
-        try {
-          await selectInteraction.deferUpdate();
-
-          const selectedMessageId = (selectInteraction as any).values?.[0];
-          const selectedMessage = selectableMessages.find(m => m.messageId === selectedMessageId);
-
-          if (!selectedMessage) {
-            await selectInteraction.editReply({
-              content: '❌ Selected message not found.',
-              components: [],
-              embeds: [],
-            });
-            return;
-          }
-
-          // Show time selection interface
-          const timeSelectMenu = createTimeSelectMenu(`watch_time_select_${interaction.user.id}`);
-          const timeEmbed = createTimeSelectionEmbed(selectedMessage);
-          const timeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-            timeSelectMenu,
-          );
-
-          await selectInteraction.editReply({
-            embeds: [timeEmbed],
-            components: [timeRow],
-          });
-
-          // Set up collector for time selection
-          const timeFilter = (timeSelectInteraction: any) =>
-            timeSelectInteraction.customId === `watch_time_select_${interaction.user.id}` &&
-            timeSelectInteraction.user.id === interaction.user.id;
-
-          const timeCollector = interaction.channel?.createMessageComponentCollector({
-            filter: timeFilter,
-            time: 300000, // 5 minutes
-            max: 1,
-          });
-
-          if (timeCollector) {
-            timeCollector.on('collect', async timeSelectInteraction => {
-              try {
-                await timeSelectInteraction.deferUpdate();
-
-                // Type guard to ensure we have a string select menu interaction
-                if (!timeSelectInteraction.isStringSelectMenu()) {
-                  await timeSelectInteraction.editReply({
-                    content: "❌ Type d'interaction invalide.",
-                  });
-                  return;
-                }
-
-                const firstValue = timeSelectInteraction.values[0];
-                if (!firstValue) return;
-                const intervalMinutes = parseInt(firstValue);
-
-                // Validate interval
-                const minInterval = Settings.is_test_mode() ? 1 : 5;
-                const maxInterval = Settings.is_test_mode() ? 10080 : 1440;
-
-                if (intervalMinutes < minInterval || intervalMinutes > maxInterval) {
-                  await timeSelectInteraction.editReply({
-                    content: `❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`,
-                    components: [],
-                    embeds: [],
-                  });
-                  return;
-                }
-
-                // Fetch the actual Discord message to validate it still exists
-                try {
-                  const message = await channel.messages.fetch(selectedMessage.messageId);
-                  if (!message) {
-                    await timeSelectInteraction.editReply({
-                      content: '❌ The selected message was deleted.',
-                      components: [],
-                      embeds: [],
-                    });
-                    return;
-                  }
-
-                  // Check bot permissions
-                  if (!validatePermissions(channel, client.user!)) {
-                    await timeSelectInteraction.editReply({
-                      content: '❌ I do not have permission to read/send messages in this channel.',
-                      components: [],
-                      embeds: [],
-                    });
-                    return;
-                  }
-
-                  // Check if event already exists
-                  const eventManager = client.eventManager;
-                  const existingEvent = await eventManager.getEvent(selectedMessage.messageId);
-
-                  let event: EventModel;
-                  let isUpdate = false;
-
-                  if (existingEvent) {
-                    // Update existing event - preserve reactions and creation date
-                    isUpdate = true;
-                    logger.info(
-                      `Updating existing watch for message ${selectedMessage.messageId} - preserving ${existingEvent.usersWhoReacted.length} reactions`,
-                    );
-
-                    event = (await eventManager.createEvent({
-                      messageId: selectedMessage.messageId,
-                      channelId: selectedMessage.channelId,
-                      guildId: interaction.guildId!,
-                      title: message.content.substring(0, 100) || 'Unnamed Event',
-                      intervalMinutes,
-                      lastRemindedAt: existingEvent.lastRemindedAt, // Preserve last reminder time
-                      isPaused: false, // Reset pause state when user updates
-                      usersWhoReacted: existingEvent.usersWhoReacted, // Preserve existing reactions
-                      createdAt: existingEvent.createdAt, // Preserve original creation date
-                      updatedAt: createTimezoneAwareDate(),
-                    })) as EventModel;
-                  } else {
-                    // Create new event
-                    logger.info(`Creating new watch for message ${selectedMessage.messageId}`);
-
-                    event = (await eventManager.createEvent({
-                      messageId: selectedMessage.messageId,
-                      channelId: selectedMessage.channelId,
-                      guildId: interaction.guildId!,
-                      title: message.content.substring(0, 100) || 'Unnamed Event',
-                      intervalMinutes,
-                      lastRemindedAt: null,
-                      isPaused: false,
-                      usersWhoReacted: [],
-                      createdAt: createTimezoneAwareDate(),
-                      updatedAt: createTimezoneAwareDate(),
-                    })) as EventModel;
-                  }
-
-                  // Schedule reminders
-                  const reminderScheduler = client.reminderScheduler;
-                  await reminderScheduler.scheduleEvent(event);
-
-                  // Add default reactions to the message for new events
-                  if (!isUpdate) {
-                    await addDefaultReactionsToMessage(message, interaction.guildId!);
-                  }
-
-                  // Create success embed with appropriate title and description
-                  const embed = new EmbedBuilder()
-                    .setColor(0x00ae86)
-                    .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
-                    .setDescription(
-                      isUpdate
-                        ? `Updated watch settings - preserved ${event.usersWhoReacted.length} existing reactions!`
-                        : `Now watching the message for reactions!`,
-                    )
-                    .addFields(
-                      {
-                        name: '📝 Message',
-                        value: `[Jump to message](https://discord.com/channels/${interaction.guildId}/${selectedMessage.channelId}/${selectedMessage.messageId})`,
-                        inline: false,
-                      },
-                      { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
-                      {
-                        name: '🔔 Next Reminder',
-                        value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`,
-                        inline: true,
-                      },
-                    );
-
-                  // Add reaction count field for updates
-                  if (isUpdate && event.usersWhoReacted.length > 0) {
-                    embed.addFields({
-                      name: '👥 Current Reactions',
-                      value: `${event.usersWhoReacted.length} users have reacted`,
-                      inline: true,
-                    });
-                  }
-
-                  embed
-                    .setFooter({
-                      text: 'Users who react to the message will be tracked automatically',
-                    })
-                    .setTimestamp();
-
-                  await timeSelectInteraction.editReply({ embeds: [embed] });
-                  logger.info(
-                    `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag}`,
-                  );
-                } catch (error) {
-                  logger.error(`Error fetching message: ${error}`);
-                  await timeSelectInteraction.editReply({
-                    content:
-                      '❌ Could not access the specified message. Check the link and my permissions.',
-                  });
-                }
-              } catch (error) {
-                logger.error(`Error in watch command: ${error}`);
-                await timeSelectInteraction.editReply({
-                  content: '❌ An error occurred while setting up the watch. Please try again.',
-                });
-              }
-            });
-
-            logger.info(
-              `Watch command interactive flow completed for ${interaction.user.tag} - message: ${selectedMessage.messageId}`,
-            );
-          }
-        } catch (error) {
-          logger.error(`Error in watch command interactive flow: ${error}`);
-          await selectInteraction.editReply({
-            content: '❌ An error occurred while processing your request. Please try again.',
-            components: [],
-            embeds: [],
-          });
-        }
-      });
-    }
+    // Handle message selection using the extracted function
+    await handleMessageSelection(interaction, client, selectableMessages, channel);
   } catch (error) {
     logger.error(`Unexpected error in watch command: ${error}`);
     await interaction.reply({
@@ -1207,6 +918,330 @@ async function handleInteractiveWatchCommand(
 }
 
 /**
+ * Interface for event creation/update result
+ */
+interface EventCreationResult {
+  event: EventModel;
+  isUpdate: boolean;
+}
+
+/**
+ * Create or update an event with the given parameters
+ * This function is shared between handleWatchCommand and handleInteractiveWatchCommand
+ */
+async function createOrUpdateEvent(
+  client: DiscordBotClient,
+  messageId: string,
+  channelId: string,
+  guildId: string,
+  message: Message,
+  intervalMinutes: number,
+): Promise<EventCreationResult> {
+  const eventManager = client.eventManager;
+  const existingEvent = await eventManager.getEvent(messageId);
+
+  let event: EventModel;
+  let isUpdate = false;
+
+  if (existingEvent) {
+    // Update existing event - preserve reactions and creation date
+    isUpdate = true;
+    logger.info(
+      `Updating existing watch for message ${messageId} - preserving ${existingEvent.usersWhoReacted.length} reactions`,
+    );
+
+    event = (await eventManager.createEvent({
+      messageId,
+      channelId,
+      guildId,
+      title: message.content.substring(0, 100) || 'Unnamed Event',
+      intervalMinutes,
+      lastRemindedAt: existingEvent.lastRemindedAt, // Preserve last reminder time
+      isPaused: false, // Reset pause state when user updates
+      usersWhoReacted: existingEvent.usersWhoReacted, // Preserve existing reactions
+      createdAt: existingEvent.createdAt, // Preserve original creation date
+      updatedAt: createTimezoneAwareDate(),
+    })) as EventModel;
+  } else {
+    // Create new event
+    logger.info(`Creating new watch for message ${messageId}`);
+
+    event = (await eventManager.createEvent({
+      messageId,
+      channelId,
+      guildId,
+      title: message.content.substring(0, 100) || 'Unnamed Event',
+      intervalMinutes,
+      lastRemindedAt: null,
+      isPaused: false,
+      usersWhoReacted: [],
+      createdAt: createTimezoneAwareDate(),
+      updatedAt: createTimezoneAwareDate(),
+    })) as EventModel;
+  }
+
+  return { event, isUpdate };
+}
+
+/**
+ * Handle message selection interaction for interactive watch command
+ */
+async function handleMessageSelection(
+  interaction: ChatInputCommandInteraction,
+  client: DiscordBotClient,
+  selectableMessages: MessageSelectionOption[],
+  channel: TextChannel,
+): Promise<void> {
+  // Set up collector for message selection
+  const filter = (selectInteraction: MessageComponentInteraction) =>
+    selectInteraction.customId === `watch_message_select_${interaction.user.id}` &&
+    selectInteraction.user.id === interaction.user.id;
+
+  const collector = interaction.channel?.createMessageComponentCollector({
+    filter,
+    time: 300000, // 5 minutes
+    max: 1,
+  });
+
+  if (collector) {
+    collector.on('collect', async selectInteraction => {
+      try {
+        await selectInteraction.deferUpdate();
+
+        const selectedMessageId = selectInteraction.isStringSelectMenu() ? selectInteraction.values[0] : undefined;
+        const selectedMessage = selectableMessages.find(m => m.messageId === selectedMessageId);
+
+        if (!selectedMessage) {
+          await selectInteraction.editReply({
+            content: '❌ Selected message not found.',
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
+
+        // Show time selection interface
+        await handleTimeSelection(interaction, client, selectedMessage, channel, selectInteraction);
+      } catch (error) {
+        logger.error(`Error in message selection: ${error}`);
+        await selectInteraction.editReply({
+          content: '❌ An error occurred while processing your request. Please try again.',
+          components: [],
+          embeds: [],
+        });
+      }
+    });
+  }
+}
+
+/**
+ * Handle time selection interaction for interactive watch command
+ */
+async function handleTimeSelection(
+  interaction: ChatInputCommandInteraction,
+  client: DiscordBotClient,
+  selectedMessage: MessageSelectionOption,
+  channel: TextChannel,
+  selectInteraction: MessageComponentInteraction,
+): Promise<void> {
+  const timeSelectMenu = createTimeSelectMenu(`watch_time_select_${interaction.user.id}`);
+  const timeEmbed = createTimeSelectionEmbed(selectedMessage);
+  const timeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(timeSelectMenu);
+
+  await selectInteraction.editReply({
+    embeds: [timeEmbed],
+    components: [timeRow],
+  });
+
+  // Set up collector for time selection
+  const timeFilter = (timeSelectInteraction: MessageComponentInteraction) =>
+    timeSelectInteraction.customId === `watch_time_select_${interaction.user.id}` &&
+    timeSelectInteraction.user.id === interaction.user.id;
+
+  const timeCollector = interaction.channel?.createMessageComponentCollector({
+    filter: timeFilter,
+    time: 300000, // 5 minutes
+    max: 1,
+  });
+
+  if (timeCollector) {
+    timeCollector.on('collect', async timeSelectInteraction => {
+      try {
+        await timeSelectInteraction.deferUpdate();
+
+        // Type guard to ensure we have a string select menu interaction
+        if (!timeSelectInteraction.isStringSelectMenu()) {
+          await timeSelectInteraction.editReply({
+            content: "❌ Type d'interaction invalide.",
+          });
+          return;
+        }
+
+        const firstValue = timeSelectInteraction.values[0];
+        if (!firstValue) return;
+        const intervalMinutes = parseInt(firstValue);
+
+        // Validate interval
+        const minInterval = Settings.is_test_mode() ? 1 : 5;
+        const maxInterval = Settings.is_test_mode() ? 10080 : 1440;
+
+        if (intervalMinutes < minInterval || intervalMinutes > maxInterval) {
+          await timeSelectInteraction.editReply({
+            content: `❌ Interval must be between ${minInterval} and ${maxInterval} minutes.`,
+            components: [],
+            embeds: [],
+          });
+          return;
+        }
+
+        // Process the final event creation
+        await processEventCreation(
+          interaction,
+          client,
+          selectedMessage,
+          channel,
+          intervalMinutes,
+          timeSelectInteraction,
+        );
+      } catch (error) {
+        logger.error(`Error in time selection: ${error}`);
+        await timeSelectInteraction.editReply({
+          content: '❌ An error occurred while setting up the watch. Please try again.',
+        });
+      }
+    });
+
+    logger.info(
+      `Watch command interactive flow completed for ${interaction.user.tag} - message: ${selectedMessage.messageId}`,
+    );
+  }
+}
+
+/**
+ * Process the final event creation for interactive watch command
+ */
+async function processEventCreation(
+  interaction: ChatInputCommandInteraction,
+  client: DiscordBotClient,
+  selectedMessage: MessageSelectionOption,
+  channel: TextChannel,
+  intervalMinutes: number,
+  timeSelectInteraction: MessageComponentInteraction,
+): Promise<void> {
+  try {
+    // Fetch the actual Discord message to validate it still exists
+    const message = await channel.messages.fetch(selectedMessage.messageId);
+    if (!message) {
+      await timeSelectInteraction.editReply({
+        content: '❌ The selected message was deleted.',
+        components: [],
+        embeds: [],
+      });
+      return;
+    }
+
+    // Check bot permissions
+    if (!validatePermissions(channel, client.user!)) {
+      await timeSelectInteraction.editReply({
+        content: '❌ I do not have permission to read/send messages in this channel.',
+        components: [],
+        embeds: [],
+      });
+      return;
+    }
+
+    // Create or update the event using the shared function
+    const { event, isUpdate } = await createOrUpdateEvent(
+      client,
+      selectedMessage.messageId,
+      selectedMessage.channelId,
+      interaction.guildId!,
+      message,
+      intervalMinutes,
+    );
+
+    // Schedule reminders
+    const reminderScheduler = client.reminderScheduler;
+    await reminderScheduler.scheduleEvent(event);
+
+    // Add default reactions to the message for new events
+    if (!isUpdate) {
+      await addDefaultReactionsToMessage(message, interaction.guildId!);
+    }
+
+    // Create success embed using the shared function
+    const embed = createWatchSuccessEmbed(
+      event,
+      isUpdate,
+      intervalMinutes,
+      interaction.guildId!,
+      selectedMessage.channelId,
+      selectedMessage.messageId,
+    );
+
+    await timeSelectInteraction.editReply({ embeds: [embed] });
+    logger.info(
+      `Event watch ${isUpdate ? 'updated' : 'started'} for message ${selectedMessage.messageId} by ${interaction.user.tag}`,
+    );
+  } catch (error) {
+    logger.error(`Error fetching message: ${error}`);
+    await timeSelectInteraction.editReply({
+      content: '❌ Could not access the specified message. Check the link and my permissions.',
+    });
+  }
+}
+
+/**
+ * Create success embed for watch command result
+ * This function is shared between handleWatchCommand and processEventCreation
+ */
+function createWatchSuccessEmbed(
+  event: EventModel,
+  isUpdate: boolean,
+  intervalMinutes: number,
+  guildId: string,
+  channelId: string,
+  messageId: string,
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(0x00ae86)
+    .setTitle(isUpdate ? '🔄 Event Watch Updated' : '✅ Event Watch Started')
+    .setDescription(
+      isUpdate
+        ? `Updated watch settings - preserved ${event.usersWhoReacted.length} existing reactions!`
+        : `Now watching the message for reactions!`,
+    )
+    .addFields(
+      {
+        name: '📝 Message',
+        value: `[Jump to message](https://discord.com/channels/${guildId}/${channelId}/${messageId})`,
+        inline: false,
+      },
+      { name: '⏰ Interval', value: `${intervalMinutes} minutes`, inline: true },
+      {
+        name: '🔔 Next Reminder',
+        value: `<t:${Math.floor((Date.now() + intervalMinutes * 60 * 1000) / 1000)}:R>`,
+        inline: true,
+      },
+    );
+
+  // Add reaction count field for updates
+  if (isUpdate && event.usersWhoReacted.length > 0) {
+    embed.addFields({
+      name: '👥 Current Reactions',
+      value: `${event.usersWhoReacted.length} users have reacted`,
+      inline: true,
+    });
+  }
+
+  embed
+    .setFooter({ text: 'Users who react to the message will be tracked automatically' })
+    .setTimestamp();
+
+  return embed;
+}
+
+/**
  * Add default reactions to a message based on guild configuration
  */
 async function addDefaultReactionsToMessage(message: Message, guildId: string): Promise<void> {
@@ -1214,11 +1249,7 @@ async function addDefaultReactionsToMessage(message: Message, guildId: string): 
     // Get guild configuration to determine default reactions
     const client = message.client as DiscordBotClient;
 
-    // Create a new storage and guild config manager instance
-    const storage = new SqliteStorage();
-    const configManager = new GuildConfigManager(client, storage);
-
-    const guildConfig = await configManager.getGuildConfig(guildId);
+    const guildConfig = await client.guildConfigManager.getGuildConfig(guildId);
     const reactions = guildConfig?.defaultReactions || Settings.DEFAULT_REACTIONS;
 
     for (const reaction of reactions) {

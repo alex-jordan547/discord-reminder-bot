@@ -8,9 +8,9 @@ import { Event } from '@/models';
 describe('Minimal Event Description Test', () => {
   it('should handle null description correctly', () => {
     const eventData = {
-      messageId: '12345',
-      channelId: '67890',
-      guildId: '11111',
+      messageId: '123456789012345678', // Valid Discord ID (18 digits)
+      channelId: '234567890123456789', // Valid Discord ID (18 digits)  
+      guildId: '345678901234567890',   // Valid Discord ID (18 digits)
       title: 'Test Event',
       description: undefined, // Change from null to undefined
       intervalMinutes: 60,

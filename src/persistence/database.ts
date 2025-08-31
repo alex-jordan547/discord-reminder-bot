@@ -120,6 +120,7 @@ export class EventRepository {
       if (!created) {
         const creationError = new Error(`Failed to create event: ${eventData.messageId}`);
         logger.error(creationError.message);
+        throw creationError;
       }
 
       logger.info(`Successfully created event: ${eventData.title} (${eventData.messageId})`);

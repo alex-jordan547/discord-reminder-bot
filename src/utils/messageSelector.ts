@@ -16,6 +16,7 @@ import {
   Collection,
   ChatInputCommandInteraction,
   StringSelectMenuOptionBuilder,
+  MessageType,
 } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
 
@@ -63,8 +64,8 @@ export async function getSelectableMessages(
         continue;
       }
 
-      // Skip system messages (type 0 is default user message)
-      if (message.type !== 0) {
+      // Skip system messages (only process default user messages)
+      if (message.type !== MessageType.Default) {
         continue;
       }
 
