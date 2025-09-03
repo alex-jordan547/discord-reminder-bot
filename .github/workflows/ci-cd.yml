@@ -13,10 +13,11 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [20.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -28,7 +29,10 @@ jobs:
         cache: 'yarn'
 
     - name: Install dependencies
-      run: yarn install --frozen-lockfile
+      run: |
+        yarn config set network-timeout 300000
+        yarn install --frozen-lockfile --network-timeout 300000
+      timeout-minutes: 10
 
     - name: Run type checking
       run: yarn type-check
@@ -43,14 +47,17 @@ jobs:
       run: yarn test:coverage
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
+      if: always()
       with:
         file: ./coverage/coverage-final.json
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
@@ -95,6 +102,7 @@ jobs:
   security-scan:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name != 'pull_request'
 
     steps:
@@ -106,7 +114,7 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -121,6 +129,7 @@ jobs:
     - name: Deploy to staging
       run: |
         echo "Deploying to staging environment..."
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
         # Add your staging deployment commands here
         # Example: kubectl apply -f k8s/staging/
 
@@ -145,11 +154,13 @@ jobs:
         echo "Deploying to production in shadow mode..."
         echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
         # Add shadow deployment commands here
+        # Example: docker run -d --name bot-shadow ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
     - name: Run health checks
       run: |
         echo "Running health checks..."
         # Add health check commands
+        # Example: curl -f http://localhost:3000/health || exit 1
         sleep 60
         echo "Health checks passed!"
 
@@ -157,6 +168,7 @@ jobs:
       run: |
         echo "Running load tests..."
         # Add load testing commands
+        # Example: artillery run load-test.yml
         sleep 120
         echo "Load tests completed successfully!"
 
@@ -164,6 +176,7 @@ jobs:
       run: |
         echo "Switching traffic to new deployment..."
         # Add traffic switching commands
+        # Example: docker stop bot-prod && docker rename bot-shadow bot-prod
 
     - name: Post-deployment validation
       run: |
