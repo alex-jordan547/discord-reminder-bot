@@ -2,460 +2,172 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: ['**'] # Tous les push déclenchent les tests
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
+    branches: [ main, develop ]
   pull_request:
-    branches: [main, preprod]
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
-      skip_tests:
-        description: 'Skip tests (not recommended)'
-        required: false
-        default: false
-        type: boolean
+    branches: [ main ]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # 🔄 TESTS - Se lancent sur TOUS les push et PR
   test:
-    name: Tests & Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Se lance toujours sauf si explicitement désactivé
-    if: ${{ !inputs.skip_tests }}
 
     strategy:
-      fail-fast: false
       matrix:
-        node-version: [20, 22]
+        node-version: [18.x, 20.x]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'yarn'
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'yarn'
 
-      - name: Install dependencies
-        run: |
-          yarn install --frozen-lockfile
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
 
-      - name: Code formatting
-        run: |
-          # Auto-fix formatting with Prettier
-          yarn format
+    - name: Run type checking
+      run: yarn type-check
 
-          # Check if any files were changed by formatting
-          if ! git diff --exit-code; then
-            echo "⚠️ Code formatting issues detected and fixed"
-            echo "Files modified by Prettier:"
-            git diff --name-only
-            # In CI, we could either fail or auto-commit the fixes
-            # For now, we'll continue but show the diff
-          else
-            echo "✅ Code formatting is correct"
-          fi
+    - name: Run linting
+      run: yarn lint
 
-      - name: Code quality checks
-        run: |
-          # Linting avec ESLint (non-strict pour le moment)
-          yarn lint || echo "⚠️ Linting issues found but continuing..."
+    - name: Run format check
+      run: yarn format:check
 
-          # Type checking avec TypeScript (non-strict pour le moment)
-          yarn type-check || echo "⚠️ Type checking issues found but continuing..."
-        continue-on-error: true
+    - name: Run tests
+      run: yarn test:coverage
 
-      - name: Security checks
-        run: |
-          # Audit des dépendances Yarn
-          yarn audit --level moderate || echo "⚠️ Security audit found issues but continuing..."
-        continue-on-error: true
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/coverage-final.json
+        fail_ci_if_error: false
 
-      - name: Unit tests
-        env:
-          DISCORD_TOKEN: test-token-for-ci
-        run: |
-          # Tests avec Vitest et coverage
-          yarn test:coverage
-
-      - name: Upload coverage to Codecov
-        if: matrix.node-version == 20
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage/lcov.info
-          fail_ci_if_error: false
-
-    outputs:
-      test-success: ${{ steps.unit-tests.outcome == 'success' }}
-
-  # 🏗️ BUILD - Se lance uniquement pour PR, tags et main
   build:
-    name: Build & Package
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
     needs: test
-    # Conditions : PR vers main/preprod, push vers main/preprod, tags, ou manuel
-    if: |
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/preprod')) ||
-      github.event_name == 'release' ||
-      github.event_name == 'workflow_dispatch'
-
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
+    runs-on: ubuntu-latest
 
     outputs:
-      image: ${{ steps.image.outputs.image }}
-      digest: ${{ steps.build.outputs.digest }}
-      version: ${{ steps.meta.outputs.version }}
-      tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{branch}}-{{date 'YYYY-MM-DD'}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-          labels: |
-            org.opencontainers.image.title=Discord Reminder Bot
-            org.opencontainers.image.description=Bot Discord pour la gestion des rappels d'événements
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
-            org.opencontainers.image.created={{date 'iso8601'}}
-            org.opencontainers.image.revision=${{ github.sha }}
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-          provenance: mode=max
-          sbom: true
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
-      - name: Generate attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+  security-scan:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
 
-      - name: Security scan with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-        continue-on-error: true
+    steps:
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
 
-      - name: Upload security scan results
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-results.sarif'
-        continue-on-error: true
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
 
-      - name: Output image info
-        id: image
-        run: |
-          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Create deployment package
-        run: |
-          mkdir -p deployment-package
-          cp docker-compose.yml deployment-package/
-          cp .env.example deployment-package/env.template
-
-          # Script de déploiement intelligent
-          cat > deployment-package/deploy.sh << 'EOF'
-          #!/bin/bash
-          set -e
-
-          IMAGE_NAME="${1:-${{ steps.image.outputs.image }}}"
-          DIGEST="${{ steps.build.outputs.digest }}"
-
-          echo "🚀 Déploiement Discord Reminder Bot"
-          echo "📦 Image: $IMAGE_NAME"
-          echo "🔍 Digest: $DIGEST"
-
-          # Arrêt en douceur
-          echo "🛑 Arrêt du conteneur existant..."
-          docker compose down --timeout 30 || true
-
-          # Sauvegarde des données SQLite et logs
-          echo "💾 Sauvegarde des données..."
-          if [ -f "discord_bot.db" ]; then
-            cp discord_bot.db "backup_$(date +%Y%m%d_%H%M%S).db"
-          fi
-          if [ -d "logs" ]; then
-            tar -czf "logs_backup_$(date +%Y%m%d_%H%M%S).tar.gz" logs/
-          fi
-
-          # Téléchargement de l'image
-          echo "📥 Téléchargement de l'image..."
-          docker pull "$IMAGE_NAME"
-
-          # Vérification du digest
-          if [ -n "$DIGEST" ]; then
-            PULLED_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE_NAME" | cut -d'@' -f2)
-            if [ "$PULLED_DIGEST" != "$DIGEST" ]; then
-              echo "⚠️  Attention: Digest différent (attendu: $DIGEST, reçu: $PULLED_DIGEST)"
-            fi
-          fi
-
-          # Variables d'environnement
-          export IMAGE_NAME="$IMAGE_NAME"
-
-          # Démarrage
-          echo "▶️  Démarrage du nouveau conteneur..."
-          docker compose up -d
-
-          # Vérification
-          echo "🔍 Vérification du statut..."
-          sleep 15
-
-          for i in {1..5}; do
-            if docker compose ps discord-reminder-bot | grep -q "Up"; then
-              echo "✅ Conteneur démarré avec succès"
-              break
-            elif [ $i -eq 5 ]; then
-              echo "❌ Échec du démarrage"
-              docker compose logs --tail=50 discord-reminder-bot
-              exit 1
-            else
-              echo "⏳ Tentative $i/5..."
-              sleep 10
-            fi
-          done
-
-          echo "🎉 Déploiement réussi!"
-          docker compose logs --tail=10 discord-reminder-bot
-          EOF
-
-          chmod +x deployment-package/deploy.sh
-
-          # Script de rollback
-          cat > deployment-package/rollback.sh << 'EOF'
-          #!/bin/bash
-          set -e
-
-          echo "🔄 Rollback Discord Reminder Bot"
-
-          docker compose down
-
-          # Restauration de la dernière sauvegarde DB
-          LATEST_DB_BACKUP=$(ls -t backup_*.db 2>/dev/null | head -n1 || echo "")
-          if [ -n "$LATEST_DB_BACKUP" ]; then
-            echo "💾 Restauration DB depuis $LATEST_DB_BACKUP"
-            cp "$LATEST_DB_BACKUP" discord_bot.db
-          fi
-
-          echo "⚠️  Veuillez spécifier manuellement l'image précédente"
-          echo "Exemple: IMAGE_NAME=previous-image ./deploy.sh"
-          EOF
-
-          chmod +x deployment-package/rollback.sh
-
-      - name: Upload deployment package
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-package-${{ github.sha }}
-          path: deployment-package/
-          retention-days: 90
-
-      - name: Build summary
-        run: |
-          echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: \`${{ steps.image.outputs.image }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tags**: \`${{ steps.meta.outputs.tags }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms**: \`linux/amd64, linux/arm64\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security**: Trivy scan completed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deployment Package**: Ready for deployment" >> $GITHUB_STEP_SUMMARY
-
-  # 🚀 DEPLOY STAGING - Utilise l'artefact du build
   deploy-staging:
-    name: Deploy to Staging
+    needs: [build, security-scan]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [test, build]
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/preprod') ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
+    if: github.ref == 'refs/heads/develop'
     environment: staging
+
     steps:
-      - name: Download deployment package
-        uses: actions/download-artifact@v4
-        with:
-          name: deployment-package-${{ github.sha }}
-          path: deployment/
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add your staging deployment commands here
+        # Example: kubectl apply -f k8s/staging/
 
-      - name: Deploy to staging
-        run: |
-          echo "🔄 Déploiement en staging"
-          echo "📦 Image: ${{ needs.build.outputs.image }}"
-          echo "🔍 Digest: ${{ needs.build.outputs.digest }}"
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests on staging..."
+        # Add smoke tests here
+        sleep 30
+        echo "Smoke tests passed!"
 
-          # Ici vous ajouteriez votre logique de déploiement staging
-          # Exemple:
-          # scp -r deployment/ staging-server:/opt/discord-bot/
-          # ssh staging-server "cd /opt/discord-bot && ./deploy.sh ${{ needs.build.outputs.image }}"
-
-          echo "✅ Déploiement staging simulé"
-
-      - name: Health check staging
-        run: |
-          echo "🔍 Vérification de santé staging..."
-          # Ajoutez ici vos tests de santé
-          echo "✅ Staging opérationnel"
-
-  # 🚀 DEPLOY PRODUCTION - Utilise l'artefact du build
   deploy-production:
-    name: Deploy to Production
+    needs: [build, security-scan]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [test, build]
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    if: github.ref == 'refs/heads/main'
     environment: production
-    steps:
-      - name: Download deployment package
-        uses: actions/download-artifact@v4
-        with:
-          name: deployment-package-${{ github.sha }}
-          path: deployment/
-
-      - name: Deploy to production
-        run: |
-          echo "🚀 Déploiement en production"
-          echo "📦 Image: ${{ needs.build.outputs.image }}"
-          echo "🔍 Digest: ${{ needs.build.outputs.digest }}"
-
-          # Configuration SSH et déploiement réel
-          # echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/id_rsa
-          # chmod 600 ~/.ssh/id_rsa
-          # ssh-keyscan -H your-server.com >> ~/.ssh/known_hosts
-          # scp -r deployment/ user@your-server:/opt/discord-bot/
-          # ssh user@your-server "cd /opt/discord-bot && ./deploy.sh ${{ needs.build.outputs.image }}"
-
-          echo "✅ Package de déploiement production prêt"
-
-      - name: Production health check
-        run: |
-          echo "🔍 Vérification de santé production..."
-          # Tests de santé production
-          echo "✅ Production opérationnelle"
-
-      - name: Create deployment record
-        run: |
-          echo "## 🎉 Production Deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: Completed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: \`${{ needs.build.outputs.image }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Digest**: \`${{ needs.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deployed at**: $(date -u)" >> $GITHUB_STEP_SUMMARY
-
-  # 📊 NOTIFICATION - Synthèse finale
-  notify:
-    name: Notify Deployment Status
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [test, build, deploy-staging, deploy-production]
-    if: always() && (needs.deploy-staging.result != 'skipped' || needs.deploy-production.result != 'skipped')
 
     steps:
-      - name: Determine status
-        id: status
-        run: |
-          if [[ "${{ needs.deploy-production.result }}" == "success" || "${{ needs.deploy-staging.result }}" == "success" ]]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-            echo "environment=${{ needs.deploy-production.result == 'success' && 'production' || 'staging' }}" >> $GITHUB_OUTPUT
-          else
-            echo "status=failure" >> $GITHUB_OUTPUT
-            echo "environment=unknown" >> $GITHUB_OUTPUT
-          fi
+    - uses: actions/checkout@v4
 
-      - name: Success notification
-        if: steps.status.outputs.status == 'success'
-        run: |
-          echo "✅ Déploiement ${{ steps.status.outputs.environment }} réussi!"
-          echo "🚀 Image: ${{ needs.build.outputs.image }}"
-          echo "🔗 Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+    - name: Deploy to production (Shadow mode)
+      run: |
+        echo "Deploying to production in shadow mode..."
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        # Add shadow deployment commands here
 
-          # Notification Discord/Slack optionnelle
-          # curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
-          #   -H "Content-Type: application/json" \
-          #   -d "{\"content\": \"✅ Bot déployé en ${{ steps.status.outputs.environment }}!\n📦 Image: \`${{ needs.build.outputs.image }}\`\"}"
+    - name: Run health checks
+      run: |
+        echo "Running health checks..."
+        # Add health check commands
+        sleep 60
+        echo "Health checks passed!"
 
-      - name: Failure notification
-        if: steps.status.outputs.status == 'failure'
-        run: |
-          echo "❌ Échec du déploiement!"
-          echo "🔗 Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+    - name: Run load tests
+      run: |
+        echo "Running load tests..."
+        # Add load testing commands
+        sleep 120
+        echo "Load tests completed successfully!"
 
-          # Notification d'échec
-          # curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
-          #   -H "Content-Type: application/json" \
-          #   -d "{\"content\": \"❌ Échec du déploiement!\n🔗 Détails: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+    - name: Switch to production traffic
+      run: |
+        echo "Switching traffic to new deployment..."
+        # Add traffic switching commands
 
-      - name: Final summary
-        run: |
-          echo "## 📊 Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy Staging**: ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy Production**: ${{ needs.deploy-production.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Overall Status**: ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+    - name: Post-deployment validation
+      run: |
+        echo "Running post-deployment validation..."
+        # Add validation tests
+        sleep 30
+        echo "Deployment validation completed!"

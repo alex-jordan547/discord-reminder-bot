@@ -27,6 +27,7 @@ import {
   handleStatusCommand,
   handleRemindNowCommand,
 } from './handlers';
+import { handleConfigCommand } from '@/commands/configHandler';
 
 const logger = createLogger('slash-commands');
 
@@ -264,6 +265,9 @@ export function setupSlashCommands(client: DiscordBotClient): void {
 
           case 'remind_now':
             await handleRemindNowCommand(interaction, client as DiscordBotClient);
+            break;
+          case 'config':
+            await handleConfigCommand(interaction, client as DiscordBotClient);
             break;
 
           default:

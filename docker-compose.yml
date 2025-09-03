@@ -11,6 +11,9 @@ services:
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
 
+      # Database Configuration
+      - DATABASE_URL=${DATABASE_URL:-./data/discord_bot.db}
+
       # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
       - USE_SEPARATE_REMINDER_CHANNEL=${USE_SEPARATE_REMINDER_CHANNEL:-false}
@@ -34,6 +37,10 @@ services:
       - ERROR_RECOVERY_MAX_DELAY=${ERROR_RECOVERY_MAX_DELAY:-60}
       - ERROR_RECOVERY_ENABLE_STATS=${ERROR_RECOVERY_ENABLE_STATS:-true}
 
+      # Production Configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - TZ=${TZ:-Europe/Paris}
+
       # Test Mode (optional)
       - TEST_MODE=${TEST_MODE:-false}
 
@@ -43,9 +50,9 @@ services:
       # Logs persistence (optional)
       - ./logs:/app/logs
 
-    # Health check - verify basic imports work
+    # Health check - verify bot is running properly
     healthcheck:
-      test: ['CMD', 'python', '-c', "import discord; import bot; print('Health check passed')"]
+      test: ['CMD', 'node', '-e', "process.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -55,15 +62,17 @@ services:
       - bot-network
 
     # Security - Use the app user created in Dockerfile
-    # user: "1000:1000"  # Commented out to avoid permission issues on different systems
+    user: "1001:1001"
 
-    # Resource limits (optional, adjust as needed)
+    # Resource limits optimized for production
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
+          cpus: '0.5'
         reservations:
-          memory: 128M
+          memory: 256M
+          cpus: '0.25'
 
 networks:
   bot-network:

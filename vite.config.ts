@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import dts from 'vite-plugin-dts';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
@@ -15,22 +14,11 @@ export default defineConfig({
       insertTypesEntry: true,
       rollupTypes: true,
     }),
-
-    // Polyfills Node.js pour compatibilité avec les modules comme crypto, buffer, etc.
-    nodePolyfills({
-      // Spécifiquement nécessaire pour Discord.js et better-sqlite3
-      include: ['buffer', 'crypto', 'events', 'fs', 'path', 'stream', 'util'],
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true,
-      },
-    }),
   ],
 
   // Configuration pour le build de production
   build: {
-    target: 'node18',
+    target: 'node20',
     lib: {
       entry: {
         bot: resolve(__dirname, 'src/bot.ts'),
@@ -50,10 +38,19 @@ export default defineConfig({
         'drizzle-orm',
         'fastify',
         'pino',
-        'pino-pretty',
         'chalk',
         'dotenv',
         'zod',
+        // Node.js built-ins
+        'fs',
+        'path',
+        'url',
+        'crypto',
+        'events',
+        'stream',
+        'util',
+        'buffer',
+        'process',
         /^node:/,
       ],
       output: {

@@ -1,133 +1,41 @@
-# 🚀 Deployment Guide - Discord Reminder Bot
+# Guide de Déploiement - Discord Reminder Bot
 
-Guide complet pour configurer et déployer le bot Discord avec GitHub Actions CI/CD.
+## Vue d'ensemble
 
-## 📋 Vue d'ensemble
+Ce guide décrit le processus complet de déploiement pour le Discord Reminder Bot en production, incluant la configuration Docker optimisée, PM2, CI/CD, et les procédures de rollback.
 
-Le système CI/CD comprend :
-- **CI (Intégration Continue)** : Tests automatiques sur chaque push/PR
-- **CD (Déploiement Continu)** : Construction d'images Docker multi-stage et déploiement automatique
-- **Registry** : GitHub Container Registry (GHCR) avec images production-ready
-- **Multi-Architecture** : Support AMD64 et ARM64
-- **Sécurité** : Scan Trivy, SBOM, et attestation de provenance
+## Architecture de Déploiement
 
-## ⚙️ Configuration GitHub
+### Composants
 
-### 1. Secrets à configurer
+- **Docker** : Containerisation avec image Alpine optimisée
+- **PM2** : Gestionnaire de processus pour la production
+- **GitHub Actions** : Pipeline CI/CD automatisé
+- **Shadow Deployment** : Déploiement parallèle pour validation
+- **Monitoring** : Surveillance continue sur 48h
 
-Dans votre repository GitHub → Settings → Secrets and variables → Actions :
+## Prérequis
 
-#### Obligatoires (pour CI/CD de base) :
-```
-# Aucun secret obligatoire pour la configuration de base
-# Le token GitHub est automatiquement fourni
-```
+### Environnement de Production
 
-#### Optionnels (pour fonctionnalités avancées) :
-```bash
-# Pour les tests d'intégration (optionnel)
-DISCORD_TOKEN_TEST=your_test_bot_token_here
+- Docker et Docker Compose installés
+- Node.js 18+ (pour PM2)
+- SQLite3 pour la base de données
+- Minimum 2GB d'espace disque libre
+- Minimum 512MB de RAM disponible
 
-# Pour Docker Hub (si vous préférez à GitHub Registry)
-DOCKERHUB_USERNAME=your_dockerhub_username
-DOCKERHUB_TOKEN=your_dockerhub_access_token
+### Variables d'Environnement
 
-# Pour déploiement automatique sur VPS (optionnel)
-PRODUCTION_SSH_KEY=your_private_ssh_key
-PRODUCTION_HOST=your.server.com
-PRODUCTION_USER=your_username
-```
+Créer un fichier `.env` avec les variables suivantes :
 
-### 2. Permissions GitHub
+```env
+# Discord Configuration
+DISCORD_TOKEN=your_discord_token_here
 
-Assurez-vous que GitHub Actions a les permissions nécessaires :
-- Repository → Settings → Actions → General
-- **Workflow permissions** : "Read and write permissions"
-- **Allow GitHub Actions to create and approve pull requests** : ✅
+# Database
+DATABASE_URL=./data/discord_bot.db
 
-### 3. Environments (optionnel mais recommandé)
-
-Créez les environnements pour le déploiement protégé :
-- Repository → Settings → Environments
-- Créer : `production` et `staging`
-- Ajouter des règles de protection (ex: required reviewers)
-
-## 🐳 Configuration Docker Registry
-
-### Option 1 : GitHub Container Registry (GHCR) - Recommandé ✅
-
-**Avantages** :
-- ✅ Intégré à GitHub, pas de configuration supplémentaire
-- ✅ Images multi-stage optimisées pour production
-- ✅ Multi-architecture (AMD64/ARM64)
-- ✅ Scan de sécurité Trivy automatique
-- ✅ SBOM et attestation de provenance
-
-**Images disponibles** :
-```bash
-# Latest production build from main branch
-ghcr.io/alex-jordan547/discord-reminder-bot:latest
-
-# Date-tagged releases
-ghcr.io/alex-jordan547/discord-reminder-bot:main-2025-08-24
-
-# Commit-specific builds  
-ghcr.io/alex-jordan547/discord-reminder-bot:main-a1b2c3d
-
-# Semantic version releases (when tagged)
-ghcr.io/alex-jordan547/discord-reminder-bot:v1.2.3
-```
-
-**Production Image Features** :
-- 🐳 Multi-stage build (builder + production)
-- 🔒 Non-root user (uid/gid 1000)
-- 📦 Minimal runtime footprint (no dev dependencies)
-- ✅ Built-in health checks
-- 🏷️ OpenContainer labels and metadata
-
-### Option 2 : Docker Hub (alternative)
-
-1. Créer un compte sur [Docker Hub](https://hub.docker.com/)
-2. Créer un Access Token : Account Settings → Security → New Access Token
-3. Ajouter les secrets :
-   - `DOCKERHUB_USERNAME`
-   - `DOCKERHUB_TOKEN`
-4. Modifier `.github/workflows/cd.yml` :
-   ```yaml
-   build-dockerhub:
-     if: true  # Changer de false à true
-   ```
-
-## 🖥️ Configuration VPS
-
-### 1. Prérequis sur le serveur
-
-```bash
-# Installer Docker et Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# Installer Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Créer le répertoire du projet
-sudo mkdir -p /opt/discord-bot
-sudo chown $USER:$USER /opt/discord-bot
-```
-
-### 2. Configuration environnement sur le serveur
-
-```bash
-cd /opt/discord-bot
-
-# Créer le fichier .env
-cat > .env << EOF
-# Configuration Production
-DISCORD_TOKEN=your_real_discord_token_here
-
-# Reminder Configuration  
+# Bot Configuration
 REMINDER_INTERVAL_HOURS=24
 USE_SEPARATE_REMINDER_CHANNEL=false
 REMINDER_CHANNEL_NAME=rappels-events
@@ -150,222 +58,319 @@ ERROR_RECOVERY_BASE_DELAY=1.5
 ERROR_RECOVERY_MAX_DELAY=60
 ERROR_RECOVERY_ENABLE_STATS=true
 
-# Production Mode
+# Production
+NODE_ENV=production
+TZ=Europe/Paris
+
+# Optional
 TEST_MODE=false
-EOF
-
-# Créer les répertoires de données
-mkdir -p data logs
-
-# Permissions
-chmod 600 .env
 ```
 
-### 3. Docker Compose pour Production
+## Méthodes de Déploiement
+
+### 1. Déploiement Automatisé (Recommandé)
+
+#### Utilisation du Script de Déploiement
 
 ```bash
-# Télécharger le docker-compose depuis le repo
-curl -O https://raw.githubusercontent.com/alex-jordan547/discord-reminder-bot/main/docker-compose.yml
+# Déploiement complet avec validation
+./scripts/deploy.sh
 
-# Ou le créer manuellement en adaptant l'image :
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
+# Vérifier le statut
+./scripts/deploy.sh --status
 
-services:
-  discord-reminder-bot:
-    image: ghcr.io/alex-jordan547/discord-reminder-bot:latest
-    container_name: discord-reminder-bot
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; import discord; import bot; from config.settings import Settings; print('✓ Health check passed - all modules ready'); sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
-    user: "1000:1000"  # Run as non-root user
-    security_opt:
-      - no-new-privileges:true
-    read_only: false  # Bot needs to write to data/logs
-
-networks:
-  default:
-    name: discord-bot-network
-EOF
+# Rollback si nécessaire
+./scripts/deploy.sh --rollback
 ```
 
-## 🔧 Déploiement
+#### Processus Automatisé
 
-### 1. Déploiement automatique (GitHub Actions)
+1. **Vérifications pré-déploiement**
+   - État Docker
+   - Espace disque disponible
+   - Fichiers de configuration
 
-Quand vous push sur `main`, le workflow CD va :
-1. **Validation pré-déploiement** : Vérification syntaxe et imports
-2. **Construction multi-stage** : Builder stage → Production stage optimisée
-3. **Multi-architecture** : Construction AMD64 et ARM64
-4. **Sécurité** : Scan Trivy + génération SBOM
-5. **Publication GHCR** : Push avec tags multiples (latest, date, SHA)
-6. **Package déploiement** : Scripts et configuration pour VPS
-7. **(Optionnel)** Déploiement automatique sur VPS via SSH
+2. **Sauvegarde automatique**
+   - Base de données
+   - Répertoire data/
+   - Logs
 
-### 2. Déploiement manuel depuis GitHub
+3. **Build de l'image Docker**
+   - Multi-stage build optimisé
+   - Tagging avec timestamp
 
-1. Repository → Actions → "CD - Build and Deploy"
-2. "Run workflow" → Sélectionner `production` → "Run workflow"
+4. **Déploiement Shadow**
+   - Container parallèle pour tests
+   - Validation des ressources
 
-### 3. Déploiement manuel sur le VPS
+5. **Tests de santé**
+   - Health checks
+   - Tests de charge
+   - Validation fonctionnelle
+
+6. **Basculement en production**
+   - Arrêt de l'ancien container
+   - Activation du nouveau
+   - Validation post-déploiement
+
+### 2. Déploiement avec Docker Compose
 
 ```bash
-# Se connecter au VPS
-ssh user@your-server.com
-cd /opt/discord-bot
+# Build et démarrage
+docker-compose up -d --build
 
-# Arrêter le bot actuel
+# Vérification des logs
+docker-compose logs -f discord-reminder-bot
+
+# Arrêt
 docker-compose down
+```
 
-# Récupérer la dernière image
-docker-compose pull
+### 3. Déploiement avec PM2
 
-# Démarrer avec la nouvelle image
-docker-compose up -d
+```bash
+# Installation PM2 globale
+npm install -g pm2
 
+# Build du projet
+npm run build
+
+# Démarrage avec PM2
+pm2 start ecosystem.config.js --env production
+
+# Monitoring
+pm2 monit
+
+# Logs
+pm2 logs discord-reminder-bot
+
+# Redémarrage
+pm2 reload ecosystem.config.js --env production
+```
+
+## CI/CD avec GitHub Actions
+
+### Configuration
+
+Le pipeline CI/CD est configuré dans `.github/workflows/ci-cd.yml` et inclut :
+
+1. **Tests automatiques** sur Node.js 18 et 20
+2. **Build Docker** multi-architecture (amd64/arm64)
+3. **Scan de sécurité** avec Trivy
+4. **Déploiement staging** sur la branche `develop`
+5. **Déploiement production** sur la branche `main`
+
+### Utilisation
+
+```bash
+# Push sur develop → déploiement staging
+git push origin develop
+
+# Push sur main → déploiement production
+git push origin main
+
+# Les environnements doivent être configurés dans GitHub
+```
+
+## Monitoring et Validation
+
+### Surveillance 48h
+
+```bash
+# Démarrer la surveillance complète
+./scripts/monitor.sh --start
+
+# Check ponctuel
+./scripts/monitor.sh --check
+
+# Test de charge
+./scripts/monitor.sh --load-test
+
+# Générer un rapport
+./scripts/monitor.sh --report
+```
+
+### Métriques Surveillées
+
+- **Statut du container** : Disponibilité
+- **Ressources** : CPU < 80%, RAM < 400MB
+- **Redémarrages** : Maximum 5
+- **Logs** : Erreurs et warnings
+- **Réseau** : Connectivité Discord API
+- **Base de données** : Intégrité et taille
+
+### Alertes
+
+Les alertes sont automatiquement générées pour :
+- Container arrêté
+- Utilisation excessive des ressources
+- Erreurs dans les logs
+- Problèmes de connectivité
+- Corruption de base de données
+
+## Procédures de Rollback
+
+### Rollback Automatique
+
+En cas d'échec de déploiement, le rollback est automatique :
+
+```bash
+# Le script de déploiement gère les échecs
+./scripts/deploy.sh  # Rollback auto si échec
+```
+
+### Rollback Manuel
+
+```bash
+# Rollback rapide vers la dernière sauvegarde
+./scripts/rollback.sh --quick
+
+# Lister les sauvegardes disponibles
+./scripts/rollback.sh --list
+
+# Rollback vers une sauvegarde spécifique
+./scripts/rollback.sh --backup backup_20250903_143022
+```
+
+### Plan de Rollback d'Urgence
+
+1. **Immédiat** (< 5 minutes)
+   ```bash
+   docker stop discord-reminder-bot
+   docker run -d --name discord-reminder-bot-emergency --env-file .env [previous-image]
+   ```
+
+2. **Complet** (< 15 minutes)
+   ```bash
+   ./scripts/rollback.sh --quick
+   ```
+
+3. **Restauration données** (< 30 minutes)
+   - Restaurer depuis sauvegarde la plus récente
+   - Vérifier l'intégrité des données
+   - Redémarrer avec configuration précédente
+
+## Optimisations Production
+
+### Docker
+
+- **Image Alpine** : Réduction de la taille
+- **Multi-stage build** : Séparation build/runtime
+- **Utilisateur non-root** : Sécurité renforcée
+- **Health checks** : Détection des problèmes
+- **Limites de ressources** : Contrôle consommation
+
+### Performance
+
+- **PM2** : Gestion avancée des processus
+- **Logging optimisé** : Rotation automatique
+- **Cache intelligent** : Réduction I/O
+- **Monitoring** : Détection proactive
+
+## Sécurité
+
+### Mesures Implémentées
+
+1. **Container Security**
+   - Utilisateur non-root (1001:1001)
+   - Image Alpine minimale
+   - Scan de vulnérabilités
+
+2. **Network Security**
+   - Réseau Docker dédié
+   - Isolation des containers
+
+3. **Data Security**
+   - Volumes persistants sécurisés
+   - Sauvegardes chiffrées
+   - Rotation des logs
+
+4. **Access Control**
+   - Variables d'environnement sécurisées
+   - Permissions fichiers restreintes
+
+## Troubleshooting
+
+### Problèmes Courants
+
+#### Container ne démarre pas
+```bash
 # Vérifier les logs
-docker-compose logs -f discord-reminder-bot
+docker logs discord-reminder-bot
+
+# Vérifier la configuration
+docker-compose config
+
+# Vérifier les variables d'environnement
+docker exec discord-reminder-bot env | grep DISCORD
 ```
 
-### 4. Script de déploiement automatique (optionnel)
-
-Pour un déploiement automatique via SSH, créez ce script sur votre VPS :
-
+#### Haute consommation mémoire
 ```bash
-# /opt/discord-bot/auto-deploy.sh
-#!/bin/bash
-set -e
-
-SCRIPT_DIR="/opt/discord-bot"
-IMAGE_NAME="${1:-ghcr.io/alex-jordan547/discord-reminder-bot:latest}"
-
-echo "🚀 Starting deployment of Discord Reminder Bot"
-echo "📦 Using image: $IMAGE_NAME"
-
-cd "$SCRIPT_DIR"
-
-# Stop existing container
-echo "🛑 Stopping existing container..."
-docker-compose down || true
-
-# Pull latest image
-echo "📥 Pulling latest image..."
-docker pull "$IMAGE_NAME"
-
-# Start new container
-echo "▶️ Starting new container..."
-docker-compose up -d
-
-# Check health
-echo "🔍 Checking container health..."
-sleep 15
-
-if docker-compose ps | grep -q "Up"; then
-    echo "✅ Deployment successful!"
-    docker-compose logs --tail=20 discord-reminder-bot
-else
-    echo "❌ Deployment failed!"
-    docker-compose logs discord-reminder-bot
-    exit 1
-fi
-```
-
-Puis l'ajouter aux secrets GitHub :
-```bash
-# Ajouter la clé SSH privée dans PRODUCTION_SSH_KEY
-# Et modifier le workflow CD pour décommenter les lignes SSH
-```
-
-## 🔍 Monitoring et Maintenance
-
-### Vérification de l'état
-
-```bash
-# État des containers
-docker-compose ps
-
-# Logs en temps réel
-docker-compose logs -f discord-reminder-bot
-
-# Utilisation des ressources
+# Vérifier les stats
 docker stats discord-reminder-bot
 
-# Santé du container
-docker-compose exec discord-reminder-bot python -c "
-import discord
-from bot import create_bot
-print('✅ Bot health check passed')
-"
+# Ajuster les limites dans docker-compose.yml
+# Redémarrer le container
+docker-compose restart discord-reminder-bot
 ```
 
-### Mise à jour
+#### Erreurs de base de données
+```bash
+# Vérifier l'intégrité
+sqlite3 discord_bot.db "PRAGMA integrity_check;"
+
+# Sauvegarder et restaurer
+./scripts/rollback.sh --quick
+```
+
+#### Bot ne répond plus
+```bash
+# Check Discord API
+curl -s https://discord.com/api/v10/gateway
+
+# Vérifier le token
+# Redémarrer le service
+docker-compose restart discord-reminder-bot
+```
+
+## Contacts et Support
+
+### Escalade
+
+1. **Niveau 1** : Logs automatiques et monitoring
+2. **Niveau 2** : Rollback automatique
+3. **Niveau 3** : Intervention manuelle requise
+
+### Logs
+
+- **Application** : `/app/logs/bot_YYYY-MM-DD.log`
+- **PM2** : `/app/logs/pm2-*.log`
+- **Déploiement** : `/app/logs/deployment.log`
+- **Monitoring** : `/app/logs/health-monitor.log`
+- **Alertes** : `/app/logs/alerts.log`
+
+### Commandes Utiles
 
 ```bash
-# Récupérer la dernière version
-docker-compose pull
+# État général
+docker ps
+docker-compose ps
+pm2 list
 
-# Redémarrer avec la nouvelle image
-docker-compose up -d
+# Logs temps réel
+docker-compose logs -f
+pm2 logs --lines 100
 
-# Nettoyer les anciennes images
-docker image prune -f
+# Ressources
+docker stats
+htop
+
+# Réseau
+docker network ls
+netstat -tlnp
 ```
-
-### Backup des données
-
-```bash
-# Backup automatique quotidien
-(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/discord-bot && tar -czf backup-\$(date +\%Y\%m\%d).tar.gz data/ logs/") | crontab -
-```
-
-## 🚨 Dépannage
-
-### Problèmes courants
-
-1. **Container ne démarre pas** :
-   ```bash
-   docker-compose logs discord-reminder-bot
-   # Vérifier DISCORD_TOKEN dans .env
-   ```
-
-2. **Permissions de fichiers** :
-   ```bash
-   sudo chown -R $USER:$USER /opt/discord-bot/
-   chmod 600 .env
-   ```
-
-3. **Image non trouvée** :
-   ```bash
-   # Vérifier que l'image existe
-   docker pull ghcr.io/alex-jordan547/discord-reminder-bot:latest
-   ```
-
-4. **Port déjà utilisé** :
-   ```bash
-   # Le bot n'utilise pas de ports externes normalement
-   # Vérifier les conflits réseau si nécessaire
-   ```
-
-## 📚 Références
-
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 ---
 
-*Ce guide est maintenu à jour avec les dernières versions du bot et des workflows.*
+**Note** : Ce guide suppose un environnement Linux/Unix. Pour Windows, adapter les chemins et commandes selon le contexte.
