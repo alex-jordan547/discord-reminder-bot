@@ -12,7 +12,7 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
 
       # Database Configuration
-      - DATABASE_URL=${DATABASE_URL:-./data/discord_bot.db}
+      - DATABASE_PATH=${DATABASE_PATH:-./data/discord_bot.db}
 
       # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}

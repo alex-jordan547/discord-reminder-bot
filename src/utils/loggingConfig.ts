@@ -92,6 +92,7 @@ function shouldUseColors(): boolean {
     }
     return false;
   } catch (error) {
+    console.error('Error checking TTY status:', error);
     return false;
   }
 }
@@ -463,7 +464,7 @@ export function createLogger(name: string): Logger {
   const wrappedLogger = Object.create(childLogger);
 
   // Override the error method to handle Error objects as second parameter
-  wrappedLogger.error = function (messageOrObj: any, ...args: any[]) {
+  wrappedLogger.error = function (messageOrObj: any, ...args: any[]): void {
     // If second argument is an Error object, put it in the err field
     if (args.length > 0 && args[0] instanceof Error) {
       const error = args[0];
@@ -482,7 +483,7 @@ export function createLogger(name: string): Logger {
 
   // Override other log levels to maintain consistency
   ['debug', 'info', 'warn', 'fatal'].forEach(level => {
-    wrappedLogger[level] = function (messageOrObj: any, ...args: any[]) {
+    wrappedLogger[level] = function (messageOrObj: any, ...args: any[]): any {
       if (args.length > 0 && args[0] instanceof Error) {
         const error = args[0];
         const additionalData = args.length > 1 ? args[1] : {};

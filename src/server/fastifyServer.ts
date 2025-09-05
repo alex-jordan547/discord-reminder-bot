@@ -11,6 +11,8 @@
  */
 
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import fastifyCors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { Settings } from '@/config/settings';
 import { createLogger } from '@/utils/loggingConfig';
 import { DiscordBotClient } from '@/types/BotClient';
@@ -165,12 +167,12 @@ export async function createServer(): Promise<FastifyInstance> {
   });
 
   // Register CORS for API access
-  await fastify.register(require('@fastify/cors'), {
+  await fastify.register(fastifyCors, {
     origin: Settings.NODE_ENV === 'development' ? true : false,
   });
 
   // Register rate limiting
-  await fastify.register(require('@fastify/rate-limit'), {
+  await fastify.register(fastifyRateLimit, {
     max: 100,
     timeWindow: '1 minute',
   });

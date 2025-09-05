@@ -9,12 +9,8 @@
 
 import {
   TextChannel,
-  Message,
   EmbedBuilder,
   StringSelectMenuBuilder,
-  ActionRowBuilder,
-  Collection,
-  ChatInputCommandInteraction,
   StringSelectMenuOptionBuilder,
   MessageType,
 } from 'discord.js';

@@ -302,6 +302,36 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   }
 
   /**
+   * Get admin roles display with both configured and effective roles
+   */
+  getAdminRolesDisplay(): string {
+    const configuredRoles = this.data.adminRoleNames;
+    const defaultRoles = Settings.ADMIN_ROLES; // Rôles par défaut depuis .env
+    
+    let display = '';
+    
+    if (this.data.adminRoleIds.length === 0 && configuredRoles.length > 0) {
+      // Mode automatique (administrateurs serveur)
+      display = `**Mode automatique**: ${configuredRoles.join(', ')}`;
+    } else if (configuredRoles.length > 0) {
+      // Rôles spécifiques configurés
+      display = `**Configurés**: ${configuredRoles.join(', ')}`;
+    } else {
+      // Pas de configuration spécifique
+      display = `**Par défaut**: ${defaultRoles.join(', ')}`;
+    }
+    
+    // Ajout des rôles effectifs si différents
+    if (defaultRoles.length > 0 && configuredRoles.length === 0) {
+      display += `\n💡 *Utilise les rôles par défaut*`;
+    } else if (configuredRoles.length > 0) {
+      display += `\n💡 *+ administrateurs Discord*`;
+    }
+    
+    return display;
+  }
+
+  /**
    * Get formatted display values for UI
    */
   getDisplayValues(): {
@@ -318,10 +348,7 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
         ? `#${this.data.reminderChannelName}`
         : 'Canal original du message',
 
-      adminRoles:
-        this.data.adminRoleNames.length > 0
-          ? this.data.adminRoleNames.join(', ')
-          : 'Aucun rôle configuré',
+      adminRoles: this.getAdminRolesDisplay(),
 
       defaultInterval: Settings.formatIntervalDisplay(this.data.defaultIntervalMinutes),
 

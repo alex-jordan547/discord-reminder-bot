@@ -89,18 +89,45 @@ export const guildConfigs = sqliteTable('guild_configs', {
   guildId: text('guild_id')
     .primaryKey()
     .references(() => guilds.guildId, { onDelete: 'cascade' }),
-  defaultReminderInterval: integer('default_reminder_interval').notNull().default(60), // minutes
+  
+  // Channel configuration
+  reminderChannelId: text('reminder_channel_id'),
+  reminderChannelName: text('reminder_channel_name').notNull().default(''),
+  
+  // Admin configuration  
+  adminRoleIds: text('admin_role_ids').notNull().default('[]'), // JSON array of role IDs
+  adminRoleNames: text('admin_role_names').notNull().default('[]'), // JSON array of role names
+  
+  // Reminder timing configuration
+  defaultIntervalMinutes: integer('default_interval_minutes').notNull().default(60),
+  autoDeleteEnabled: integer('auto_delete_enabled', { mode: 'boolean' }).notNull().default(false),
+  autoDeleteDelayMinutes: integer('auto_delete_delay_minutes').notNull().default(5),
+  delayBetweenRemindersMs: integer('delay_between_reminders_ms').notNull().default(1000),
+  
+  // Mention and reaction configuration
+  maxMentionsPerReminder: integer('max_mentions_per_reminder').notNull().default(50),
+  useEveryoneAboveLimit: integer('use_everyone_above_limit', { mode: 'boolean' }).notNull().default(true),
+  defaultReactions: text('default_reactions').notNull().default('["✅","❌","❓"]'), // JSON array
+  
+  // Timezone configuration
   timezone: text('timezone').notNull().default('UTC'),
-  dateFormat: text('date_format').notNull().default('YYYY-MM-DD HH:mm'),
-  allowedRoles: text('allowed_roles').notNull().default('[]'), // JSON array of role IDs
+  
+  // Legacy/deprecated fields for backwards compatibility
+  allowedRoles: text('allowed_roles').notNull().default('[]'), // JSON array of role IDs (deprecated)
   blockedChannels: text('blocked_channels').notNull().default('[]'), // JSON array of channel IDs
   maxEventsPerGuild: integer('max_events_per_guild').notNull().default(50),
   enableAutoCleanup: integer('enable_auto_cleanup', { mode: 'boolean' }).notNull().default(true),
   cleanupDays: integer('cleanup_days').notNull().default(30),
+  dateFormat: text('date_format').notNull().default('YYYY-MM-DD HH:mm'),
+  
+  // Metadata
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' })
     .notNull()
     .default(sql`(unixepoch())`),
 });

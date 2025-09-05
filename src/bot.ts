@@ -27,7 +27,7 @@ import { ReminderScheduler } from '@/services/reminderScheduler';
 import { ReactionTracker } from '@/services/reactionTracker';
 import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { DiscordBotClient, BotServices } from '@/types/BotClient';
+import { DiscordBotClient } from '@/types/BotClient';
 
 const logger = createLogger('bot.ts');
 
@@ -85,7 +85,7 @@ export async function createDiscordClient(): Promise<DiscordBotClient> {
     }
 
     // Setup command handlers
-    setupEventHandlers(client);
+    setupEventHandlers();
 
     // Initialize event manager (creates tables and loads events)
     try {

@@ -15,11 +15,8 @@ import {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
-  ButtonStyle,
-  ComponentType,
   MessageFlags,
   Message,
-  StringSelectMenuInteraction,
   MessageComponentInteraction,
 } from 'discord.js';
 import { DiscordBotClient } from '@/types/BotClient';
@@ -44,7 +41,7 @@ const logger = createLogger('handlers');
  * Setup all event handlers for the bot
  * Note: Slash commands are handled directly in slash.ts, this function is for future expansion
  */
-export function setupEventHandlers(_client: DiscordBotClient): void {
+export function setupEventHandlers(): void {
   logger.info('Event handlers setup complete - slash commands handled in slash.ts');
 }
 
@@ -388,6 +385,7 @@ export async function handleUnwatchCommand(
       }
     } catch (timeoutError) {
       // Handle timeout
+      logger.info(`Unwatch selection timed out for user ${interaction.user.tag} : ${timeoutError}`);
       const timeoutEmbed = new EmbedBuilder()
         .setColor(0xffa500)
         .setTitle('⏰ Selection Timeout')

@@ -18,27 +18,14 @@ import {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType,
   MessageFlags,
   Message,
-  TextChannel,
-  DMChannel,
-  PartialDMChannel,
-  NewsChannel,
-  ThreadChannel,
-  VoiceChannel,
-  StageChannel,
-  ForumChannel,
-  MediaChannel,
-  Collection,
   ChannelType,
 } from 'discord.js';
 import { createLogger } from '@/utils/loggingConfig';
-import { GuildConfigManager, ChannelOption, RoleOption } from '@/services/guildConfigManager';
+import { GuildConfigManager } from '@/services/guildConfigManager';
 import { SqliteStorage } from '@/persistence/sqliteStorage';
-import { GuildConfig } from '@/models';
 import { hasAdminRole } from '@/utils/permissions';
-import { Settings } from '@/config/settings';
 
 const logger = createLogger('config-handler');
 
@@ -459,7 +446,21 @@ ${roles.length === 0 ? 'Seuls @everyone et des rôles de bots sont présents' : 
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
   const config = await configManager.getGuildConfig(interaction.guildId!);
-  const currentRoles = config?.adminRoleIds || [];
+  const currentRoleNames = config?.adminRoleNames || [];
+  const currentRoleIds = config?.adminRoleIds || [];
+
+  // Display current configuration
+  let currentConfigText = '';
+  if (currentRoleIds.length === 0 && currentRoleNames.length > 0) {
+    // Server admins mode (auto)
+    currentConfigText = `Mode automatique : ${currentRoleNames.join(', ')}`;
+  } else if (currentRoleNames.length > 0) {
+    // Specific roles mode
+    currentConfigText = `Rôles configurés : ${currentRoleNames.join(', ')}`;
+  } else {
+    // No configuration
+    currentConfigText = 'Aucun rôle configuré (admin Discord uniquement)';
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
@@ -472,10 +473,7 @@ ${roles.length === 0 ? 'Seuls @everyone et des rôles de bots sont présents' : 
     )
     .addFields({
       name: '🔧 Configuration actuelle',
-      value:
-        currentRoles.length > 0
-          ? `Rôles configurés : ${currentRoles.join(', ')}`
-          : 'Aucun rôle configuré (admin Discord uniquement)',
+      value: currentConfigText,
       inline: false,
     })
     .setFooter({ text: 'Vous pouvez sélectionner plusieurs rôles à la fois' });
@@ -511,7 +509,7 @@ function setupRoleCollector(
       try {
         await selectInteraction.deferUpdate();
 
-        if (!selectInteraction.isRoleSelectMenu()) return;
+        if (!selectInteraction.isStringSelectMenu()) return;
         const selectedValues = selectInteraction.values;
         let adminRoleIds: string[] = [];
         let adminRoleNames: string[] = [];
