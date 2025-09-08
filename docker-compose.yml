@@ -43,6 +43,7 @@ services:
 
       # Test Mode (optional)
       - TEST_MODE=${TEST_MODE:-false}
+      - '${PORT:-3000}:3000'
 
     volumes:
       # Data persistence
