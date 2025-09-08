@@ -1,441 +1,376 @@
-# SQLite Migration Deployment Guide
+# Guide de Déploiement - Discord Reminder Bot
 
-This document provides comprehensive instructions for deploying the SQLite migration for the Discord Reminder Bot.
+## Vue d'ensemble
 
-## Overview
+Ce guide décrit le processus complet de déploiement pour le Discord Reminder Bot en production, incluant la configuration Docker optimisée, PM2, CI/CD, et les procédures de rollback.
 
-The SQLite migration transforms the bot's data storage from JSON files to a SQLite database with the Pewee ORM. This migration includes:
+## Architecture de Déploiement
 
-- **Feature flags system** for progressive activation
-- **Automatic fallback** to JSON storage if issues occur
-- **Comprehensive monitoring** and alerting
-- **Rollback capabilities** for safe deployment
+### Composants
 
-## Prerequisites
+- **Docker** : Containerisation avec image Alpine optimisée
+- **PM2** : Gestionnaire de processus pour la production
+- **GitHub Actions** : Pipeline CI/CD automatisé
+- **Shadow Deployment** : Déploiement parallèle pour validation
+- **Monitoring** : Surveillance continue sur 48h
 
-### System Requirements
+## Prérequis
 
-- Python 3.9 or higher
-- SQLite 3.x
-- Sufficient disk space (at least 100MB free)
-- Write permissions in the bot directory
+### Environnement de Production
 
-### Environment Variables
+- Docker et Docker Compose installés
+- Node.js 18+ (pour PM2)
+- SQLite3 pour la base de données
+- Minimum 2GB d'espace disque libre
+- Minimum 512MB de RAM disponible
 
-Ensure these environment variables are configured:
+### Variables d'Environnement
+
+Créer un fichier `.env` avec les variables suivantes :
+
+```env
+# Discord Configuration
+DISCORD_TOKEN=your_discord_token_here
+
+# Database
+DATABASE_URL=./data/discord_bot.db
+
+# Bot Configuration
+REMINDER_INTERVAL_HOURS=24
+USE_SEPARATE_REMINDER_CHANNEL=false
+REMINDER_CHANNEL_NAME=rappels-events
+
+# Auto-deletion
+AUTO_DELETE_REMINDERS=true
+AUTO_DELETE_DELAY_HOURS=1
+
+# Permissions
+ADMIN_ROLES=Admin,Moderateur,Coach
+
+# Logging
+LOG_LEVEL=INFO
+LOG_TO_FILE=true
+LOG_COLORS=false
+
+# Error Recovery
+ERROR_RECOVERY_MAX_RETRIES=3
+ERROR_RECOVERY_BASE_DELAY=1.5
+ERROR_RECOVERY_MAX_DELAY=60
+ERROR_RECOVERY_ENABLE_STATS=true
+
+# Production
+NODE_ENV=production
+TZ=Europe/Paris
+
+# Optional
+TEST_MODE=false
+```
+
+## Méthodes de Déploiement
+
+### 1. Déploiement Automatisé (Recommandé)
+
+#### Utilisation du Script de Déploiement
 
 ```bash
-# Required
-DISCORD_TOKEN=your_discord_bot_token
+# Déploiement complet avec validation
+./scripts/deploy.sh
 
-# SQLite Configuration
-USE_SQLITE=true                    # Enable SQLite storage
-DATABASE_PATH=discord_bot.db       # SQLite database file path
-AUTO_MIGRATE=true                  # Enable automatic migration
-BACKUP_JSON_ON_MIGRATION=true     # Backup JSON files during migration
+# Vérifier le statut
+./scripts/deploy.sh --status
 
-# Feature Flags (Optional)
-SQLITE_STORAGE_ENABLED=true       # Enable SQLite storage
-SQLITE_MIGRATION_ENABLED=true     # Enable migration features
-SQLITE_SCHEDULER_ENABLED=true     # Enable SQLite scheduler
-SQLITE_CONCURRENCY_ENABLED=true   # Enable concurrency features
-SQLITE_MONITORING_ENABLED=true    # Enable monitoring
-SQLITE_BACKUP_ENABLED=true        # Enable backup features
-
-# Safety Features
-AUTO_FALLBACK_ENABLED=true        # Enable automatic fallback
-DEGRADED_MODE_ENABLED=false       # Start in degraded mode
-STRICT_VALIDATION_ENABLED=true    # Enable strict validation
-
-# Monitoring and Alerts (Optional)
-ALERT_EMAIL_ENABLED=false         # Enable email alerts
-ALERT_SMTP_SERVER=localhost       # SMTP server
-ALERT_SMTP_PORT=587               # SMTP port
-ALERT_EMAIL_USERNAME=             # SMTP username
-ALERT_EMAIL_PASSWORD=             # SMTP password
-ALERT_FROM_EMAIL=bot@example.com  # From email address
-ALERT_TO_EMAILS=admin@example.com # Alert recipient emails (comma-separated)
-
-ALERT_WEBHOOK_ENABLED=false       # Enable webhook alerts
-ALERT_WEBHOOK_URL=                # Webhook URL for alerts
+# Rollback si nécessaire
+./scripts/deploy.sh --rollback
 ```
 
-## Deployment Methods
+#### Processus Automatisé
 
-### Method 1: Automated Deployment Script
+1. **Vérifications pré-déploiement**
+   - État Docker
+   - Espace disque disponible
+   - Fichiers de configuration
 
-The recommended method uses the automated deployment script:
+2. **Sauvegarde automatique**
+   - Base de données
+   - Répertoire data/
+   - Logs
+
+3. **Build de l'image Docker**
+   - Multi-stage build optimisé
+   - Tagging avec timestamp
+
+4. **Déploiement Shadow**
+   - Container parallèle pour tests
+   - Validation des ressources
+
+5. **Tests de santé**
+   - Health checks
+   - Tests de charge
+   - Validation fonctionnelle
+
+6. **Basculement en production**
+   - Arrêt de l'ancien container
+   - Activation du nouveau
+   - Validation post-déploiement
+
+### 2. Déploiement avec Docker Compose
 
 ```bash
-# Basic deployment
-python scripts/deploy_sqlite_migration.py
+# Build et démarrage
+docker-compose up -d --build
 
-# Deployment with custom configuration
-python scripts/deploy_sqlite_migration.py --config deployment_config.json
+# Vérification des logs
+docker-compose logs -f discord-reminder-bot
 
-# Dry run (test without making changes)
-python scripts/deploy_sqlite_migration.py --dry-run
-
-# Skip pre-deployment checks (not recommended)
-python scripts/deploy_sqlite_migration.py --skip-checks
-
-# Deployment without backup (not recommended)
-python scripts/deploy_sqlite_migration.py --no-backup
+# Arrêt
+docker-compose down
 ```
 
-#### Deployment Configuration File
-
-Create a `deployment_config.json` file to customize the deployment:
-
-```json
-{
-  "pre_deployment_checks": true,
-  "create_backup": true,
-  "enable_monitoring": true,
-  "migration_timeout_minutes": 30,
-  "health_check_interval_seconds": 10,
-  "max_health_check_failures": 3,
-  "enable_progressive_rollout": false,
-  "rollout_percentage": 100,
-  "dry_run": false
-}
-```
-
-### Method 2: Manual Deployment
-
-For more control over the deployment process:
-
-#### Step 1: Pre-deployment Checks
+### 3. Déploiement avec PM2
 
 ```bash
-# Check environment configuration
-python -c "from config.settings import Settings; Settings.validate_required_settings()"
+# Installation PM2 globale
+npm install -g pm2
 
-# Test database connectivity
-python -c "import sqlite3; conn = sqlite3.connect('test.db'); conn.execute('SELECT 1'); conn.close()"
+# Build du projet
+npm run build
 
-# Verify feature flags
-python test_integration.py
+# Démarrage avec PM2
+pm2 start ecosystem.config.js --env production
+
+# Monitoring
+pm2 monit
+
+# Logs
+pm2 logs discord-reminder-bot
+
+# Redémarrage
+pm2 reload ecosystem.config.js --env production
 ```
 
-#### Step 2: Create Backup
+## CI/CD avec GitHub Actions
+
+### Configuration
+
+Le pipeline CI/CD est configuré dans `.github/workflows/ci-cd.yml` et inclut :
+
+1. **Tests automatiques** sur Node.js 18 et 20
+2. **Build Docker** multi-architecture (amd64/arm64)
+3. **Scan de sécurité** avec Trivy
+4. **Déploiement staging** sur la branche `develop`
+5. **Déploiement production** sur la branche `main`
+
+### Utilisation
 
 ```bash
-# Create backup directory
-mkdir -p data/backups
+# Push sur develop → déploiement staging
+git push origin develop
 
-# Backup existing JSON files
-cp watched_reminders.json data/backups/watched_reminders_$(date +%Y%m%d_%H%M%S).json
+# Push sur main → déploiement production
+git push origin main
 
-# Backup existing SQLite database (if exists)
-if [ -f discord_bot.db ]; then
-    cp discord_bot.db data/backups/discord_bot_$(date +%Y%m%d_%H%M%S).db
-fi
+# Les environnements doivent être configurés dans GitHub
 ```
 
-#### Step 3: Enable SQLite Features
+## Monitoring et Validation
 
-Set environment variables or update your `.env` file:
+### Surveillance 48h
 
 ```bash
-export USE_SQLITE=true
-export AUTO_MIGRATE=true
-export BACKUP_JSON_ON_MIGRATION=true
+# Démarrer la surveillance complète
+./scripts/monitor.sh --start
+
+# Check ponctuel
+./scripts/monitor.sh --check
+
+# Test de charge
+./scripts/monitor.sh --load-test
+
+# Générer un rapport
+./scripts/monitor.sh --report
 ```
 
-#### Step 4: Start the Bot
+### Métriques Surveillées
+
+- **Statut du container** : Disponibilité
+- **Ressources** : CPU < 80%, RAM < 400MB
+- **Redémarrages** : Maximum 5
+- **Logs** : Erreurs et warnings
+- **Réseau** : Connectivité Discord API
+- **Base de données** : Intégrité et taille
+
+### Alertes
+
+Les alertes sont automatiquement générées pour :
+- Container arrêté
+- Utilisation excessive des ressources
+- Erreurs dans les logs
+- Problèmes de connectivité
+- Corruption de base de données
+
+## Procédures de Rollback
+
+### Rollback Automatique
+
+En cas d'échec de déploiement, le rollback est automatique :
 
 ```bash
-python bot.py
+# Le script de déploiement gère les échecs
+./scripts/deploy.sh  # Rollback auto si échec
 ```
 
-The bot will automatically:
-- Initialize the SQLite database
-- Migrate existing JSON data
-- Enable SQLite features progressively
-- Create backups of JSON files
-
-#### Step 5: Verify Deployment
+### Rollback Manuel
 
 ```bash
-# Check bot logs for successful migration
-tail -f logs/bot_$(date +%Y%m%d).log
+# Rollback rapide vers la dernière sauvegarde
+./scripts/rollback.sh --quick
 
-# Verify database was created
-ls -la discord_bot.db
+# Lister les sauvegardes disponibles
+./scripts/rollback.sh --list
 
-# Check feature flag status
-python -c "
-from config.feature_flags import feature_flags
-print('SQLite fully enabled:', feature_flags.is_sqlite_fully_enabled())
-print('Degraded mode:', feature_flags.is_degraded_mode())
-"
+# Rollback vers une sauvegarde spécifique
+./scripts/rollback.sh --backup backup_20250903_143022
 ```
 
-## Monitoring and Alerting
+### Plan de Rollback d'Urgence
 
-### Starting Monitoring
-
-```bash
-# Start monitoring with default configuration
-python scripts/monitoring_alerts.py
-
-# Start monitoring with custom configuration
-python scripts/monitoring_alerts.py --config monitoring_config.json
-
-# Monitor for specific duration (in minutes)
-python scripts/monitoring_alerts.py --duration 60
-
-# Test alert system
-python scripts/monitoring_alerts.py --test-alerts
-```
-
-### Monitoring Configuration
-
-Create a `monitoring_config.json` file:
-
-```json
-{
-  "email": {
-    "enabled": true,
-    "smtp_server": "smtp.gmail.com",
-    "smtp_port": 587,
-    "username": "your_email@gmail.com",
-    "password": "your_app_password",
-    "from_email": "bot@yourcompany.com",
-    "to_emails": ["admin@yourcompany.com", "devops@yourcompany.com"],
-    "use_tls": true
-  },
-  "webhook": {
-    "enabled": true,
-    "url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
-    "timeout": 10
-  },
-  "alert_levels": {
-    "email": ["error", "critical"],
-    "webhook": ["warning", "error", "critical"],
-    "file": ["info", "warning", "error", "critical"],
-    "console": ["info", "warning", "error", "critical"]
-  }
-}
-```
-
-### Key Metrics Monitored
-
-- **Feature Flag Status**: Fallbacks and degraded mode
-- **Database Health**: Connectivity and integrity
-- **Performance**: Response times and query performance
-- **System Health**: Component status and errors
-- **Migration Status**: Progress and completion
-
-## Rollback Procedures
-
-### Automatic Rollback
-
-The system includes automatic rollback triggers:
-
-- **Health Check Failures**: Multiple consecutive health check failures
-- **Critical Errors**: Database corruption or initialization failures
-- **Feature Flag Fallbacks**: Critical feature flags entering fallback mode
-
-### Manual Rollback
-
-#### Using Deployment Script
-
-```bash
-# Perform rollback using deployment script
-python scripts/deploy_sqlite_migration.py --rollback
-```
-
-#### Manual Rollback Steps
-
-1. **Stop the Bot**:
+1. **Immédiat** (< 5 minutes)
    ```bash
-   # If running as a service
-   sudo systemctl stop discord-bot
-   
-   # If running in screen/tmux
-   # Use Ctrl+C to stop the bot
+   docker stop discord-reminder-bot
+   docker run -d --name discord-reminder-bot-emergency --env-file .env [previous-image]
    ```
 
-2. **Disable SQLite Features**:
+2. **Complet** (< 15 minutes)
    ```bash
-   export USE_SQLITE=false
-   # or update your .env file
-   echo "USE_SQLITE=false" >> .env
+   ./scripts/rollback.sh --quick
    ```
 
-3. **Restore JSON Backup**:
-   ```bash
-   # Find the most recent backup
-   ls -la data/backups/watched_reminders_*.json
-   
-   # Restore the backup
-   cp data/backups/watched_reminders_YYYYMMDD_HHMMSS.json watched_reminders.json
-   ```
+3. **Restauration données** (< 30 minutes)
+   - Restaurer depuis sauvegarde la plus récente
+   - Vérifier l'intégrité des données
+   - Redémarrer avec configuration précédente
 
-4. **Remove SQLite Database** (optional):
-   ```bash
-   # Move database to backup location
-   mv discord_bot.db data/backups/discord_bot_rollback_$(date +%Y%m%d_%H%M%S).db
-   ```
+## Optimisations Production
 
-5. **Restart the Bot**:
-   ```bash
-   python bot.py
-   ```
+### Docker
 
-### Rollback Verification
+- **Image Alpine** : Réduction de la taille
+- **Multi-stage build** : Séparation build/runtime
+- **Utilisateur non-root** : Sécurité renforcée
+- **Health checks** : Détection des problèmes
+- **Limites de ressources** : Contrôle consommation
 
-After rollback, verify the system is working:
+### Performance
 
-```bash
-# Check that JSON storage is being used
-python -c "
-from utils.unified_event_manager import unified_event_manager
-import asyncio
-async def check():
-    await unified_event_manager.initialize()
-    print('Using JSON backend:', unified_event_manager.is_using_json())
-asyncio.run(check())
-"
+- **PM2** : Gestion avancée des processus
+- **Logging optimisé** : Rotation automatique
+- **Cache intelligent** : Réduction I/O
+- **Monitoring** : Détection proactive
 
-# Verify bot functionality
-# Test Discord commands to ensure the bot is working normally
-```
+## Sécurité
+
+### Mesures Implémentées
+
+1. **Container Security**
+   - Utilisateur non-root (1001:1001)
+   - Image Alpine minimale
+   - Scan de vulnérabilités
+
+2. **Network Security**
+   - Réseau Docker dédié
+   - Isolation des containers
+
+3. **Data Security**
+   - Volumes persistants sécurisés
+   - Sauvegardes chiffrées
+   - Rotation des logs
+
+4. **Access Control**
+   - Variables d'environnement sécurisées
+   - Permissions fichiers restreintes
 
 ## Troubleshooting
 
-### Common Issues
+### Problèmes Courants
 
-#### 1. Migration Fails with "Database locked" Error
-
-**Cause**: Another process is accessing the SQLite database.
-
-**Solution**:
+#### Container ne démarre pas
 ```bash
-# Check for processes using the database
-lsof discord_bot.db
+# Vérifier les logs
+docker logs discord-reminder-bot
 
-# Kill any processes using the database
-# Then restart the migration
+# Vérifier la configuration
+docker-compose config
+
+# Vérifier les variables d'environnement
+docker exec discord-reminder-bot env | grep DISCORD
 ```
 
-#### 2. Feature Flags Not Working
-
-**Cause**: Environment variables not properly set.
-
-**Solution**:
+#### Haute consommation mémoire
 ```bash
-# Check environment variables
-env | grep SQLITE
+# Vérifier les stats
+docker stats discord-reminder-bot
 
-# Verify feature flags are loaded
-python -c "from config.feature_flags import feature_flags; print(feature_flags.get_status_summary())"
+# Ajuster les limites dans docker-compose.yml
+# Redémarrer le container
+docker-compose restart discord-reminder-bot
 ```
 
-#### 3. JSON Data Not Migrated
-
-**Cause**: JSON file not found or corrupted.
-
-**Solution**:
+#### Erreurs de base de données
 ```bash
-# Check if JSON file exists and is valid
-python -c "import json; print(json.load(open('watched_reminders.json')))"
+# Vérifier l'intégrité
+sqlite3 discord_bot.db "PRAGMA integrity_check;"
 
-# If corrupted, restore from backup
-cp data/backups/watched_reminders_*.json watched_reminders.json
+# Sauvegarder et restaurer
+./scripts/rollback.sh --quick
 ```
 
-#### 4. High Memory Usage
-
-**Cause**: Large dataset or memory leak.
-
-**Solution**:
+#### Bot ne répond plus
 ```bash
-# Monitor memory usage
-top -p $(pgrep -f bot.py)
+# Check Discord API
+curl -s https://discord.com/api/v10/gateway
 
-# Check database size
-ls -lh discord_bot.db
-
-# Consider database optimization
-sqlite3 discord_bot.db "VACUUM;"
+# Vérifier le token
+# Redémarrer le service
+docker-compose restart discord-reminder-bot
 ```
 
-### Log Analysis
+## Contacts et Support
 
-Check logs for deployment issues:
+### Escalade
+
+1. **Niveau 1** : Logs automatiques et monitoring
+2. **Niveau 2** : Rollback automatique
+3. **Niveau 3** : Intervention manuelle requise
+
+### Logs
+
+- **Application** : `/app/logs/bot_YYYY-MM-DD.log`
+- **PM2** : `/app/logs/pm2-*.log`
+- **Déploiement** : `/app/logs/deployment.log`
+- **Monitoring** : `/app/logs/health-monitor.log`
+- **Alertes** : `/app/logs/alerts.log`
+
+### Commandes Utiles
 
 ```bash
-# Bot logs
-tail -f logs/bot_$(date +%Y%m%d).log
+# État général
+docker ps
+docker-compose ps
+pm2 list
 
-# Deployment logs
-ls -la deployment_*.log
-tail -f deployment_*.log
+# Logs temps réel
+docker-compose logs -f
+pm2 logs --lines 100
 
-# Alert logs
-tail -f alerts.log
+# Ressources
+docker stats
+htop
+
+# Réseau
+docker network ls
+netstat -tlnp
 ```
 
-### Getting Help
+---
 
-If you encounter issues:
-
-1. **Check the logs** for error messages
-2. **Verify environment variables** are correctly set
-3. **Test the integration** using `python test_integration.py`
-4. **Review the deployment report** generated by the deployment script
-5. **Check system resources** (disk space, memory, CPU)
-
-## Post-Deployment
-
-### Verification Checklist
-
-After successful deployment:
-
-- [ ] Bot starts without errors
-- [ ] SQLite database is created and populated
-- [ ] Discord commands work normally
-- [ ] Event reminders are sent correctly
-- [ ] Monitoring is active and alerts are working
-- [ ] Backups are created and accessible
-- [ ] Performance is acceptable
-
-### Ongoing Maintenance
-
-- **Monitor alerts** regularly for system health
-- **Review logs** for any warnings or errors
-- **Backup database** regularly
-- **Update monitoring configuration** as needed
-- **Test rollback procedures** periodically
-
-### Performance Optimization
-
-After deployment, consider these optimizations:
-
-```sql
--- Database optimization queries
-PRAGMA optimize;
-VACUUM;
-REINDEX;
-
--- Check database statistics
-.schema
-.tables
-.dbinfo
-```
-
-## Security Considerations
-
-- **Environment Variables**: Store sensitive configuration in environment variables, not in code
-- **File Permissions**: Ensure database and backup files have appropriate permissions
-- **Network Security**: If using webhook alerts, ensure URLs are secure
-- **Access Control**: Limit access to deployment scripts and configuration files
-
-## Conclusion
-
-The SQLite migration deployment provides a robust, monitored transition from JSON to SQLite storage. The feature flags system and automatic fallback mechanisms ensure a safe deployment with minimal risk of data loss or service interruption.
-
-For additional support or questions, refer to the project documentation or contact the development team.
+**Note** : Ce guide suppose un environnement Linux/Unix. Pour Windows, adapter les chemins et commandes selon le contexte.

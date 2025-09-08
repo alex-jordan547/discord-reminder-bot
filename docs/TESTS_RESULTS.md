@@ -143,7 +143,7 @@ make validate-ci
 
 ### Corrections Prioritaires
 1. **Ajouter la commande `/admin`** dans SlashCommands
-2. **Activer les feature flags SQLite par défaut** dans `.env.example`
+2. **Activer les feature flags SQLite par défaut** dans `server/.env.example`
 3. **Corriger les erreurs de linting** pour passer les CI
 
 ### Améliorations Futures

@@ -1,0 +1,19 @@
+{
+  "name": "discord-reminder-bot-shared",
+  "version": "2.0.0",
+  "description": "Shared types and utilities for Discord bot",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

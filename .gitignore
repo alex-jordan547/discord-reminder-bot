@@ -176,6 +176,13 @@ staging_setup_*.log
 data/backups/
 .kiro/*
 
+# Backup files
+.last_backup
+*.backup-*
+
+# Test coverage reports
+coverage/
+
 # ===== TypeScript/Node.js specific =====
 # Dependencies
 node_modules/

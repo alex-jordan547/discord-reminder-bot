@@ -90,7 +90,6 @@ test_loading.py
 test_compatibility.json
 scripts/
 run_dev.sh
-prepare_commit.sh
 Makefile
 
 # Build artifacts and CI files
