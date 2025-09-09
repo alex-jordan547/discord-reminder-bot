@@ -25,7 +25,8 @@ export interface MemoryUsage {
 
 export interface CPUUsage {
   percentage: number;
-  loadAverage: number[];
+  cores?: number;
+  loadAverage?: number[];
 }
 
 export interface DiskUsage {
@@ -37,8 +38,8 @@ export interface DiskUsage {
 export interface NetworkStats {
   bytesIn: number;
   bytesOut: number;
-  packetsIn: number;
-  packetsOut: number;
+  packetsIn?: number;
+  packetsOut?: number;
 }
 
 export interface BotMetrics {
@@ -58,7 +59,7 @@ export interface CommandStats {
 }
 
 export interface ErrorStats {
-  total: number;
+  total?: number;
   critical: number;
   warnings: number;
   info: number;

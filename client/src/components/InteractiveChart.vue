@@ -52,6 +52,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import type { MonitoringMetrics } from '@/types';
@@ -66,6 +67,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
+  Filler,
   zoomPlugin
 );
 
