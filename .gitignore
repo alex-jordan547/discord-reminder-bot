@@ -266,3 +266,6 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+server/backups/*
+

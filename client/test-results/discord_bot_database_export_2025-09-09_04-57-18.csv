@@ -1,0 +1,4 @@
+id,username,email,created_at,is_active,reminder_count
+1,"john_doe","john@example.com","2024-01-15T10:30:00Z",true,1
+2,"jane_smith","jane@example.com","2024-01-16T14:45:00Z",true,0
+3,"bob_johnson","bob@example.com","2024-01-17T09:15:00Z",false,2

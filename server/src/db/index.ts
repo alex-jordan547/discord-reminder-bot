@@ -12,6 +12,7 @@ import * as schema from './schema.js';
 import { createLogger } from '#/utils/loggingConfig';
 import path from 'path';
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 // Type for Node.js file system errors
 interface ErrnoException extends Error {
   code?: string;
@@ -88,7 +89,7 @@ export class DatabaseManager {
     // Ensure the directory exists
     const dbDir = path.dirname(dbFile);
     try {
-      require('fs').mkdirSync(dbDir, { recursive: true });
+      fsSync.mkdirSync(dbDir, { recursive: true });
     } catch (error) {
       logger.error(`Could not create database directory ${dbDir}:`, error);
       // Directory might already exist, that's okay
@@ -209,7 +210,7 @@ export class DatabaseManager {
    */
   async getInfo(): Promise<DatabaseInfo> {
     const databasePath = this.config.path;
-    const databaseExists = require('fs').existsSync(databasePath);
+    const databaseExists = fsSync.existsSync(databasePath);
     const databaseName = path.basename(databasePath);
 
     let databaseSizeBytes: number | undefined;

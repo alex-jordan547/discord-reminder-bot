@@ -208,7 +208,7 @@ setInterval(cleanupConnections, 60000); // Run every minute
  */
 export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise<void> {
   // Register WebSocket plugin
-  await fastify.register(require('@fastify/websocket'));
+  await fastify.register(import('@fastify/websocket'));
 
   // WebSocket route for metrics
   fastify.register(async function (fastify) {

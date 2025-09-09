@@ -11,7 +11,7 @@ import {
   generateId,
   isValidUrl,
   deepClone,
-} from '@/index';
+} from './index';
 
 describe('Dashboard Utilities', () => {
   describe('formatBytes', () => {

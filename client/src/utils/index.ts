@@ -126,6 +126,27 @@ export function generateId(): string {
 }
 
 /**
+ * Generate a safe, human-readable filename with timestamp
+ */
+export function generateSafeFilename(prefix: string, extension: string): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    
+    // Create a human-readable timestamp
+    const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+    
+    // Sanitize prefix to ensure it's filesystem-safe
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    return `${safePrefix}_${timestamp}.${extension}`;
+}
+
+/**
  * Validate if a string is a valid URL
  */
 export function isValidUrl(string: string): boolean {

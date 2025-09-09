@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Management Test - Improved</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --accent-color-hover: #2563eb;
+            --accent-color-alpha: rgba(59, 130, 246, 0.1);
+            --error-color: #ef4444;
+            --error-bg: #fef2f2;
+            --error-border: #fecaca;
+            --success-color: #10b981;
+            --success-bg: #f0fdf4;
+            --success-border: #bbf7d0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        select, button {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        select {
+            width: 100%;
+            background: white;
+        }
+
+        button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: var(--accent-color-hover);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: var(--error-color);
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .success {
+            color: var(--success-color);
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        .file-info {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .debug-info {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Database Export Test - Improved</h1>
+            <p>Test des exports de base de données avec vérification du contenu</p>
+        </div>
+
+        <div class="section">
+            <h2>Export Database</h2>
+            
+            <div class="form-group">
+                <label for="export-format">Format d'export:</label>
+                <select id="export-format" data-testid="export-format-select">
+                    <option value="">Sélectionner un format...</option>
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                    <option value="sqlite">SQLite</option>
+                </select>
+                <div id="format-error" data-testid="format-error" class="error">
+                    Veuillez sélectionner un format d'export
+                </div>
+            </div>
+
+            <button type="button" data-testid="export-button" onclick="handleExport()">
+                Exporter la base de données
+            </button>
+
+            <div id="export-result" style="display: none;"></div>
+            <div id="debug-info" class="debug-info" style="display: none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>Test de contenu</h2>
+            <p>Cette section affiche des informations de débogage sur les fichiers générés.</p>
+            <button onclick="testFileGeneration()">Tester la génération de fichiers</button>
+            <div id="test-results"></div>
+        </div>
+    </div>
+
+    <script>
+        function generateSafeFilename(format) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+            const extension = format === 'sqlite' ? 'db' : format;
+            
+            return `discord_bot_database_export_${timestamp}.${extension}`;
+        }
+
+        function generateFileContent(format) {
+            switch (format) {
+                case 'json':
+                    return {
+                        content: JSON.stringify({
+                            metadata: {
+                                exportDate: new Date().toISOString(),
+                                format: 'json',
+                                version: '1.0',
+                                source: 'Discord Bot Dashboard'
+                            },
+                            tables: {
+                                users: [
+                                    { 
+                                        id: 1, 
+                                        username: 'john_doe', 
+                                        email: 'john@example.com',
+                                        created_at: '2024-01-15T10:30:00Z',
+                                        is_active: true
+                                    },
+                                    { 
+                                        id: 2, 
+                                        username: 'jane_smith', 
+                                        email: 'jane@example.com',
+                                        created_at: '2024-01-16T14:45:00Z',
+                                        is_active: true
+                                    }
+                                ],
+                                reminders: [
+                                    {
+                                        id: 1,
+                                        user_id: 1,
+                                        title: 'Meeting reminder',
+                                        description: 'Team meeting at 3 PM',
+                                        scheduled_time: '2024-02-01T15:00:00Z',
+                                        is_completed: false
+                                    }
+                                ],
+                                settings: [
+                                    { key: 'theme', value: 'dark', updated_at: new Date().toISOString() },
+                                    { key: 'language', value: 'en', updated_at: new Date().toISOString() }
+                                ]
+                            }
+                        }, null, 2),
+                        mimeType: 'application/json'
+                    };
+
+                case 'csv':
+                    return {
+                        content: `id,username,email,created_at,is_active,reminder_count
+1,"john_doe","john@example.com","2024-01-15T10:30:00Z",true,1
+2,"jane_smith","jane@example.com","2024-01-16T14:45:00Z",true,0
+3,"bob_johnson","bob@example.com","2024-01-17T09:15:00Z",false,2`,
+                        mimeType: 'text/csv'
+                    };
+
+                case 'sqlite':
+                    // Generate a more complete SQLite file header
+                    const sqliteHeader = new Uint8Array([
+                        // SQLite format 3 header
+                        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+                        // Page size (4096 bytes)
+                        0x10, 0x00,
+                        // File format write version
+                        0x01,
+                        // File format read version  
+                        0x01,
+                        // Reserved space at end of each page
+                        0x00,
+                        // Maximum embedded payload fraction
+                        0x40,
+                        // Minimum embedded payload fraction
+                        0x20,
+                        // Minimum leaf payload fraction
+                        0x20,
+                        // File change counter
+                        0x00, 0x00, 0x00, 0x01,
+                        // Size of database in pages
+                        0x00, 0x00, 0x00, 0x02
+                    ]);
+                    
+                    // Add some dummy data to make it more realistic
+                    const additionalData = new Uint8Array(1000);
+                    for (let i = 0; i < additionalData.length; i++) {
+                        additionalData[i] = i % 256;
+                    }
+                    
+                    const fullSqliteData = new Uint8Array(sqliteHeader.length + additionalData.length);
+                    fullSqliteData.set(sqliteHeader);
+                    fullSqliteData.set(additionalData, sqliteHeader.length);
+                    
+                    return {
+                        content: fullSqliteData,
+                        mimeType: 'application/x-sqlite3'
+                    };
+
+                default:
+                    throw new Error(`Format non supporté: ${format}`);
+            }
+        }
+
+        function handleExport() {
+            const formatSelect = document.getElementById('export-format');
+            const formatError = document.getElementById('format-error');
+            const exportResult = document.getElementById('export-result');
+            const debugInfo = document.getElementById('debug-info');
+            
+            // Reset previous states
+            formatError.style.display = 'none';
+            exportResult.style.display = 'none';
+            debugInfo.style.display = 'none';
+            
+            if (!formatSelect.value) {
+                formatError.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const format = formatSelect.value;
+                const filename = generateSafeFilename(format);
+                const { content, mimeType } = generateFileContent(format);
+                
+                // Show debug information
+                debugInfo.innerHTML = `
+                    <h4>Informations de débogage:</h4>
+                    <p><strong>Format:</strong> ${format}</p>
+                    <p><strong>Nom de fichier:</strong> ${filename}</p>
+                    <p><strong>Type MIME:</strong> ${mimeType}</p>
+                    <p><strong>Taille du contenu:</strong> ${content.length} ${typeof content === 'string' ? 'caractères' : 'octets'}</p>
+                    <p><strong>Type de contenu:</strong> ${typeof content}</p>
+                    ${format === 'json' ? `<p><strong>Aperçu JSON:</strong><br><pre style="max-height: 200px; overflow-y: auto; background: white; padding: 0.5rem; border-radius: 4px;">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</pre></p>` : ''}
+                    ${format === 'csv' ? `<p><strong>Aperçu CSV:</strong><br><pre style="max-height: 200px; overflow-y: auto; background: white; padding: 0.5rem; border-radius: 4px;">${content}</pre></p>` : ''}
+                `;
+                debugInfo.style.display = 'block';
+                
+                // Create and trigger download
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                
+                a.href = url;
+                a.download = filename;
+                a.style.display = 'none';
+                
+                // Add to DOM, click, then remove
+                document.body.appendChild(a);
+                
+                // Use setTimeout to ensure the element is properly added
+                setTimeout(() => {
+                    a.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                }, 10);
+                
+                // Show success message
+                exportResult.innerHTML = `
+                    <div class="success">
+                        <strong>Export réussi!</strong><br>
+                        Fichier: ${filename}<br>
+                        Taille: ${blob.size} octets<br>
+                        Le fichier devrait être téléchargé dans votre dossier de téléchargements.
+                    </div>
+                `;
+                exportResult.style.display = 'block';
+                
+            } catch (error) {
+                exportResult.innerHTML = `
+                    <div class="error" style="display: block;">
+                        <strong>Erreur lors de l'export:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+                exportResult.style.display = 'block';
+            }
+        }
+
+        function testFileGeneration() {
+            const testResults = document.getElementById('test-results');
+            const formats = ['json', 'csv', 'sqlite'];
+            let results = '<h3>Résultats des tests:</h3>';
+            
+            formats.forEach(format => {
+                try {
+                    const filename = generateSafeFilename(format);
+                    const { content, mimeType } = generateFileContent(format);
+                    const blob = new Blob([content], { type: mimeType });
+                    
+                    results += `
+                        <div class="file-info">
+                            <h4>Format: ${format.toUpperCase()}</h4>
+                            <p><strong>Nom:</strong> ${filename}</p>
+                            <p><strong>MIME:</strong> ${mimeType}</p>
+                            <p><strong>Taille:</strong> ${blob.size} octets</p>
+                            <p><strong>Type contenu:</strong> ${typeof content}</p>
+                            <p><strong>Statut:</strong> <span style="color: var(--success-color);">✓ OK</span></p>
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="file-info">
+                            <h4>Format: ${format.toUpperCase()}</h4>
+                            <p><strong>Statut:</strong> <span style="color: var(--error-color);">✗ Erreur: ${error.message}</span></p>
+                        </div>
+                    `;
+                }
+            });
+            
+            testResults.innerHTML = results;
+        }
+
+        // Test automatique au chargement de la page
+        window.addEventListener('load', () => {
+            console.log('Page chargée, test de génération de fichiers...');
+            testFileGeneration();
+        });
+    </script>
+</body>
+</html>

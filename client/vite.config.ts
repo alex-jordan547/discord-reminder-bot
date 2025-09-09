@@ -26,7 +26,7 @@ export default defineConfig({
 
   // Configuration pour le serveur de développement
   server: {
-    port: 3001,
+    port: 3002,
     hmr: true, // HMR activé pour Vue.js
     proxy: {
       // Proxy API calls to the Fastify server

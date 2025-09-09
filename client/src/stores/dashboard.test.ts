@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useDashboardStore } from '@/dashboard';
-import { createMockMetrics, createMockAlert, createMockActivity } from '@/test-setup';
+import { useDashboardStore } from './dashboard';
+import { createMockMetrics, createMockAlert, createMockActivity } from '../../tests/setup';
 
 describe('Dashboard Store', () => {
   beforeEach(() => {
