@@ -43,13 +43,19 @@
     "db:generate": "cd server && npm run db:generate",
     "db:migrate": "cd server && npm run db:migrate",
     "db:studio": "cd server && npm run db:studio",
+    "db:migrate:manual": "node scripts/apply-migrations.js",
     "db:backup": "./scripts/backup-db.sh",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
     "docker:restart": "docker-compose restart",
     "docker:rebuild": "npm run db:backup && docker-compose up --build -d",
     "docker:logs": "docker-compose logs -f",
-    "docker:down": "docker-compose down"
+    "docker:down": "docker-compose down",
+    "docker:migrate": "docker compose --profile migration up db-migration",
+    "test:infrastructure": "playwright test --config=playwright-infrastructure.config.ts",
+    "test:infrastructure:ui": "playwright test --config=playwright-infrastructure.config.ts --ui",
+    "test:infrastructure:headed": "playwright test --config=playwright-infrastructure.config.ts --headed",
+    "test:docker": "npm run test:infrastructure"
   },
   "keywords": [
     "discord",
@@ -91,6 +97,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@playwright/test": "^1.55.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/eslint": "^9.6.1",
     "@types/node": "^20.8.10",
@@ -109,6 +116,7 @@
     "jsdom": "^24.0.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.0.3",
+    "redis": "^4.7.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",

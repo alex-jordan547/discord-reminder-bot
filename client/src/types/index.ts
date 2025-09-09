@@ -180,3 +180,63 @@ export interface ImportError {
 
 export type ExportFormat = 'sqlite' | 'json' | 'csv';
 export type ImportFormat = 'sqlite' | 'json' | 'csv';
+
+// Notification system types
+export interface Notification {
+  id: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  timestamp: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  persistent?: boolean;
+  autoHide?: boolean;
+  hideDelay?: number;
+  actions?: NotificationAction[];
+  metadata?: Record<string, any>;
+  acknowledged?: boolean;
+  category?: string;
+  duration?: number;
+}
+
+export interface NotificationAction {
+  id: string;
+  label: string;
+  action: () => void;
+  style?: 'primary' | 'secondary' | 'danger';
+}
+
+export interface NotificationSettings {
+  enabled?: {
+    system: boolean;
+    alerts: boolean;
+    database: boolean;
+    security: boolean;
+  };
+  types?: string[];
+  maxVisible?: number;
+  autoHide?: boolean;
+  hideDelay?: number;
+  priority?: {
+    low: boolean;
+    medium: boolean;
+    high: boolean;
+    critical: boolean;
+  };
+  sound?: {
+    enabled: boolean;
+    volume: number;
+  };
+  desktop?: boolean;
+  display?: {
+    duration: number;
+    maxVisible: number;
+    position: string;
+  };
+}
+
+export interface NotificationQueue {
+  notifications: Notification[];
+  maxSize: number;
+  deduplication: boolean;
+}

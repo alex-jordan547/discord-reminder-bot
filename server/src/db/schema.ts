@@ -4,11 +4,11 @@
  * Defines all database tables with proper types and relationships
  */
 
-import { sqliteTable, text, integer, real, unique, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, real, unique, index, timestamp, boolean, serial } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Events table - core table for tracking Discord events and reminders
-export const events = sqliteTable(
+export const events = pgTable(
   'events',
   {
     messageId: text('message_id').primaryKey(),
@@ -17,39 +17,41 @@ export const events = sqliteTable(
     title: text('title').notNull(),
     description: text('description'),
     intervalMinutes: integer('interval_minutes').notNull(),
-    isPaused: integer('is_paused', { mode: 'boolean' }).notNull().default(false),
-    lastRemindedAt: integer('last_reminded_at', { mode: 'timestamp' }),
+    isPaused: boolean('is_paused').notNull().default(false),
+    lastRemindedAt: timestamp('last_reminded_at'),
     usersWhoReacted: text('users_who_reacted').notNull().default('[]'), // JSON array of user IDs
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at')
       .notNull()
-      .default(sql`(unixepoch())`),
+      .default(sql`now()`),
   },
   table => ({
     guildChannelIdx: index('idx_events_guild_channel').on(table.guildId, table.channelId),
     updatedAtIdx: index('idx_events_updated_at').on(table.updatedAt),
+    pausedIdx: index('idx_events_paused').on(table.isPaused),
+    lastRemindedAtIdx: index('idx_events_last_reminded_at').on(table.lastRemindedAt),
   }),
 );
 
 // Users table - tracks Discord users across guilds
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
     userId: text('user_id').notNull(),
     guildId: text('guild_id').notNull(),
     username: text('username').notNull(),
-    isBot: integer('is_bot', { mode: 'boolean' }).notNull().default(false),
-    lastSeen: integer('last_seen', { mode: 'timestamp' })
+    isBot: boolean('is_bot').notNull().default(false),
+    lastSeen: timestamp('last_seen')
       .notNull()
-      .default(sql`(unixepoch())`),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    createdAt: timestamp('created_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at')
       .notNull()
-      .default(sql`(unixepoch())`),
+      .default(sql`now()`),
   },
   table => ({
     pk: unique().on(table.userId, table.guildId),
@@ -59,24 +61,24 @@ export const users = sqliteTable(
 );
 
 // Guilds table - tracks Discord server configurations
-export const guilds = sqliteTable(
+export const guilds = pgTable(
   'guilds',
   {
     guildId: text('guild_id').primaryKey(),
     guildName: text('guild_name').notNull(),
     ownerId: text('owner_id').notNull(),
     memberCount: integer('member_count').notNull().default(0),
-    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-    joinedAt: integer('joined_at', { mode: 'timestamp' })
+    isActive: boolean('is_active').notNull().default(true),
+    joinedAt: timestamp('joined_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    leftAt: integer('left_at', { mode: 'timestamp' }),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    leftAt: timestamp('left_at'),
+    createdAt: timestamp('created_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at')
       .notNull()
-      .default(sql`(unixepoch())`),
+      .default(sql`now()`),
   },
   table => ({
     activeIdx: index('idx_guilds_active').on(table.isActive),
@@ -85,7 +87,7 @@ export const guilds = sqliteTable(
 );
 
 // Guild configs table - stores per-guild configuration settings
-export const guildConfigs = sqliteTable('guild_configs', {
+export const guildConfigs = pgTable('guild_configs', {
   guildId: text('guild_id')
     .primaryKey()
     .references(() => guilds.guildId, { onDelete: 'cascade' }),
@@ -100,13 +102,13 @@ export const guildConfigs = sqliteTable('guild_configs', {
   
   // Reminder timing configuration
   defaultIntervalMinutes: integer('default_interval_minutes').notNull().default(60),
-  autoDeleteEnabled: integer('auto_delete_enabled', { mode: 'boolean' }).notNull().default(false),
+  autoDeleteEnabled: boolean('auto_delete_enabled').notNull().default(false),
   autoDeleteDelayMinutes: integer('auto_delete_delay_minutes').notNull().default(5),
   delayBetweenRemindersMs: integer('delay_between_reminders_ms').notNull().default(1000),
   
   // Mention and reaction configuration
   maxMentionsPerReminder: integer('max_mentions_per_reminder').notNull().default(50),
-  useEveryoneAboveLimit: integer('use_everyone_above_limit', { mode: 'boolean' }).notNull().default(true),
+  useEveryoneAboveLimit: boolean('use_everyone_above_limit').notNull().default(true),
   defaultReactions: text('default_reactions').notNull().default('["✅","❌","❓"]'), // JSON array
   
   // Timezone configuration
@@ -116,24 +118,29 @@ export const guildConfigs = sqliteTable('guild_configs', {
   allowedRoles: text('allowed_roles').notNull().default('[]'), // JSON array of role IDs (deprecated)
   blockedChannels: text('blocked_channels').notNull().default('[]'), // JSON array of channel IDs
   maxEventsPerGuild: integer('max_events_per_guild').notNull().default(50),
-  enableAutoCleanup: integer('enable_auto_cleanup', { mode: 'boolean' }).notNull().default(true),
+  enableAutoCleanup: boolean('enable_auto_cleanup').notNull().default(true),
   cleanupDays: integer('cleanup_days').notNull().default(30),
   dateFormat: text('date_format').notNull().default('YYYY-MM-DD HH:mm'),
   
   // Metadata
-  createdAt: integer('created_at', { mode: 'timestamp' })
+  createdAt: timestamp('created_at')
     .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .default(sql`now()`),
+  updatedAt: timestamp('updated_at')
     .notNull()
-    .default(sql`(unixepoch())`),
-  lastUsedAt: integer('last_used_at', { mode: 'timestamp' })
+    .default(sql`now()`),
+  lastUsedAt: timestamp('last_used_at')
     .notNull()
-    .default(sql`(unixepoch())`),
-});
+    .default(sql`now()`),
+}, table => ({
+  // Performance indexes for frequent queries
+  guildActiveIdx: index('idx_guild_configs_active').on(table.guildId),
+  reminderChannelIdx: index('idx_guild_configs_reminder_channel').on(table.reminderChannelId),
+  lastUsedIdx: index('idx_guild_configs_last_used').on(table.lastUsedAt),
+}));
 
 // Reactions table - tracks user reactions to events
-export const reactions = sqliteTable(
+export const reactions = pgTable(
   'reactions',
   {
     messageId: text('message_id')
@@ -142,17 +149,17 @@ export const reactions = sqliteTable(
     userId: text('user_id').notNull(),
     guildId: text('guild_id').notNull(),
     emoji: text('emoji').notNull(),
-    isRemoved: integer('is_removed', { mode: 'boolean' }).notNull().default(false),
-    reactedAt: integer('reacted_at', { mode: 'timestamp' })
+    isRemoved: boolean('is_removed').notNull().default(false),
+    reactedAt: timestamp('reacted_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    removedAt: integer('removed_at', { mode: 'timestamp' }),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    removedAt: timestamp('removed_at'),
+    createdAt: timestamp('created_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at')
       .notNull()
-      .default(sql`(unixepoch())`),
+      .default(sql`now()`),
   },
   table => ({
     pk: unique().on(table.messageId, table.userId, table.emoji),
@@ -160,14 +167,15 @@ export const reactions = sqliteTable(
     userIdx: index('idx_reactions_user').on(table.userId),
     guildIdx: index('idx_reactions_guild').on(table.guildId),
     reactedAtIdx: index('idx_reactions_reacted_at').on(table.reactedAt),
+    removedIdx: index('idx_reactions_removed').on(table.isRemoved),
   }),
 );
 
 // Reminder logs table - tracks when reminders were sent
-export const reminderLogs = sqliteTable(
+export const reminderLogs = pgTable(
   'reminder_logs',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     messageId: text('message_id')
       .notNull()
       .references(() => events.messageId, { onDelete: 'cascade' }),
@@ -179,12 +187,12 @@ export const reminderLogs = sqliteTable(
     errorCount: integer('error_count').notNull().default(0),
     errorDetails: text('error_details'), // JSON object with error information
     executionTimeMs: real('execution_time_ms'),
-    sentAt: integer('sent_at', { mode: 'timestamp' })
+    sentAt: timestamp('sent_at')
       .notNull()
-      .default(sql`(unixepoch())`),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`now()`),
+    createdAt: timestamp('created_at')
       .notNull()
-      .default(sql`(unixepoch())`),
+      .default(sql`now()`),
   },
   table => ({
     messageIdx: index('idx_reminder_logs_message').on(table.messageId),

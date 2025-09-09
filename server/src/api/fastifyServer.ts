@@ -25,6 +25,7 @@ import {
 import { getSecurityStats, generateSecurityReport, cleanupRateLimits } from '#/utils/permissions';
 import { registerDashboardRoutes } from './dashboardRoutes';
 import { registerWebSocketRoutes } from './websocketRoutes';
+import { registerAuthRoutes } from './authRoutes';
 
 const logger = createLogger('server');
 
@@ -747,6 +748,9 @@ export async function createServer(): Promise<FastifyInstance> {
     };
   });
 
+  // Register authentication routes
+  await registerAuthRoutes(fastify);
+  
   // Register dashboard routes
   await registerDashboardRoutes(fastify);
 

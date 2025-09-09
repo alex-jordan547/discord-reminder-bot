@@ -1,18 +1,107 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:15-alpine
+    container_name: discord-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-bot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot_user} -d ${POSTGRES_DB:-discord_bot}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Redis Service for Caching and Session Management
+  redis:
+    image: redis:7-alpine
+    container_name: discord-bot-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # Main Discord Bot Application
   discord-reminder-bot:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: discord-reminder-bot
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
 
       # Database Configuration
+      - DATABASE_TYPE=${DATABASE_TYPE:-postgres}
       - DATABASE_PATH=${DATABASE_PATH:-./data/discord_bot.db}
+      
+      # PostgreSQL Configuration
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-discord_bot}
+      - POSTGRES_USER=${POSTGRES_USER:-bot_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+      - POSTGRES_SSL=${POSTGRES_SSL:-false}
+      - POSTGRES_CONNECTION_TIMEOUT=${POSTGRES_CONNECTION_TIMEOUT:-30000}
+      - POSTGRES_MAX_CONNECTIONS=${POSTGRES_MAX_CONNECTIONS:-10}
+
+      # Redis Configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_KEY_PREFIX=${REDIS_KEY_PREFIX:-discord_bot:}
 
       # Reminder Configuration
       - REMINDER_INTERVAL_HOURS=${REMINDER_INTERVAL_HOURS:-24}
@@ -41,23 +130,32 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - TZ=${TZ:-Europe/Paris}
 
+      # Dashboard Configuration
+      - ENABLE_DASHBOARD=${ENABLE_DASHBOARD:-true}
+      - DASHBOARD_PORT=${DASHBOARD_PORT:-3000}
+      - DASHBOARD_HOST=${DASHBOARD_HOST:-0.0.0.0}
+      
       # Test Mode (optional)
       - TEST_MODE=${TEST_MODE:-false}
-      - '${PORT:-3000}:3000'
+
+    ports:
+      - "${PORT:-3000}:3000"
 
     volumes:
-      # Data persistence
+      # SQLite fallback data persistence
       - ./data:/app/data
-      # Logs persistence (optional)
+      # Logs persistence
       - ./logs:/app/logs
+      # Backup storage
+      - ./backups:/app/backups
 
     # Health check - verify bot is running properly
     healthcheck:
-      test: ['CMD', 'node', '-e', "process.exit(0)"]
+      test: ['CMD', 'node', '-e', "const http = require('http'); const req = http.request({hostname:'localhost',port:3000,path:'/health',method:'GET'}, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }); req.on('error', () => process.exit(1)); req.end();"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
     networks:
       - bot-network
@@ -69,12 +167,64 @@ services:
     deploy:
       resources:
         limits:
+          memory: 1024M
+          cpus: '1.0'
+        reservations:
           memory: 512M
           cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
 
+  # Database Migration Service (runs once)
+  db-migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: discord-bot-migration
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-discord_bot}
+      - POSTGRES_USER=${POSTGRES_USER:-bot_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+      - POSTGRES_SSL=${POSTGRES_SSL:-false}
+      - SQLITE_PATH=${DATABASE_PATH:-./data/discord_bot.db}
+      - MIGRATION_MODE=true
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data:ro
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    networks:
+      - bot-network
+    profiles:
+      - migration
+    restart: "no"
+    command: ["node", "dist/scripts/migrate-database.js"]
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/volumes/postgres
+      o: bind
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/volumes/redis
+      o: bind
+
+# Network for service communication
 networks:
   bot-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

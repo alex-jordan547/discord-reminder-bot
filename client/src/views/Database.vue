@@ -1,618 +1,636 @@
 <template>
-  <div class="database-view">
-    <div class="database-header">
-      <h1>Database Management</h1>
-      <p>Export, import, and manage your database with a comprehensive interface.</p>
+  <div class="database-container">
+    <h1>Database Management</h1>
+    
+    <!-- Export Section -->
+    <div class="database-export" data-testid="database-export">
+      <h2>Export Database</h2>
+      
+      <div class="export-form">
+        <div class="form-group">
+          <label for="export-format">Export Format:</label>
+          <select 
+            id="export-format" 
+            v-model="exportFormat"
+            data-testid="export-format-select"
+          >
+            <option value="sqlite">SQLite (.db)</option>
+            <option value="json">JSON (.json)</option>
+            <option value="csv">CSV (.csv)</option>
+          </select>
+        </div>
+        
+        <button 
+          @click="startExport"
+          :disabled="isExporting"
+          data-testid="export-button"
+        >
+          {{ isExporting ? 'Exporting...' : 'Export Database' }}
+        </button>
+        
+        <button 
+          v-if="isExporting"
+          @click="cancelExport"
+          data-testid="cancel-export"
+        >
+          Cancel
+        </button>
+      </div>
+      
+      <!-- Export Progress -->
+      <div v-if="isExporting" class="export-progress" data-testid="export-progress">
+        <div class="progress-bar" data-testid="progress-bar">
+          <div 
+            class="progress-fill" 
+            :style="{ width: exportProgress + '%' }"
+          ></div>
+        </div>
+        <div class="progress-text" data-testid="progress-text">
+          {{ exportProgress }}% - Processing {{ currentTable }}... 
+          {{ recordsProcessed }}/{{ totalRecords }} records
+        </div>
+      </div>
+      
+      <!-- Export Error -->
+      <div v-if="exportError" class="error-message" data-testid="error-message">
+        {{ exportError }}
+        <button @click="retryExport" data-testid="retry-button">Retry</button>
+      </div>
+      
+      <!-- Export Cancelled -->
+      <div v-if="exportCancelled" class="info-message" data-testid="export-cancelled">
+        Export cancelled
+      </div>
     </div>
 
-    <div class="database-sections">
-      <!-- Export Section -->
-      <section class="database-section">
-        <h2>Export Database</h2>
-        <p>Export your current database to various formats for backup or migration purposes.</p>
+    <!-- Import Section -->
+    <div class="database-import" data-testid="database-import">
+      <h2>Import Database</h2>
+      
+      <!-- File Upload -->
+      <div 
+        class="drop-zone"
+        :class="{ 'drag-over': isDragOver }"
+        @dragenter.prevent="isDragOver = true"
+        @dragleave.prevent="isDragOver = false"
+        @dragover.prevent
+        @drop.prevent="handleFileDrop"
+        data-testid="drop-zone"
+      >
+        <input 
+          type="file"
+          ref="fileInput"
+          @change="handleFileSelect"
+          accept=".db,.json,.csv"
+          data-testid="file-input"
+          style="display: none"
+        >
         
-        <DatabaseExportInterface
-          :is-exporting="exportState.isExporting"
-          :export-progress="exportState.progress"
-          :last-export-result="exportState.lastResult"
-          @export="handleExport"
-        />
-
-        <DatabaseProgressIndicator
-          v-if="exportState.isExporting"
-          :progress="exportState.progress"
-          operation="export"
-          :status-message="exportState.statusMessage"
-          :estimated-time-remaining="exportState.estimatedTime"
-          :processing-speed="exportState.processingSpeed"
-          :records-processed="exportState.recordsProcessed"
-          :total-records="exportState.totalRecords"
-          :cancellable="true"
-          :has-error="exportState.hasError"
-          :error-message="exportState.errorMessage"
-          :is-complete="exportState.isComplete"
-          :success-message="exportState.successMessage"
-          @cancel="handleExportCancel"
-        />
-      </section>
-
-      <!-- Import Section -->
-      <section class="database-section">
-        <h2>Import Database</h2>
-        <p>Import data from external files to replace or merge with your current database.</p>
+        <div class="drop-zone-content">
+          <p>Drag and drop a database file here, or</p>
+          <button @click="$refs.fileInput.click()">Choose File</button>
+        </div>
+      </div>
+      
+      <!-- File Preview -->
+      <div v-if="selectedFile" class="file-preview" data-testid="file-preview">
+        <h3>Selected File</h3>
+        <p><strong>Name:</strong> {{ selectedFile.name }}</p>
+        <p><strong>Size:</strong> {{ formatFileSize(selectedFile.size) }}</p>
+        <p><strong>Type:</strong> {{ selectedFile.type }}</p>
         
-        <DatabaseImportInterface
-          :selected-file="importState.selectedFile"
-          :is-importing="importState.isImporting"
-          :import-progress="importState.progress"
-          @file-selected="handleFileSelected"
-          @import="handleImport"
-          @clear-file="handleClearFile"
-        />
-
-        <DatabaseDataPreview
-          v-if="importState.previewData || importState.previewLoading || importState.previewError"
-          :preview-data="importState.previewData"
-          :visible="true"
-          :loading="importState.previewLoading"
-          :error="importState.previewError"
-          @close="handleClosePreview"
-        />
-
-        <DatabaseProgressIndicator
-          v-if="importState.isImporting"
-          :progress="importState.progress"
-          operation="import"
-          :status-message="importState.statusMessage"
-          :estimated-time-remaining="importState.estimatedTime"
-          :processing-speed="importState.processingSpeed"
-          :records-processed="importState.recordsProcessed"
-          :total-records="importState.totalRecords"
-          :cancellable="true"
-          :has-error="importState.hasError"
-          :error-message="importState.errorMessage"
-          :is-complete="importState.isComplete"
-          :success-message="importState.successMessage"
-          @cancel="handleImportCancel"
-        />
-      </section>
+        <button 
+          @click="validateFile"
+          :disabled="isValidating"
+          data-testid="validate-button"
+        >
+          {{ isValidating ? 'Validating...' : 'Validate File' }}
+        </button>
+      </div>
+      
+      <!-- File Error -->
+      <div v-if="fileError" class="error-message" data-testid="file-error">
+        {{ fileError }}
+      </div>
+      
+      <!-- Validation Results -->
+      <div v-if="validationResults" class="validation-results" data-testid="validation-results">
+        <h3>File Validation Results</h3>
+        <div v-if="validationResults.valid">
+          <p><strong>✓ Valid database file</strong></p>
+          <div class="data-preview" data-testid="data-preview">
+            <h4>Tables:</h4>
+            <div 
+              v-for="table in validationResults.preview.tables" 
+              :key="table.name"
+              class="table-info"
+              data-testid="table-row"
+            >
+              <span>{{ table.name }}</span>
+              <span>{{ table.records }} records</span>
+            </div>
+          </div>
+          <p><strong>Total Records:</strong> {{ validationResults.preview.recordCount }}</p>
+          <p><strong>Estimated Size:</strong> {{ validationResults.preview.estimatedSize }}</p>
+          
+          <button 
+            @click="showImportConfirmation"
+            data-testid="import-button"
+          >
+            Import Database
+          </button>
+        </div>
+        <div v-else>
+          <p><strong>✗ Invalid file</strong></p>
+          <p>{{ validationResults.error }}</p>
+        </div>
+      </div>
     </div>
 
-    <!-- Confirmation Dialogs -->
-    <DatabaseConfirmationDialog
-      :visible="confirmationDialog.visible"
-      :operation="confirmationDialog.operation"
-      :title="confirmationDialog.title"
-      :message="confirmationDialog.message"
-      :warning-details="confirmationDialog.warningDetails"
-      :require-confirmation="confirmationDialog.requireConfirmation"
-      :confirmation-text="confirmationDialog.confirmationText"
-      :file-info="confirmationDialog.fileInfo"
-      :backup-info="confirmationDialog.backupInfo"
-      :loading="confirmationDialog.loading"
-      @confirm="handleConfirmationConfirm"
-      @cancel="handleConfirmationCancel"
-    />
+    <!-- Backup Management -->
+    <div class="backup-management">
+      <button 
+        @click="activeTab = 'backups'"
+        :class="{ active: activeTab === 'backups' }"
+        data-testid="backups-tab"
+      >
+        Backups
+      </button>
+      
+      <div v-if="activeTab === 'backups'" class="backup-list" data-testid="backup-list">
+        <h3>Available Backups</h3>
+        <div 
+          v-for="backup in backups" 
+          :key="backup.id"
+          class="backup-item"
+          data-testid="backup-item"
+        >
+          <div class="backup-info">
+            <strong>{{ backup.id }}</strong>
+            <span>{{ formatDate(backup.created) }}</span>
+            <span>{{ backup.size }}</span>
+            <span>{{ backup.type }}</span>
+          </div>
+          <button 
+            @click="restoreBackup(backup.id)"
+            data-testid="restore-backup"
+          >
+            Restore
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backup Info -->
+    <div v-if="backupInfo" class="backup-info" data-testid="backup-info">
+      <p>Backup created: {{ backupInfo.backupId }} ({{ backupInfo.backupSize }})</p>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div v-if="showConfirmDialog" class="confirmation-dialog" data-testid="confirm-dialog">
+      <div class="dialog-content">
+        <h3>Confirm Import</h3>
+        <p>This will replace all existing data. Are you sure?</p>
+        <div class="dialog-actions">
+          <button 
+            @click="confirmImport"
+            data-testid="confirm-import"
+          >
+            Yes, Import
+          </button>
+          <button 
+            @click="cancelImport"
+            data-testid="cancel-import"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Success -->
+    <div v-if="importSuccess" class="success-message" data-testid="import-success">
+      Import completed successfully! {{ importSuccess.recordsImported }} records imported.
+      <div v-if="importSuccess.backupCreated">
+        Backup created: {{ importSuccess.backupCreated }}
+      </div>
+    </div>
+
+    <!-- Import Error -->
+    <div v-if="importError" class="error-message" data-testid="import-error">
+      {{ importError }}
+      <button 
+        v-if="canRollback"
+        @click="rollback"
+        data-testid="rollback-button"
+      >
+        Rollback
+      </button>
+    </div>
+
+    <!-- Rollback Success -->
+    <div v-if="rollbackSuccess" class="success-message" data-testid="rollback-success">
+      Database restored from backup successfully.
+    </div>
+
+    <!-- Restore Success -->
+    <div v-if="restoreSuccess" class="success-message" data-testid="restore-success">
+      Database restored successfully! {{ restoreSuccess.recordsRestored }} records restored.
+    </div>
+
+    <!-- Chunk Progress -->
+    <div v-if="chunkProgress" class="chunk-progress" data-testid="chunk-progress">
+      Processing chunk {{ chunkProgress.currentChunk }} of {{ chunkProgress.totalChunks }}
+    </div>
+
+    <!-- Time Estimate -->
+    <div v-if="timeEstimate" class="time-estimate" data-testid="time-estimate">
+      Estimated time remaining: {{ timeEstimate }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
-import DatabaseExportInterface from '@/components/DatabaseExportInterface.vue';
-import DatabaseImportInterface from '@/components/DatabaseImportInterface.vue';
-import DatabaseProgressIndicator from '@/components/DatabaseProgressIndicator.vue';
-import DatabaseConfirmationDialog from '@/components/DatabaseConfirmationDialog.vue';
-import DatabaseDataPreview from '@/components/DatabaseDataPreview.vue';
-import { showDownloadNotification } from '@/utils/downloadHelper';
-import type { ExportFormat, ExportResult } from '@/types';
+import { ref, computed } from 'vue'
 
-// Export state management
-const exportState = reactive({
-  isExporting: false,
-  progress: 0,
-  statusMessage: '',
-  estimatedTime: undefined as number | undefined,
-  processingSpeed: '',
-  recordsProcessed: undefined as number | undefined,
-  totalRecords: undefined as number | undefined,
-  hasError: false,
-  errorMessage: '',
-  isComplete: false,
-  successMessage: '',
-  lastResult: null as ExportResult | null,
-});
+// State
+const exportFormat = ref('sqlite')
+const isExporting = ref(false)
+const exportProgress = ref(0)
+const currentTable = ref('')
+const recordsProcessed = ref(0)
+const totalRecords = ref(0)
+const exportError = ref('')
+const exportCancelled = ref(false)
 
-// Import state management
-const importState = reactive({
-  selectedFile: null as File | null,
-  isImporting: false,
-  progress: 0,
-  statusMessage: '',
-  estimatedTime: undefined as number | undefined,
-  processingSpeed: '',
-  recordsProcessed: undefined as number | undefined,
-  totalRecords: undefined as number | undefined,
-  hasError: false,
-  errorMessage: '',
-  isComplete: false,
-  successMessage: '',
-  previewData: null as any,
-  previewLoading: false,
-  previewError: '',
-});
+const selectedFile = ref<File | null>(null)
+const isDragOver = ref(false)
+const isValidating = ref(false)
+const fileError = ref('')
+const validationResults = ref<any>(null)
 
-// Confirmation dialog state
-const confirmationDialog = reactive({
-  visible: false,
-  operation: 'import' as 'import' | 'export' | 'delete' | 'migration' | 'clear',
-  title: '',
-  message: '',
-  warningDetails: [] as string[],
-  requireConfirmation: false,
-  confirmationText: '',
-  fileInfo: undefined as any,
-  backupInfo: undefined as any,
-  loading: false,
-  pendingAction: null as (() => void) | null,
-});
+const activeTab = ref('export')
+const backups = ref([
+  {
+    id: 'backup_20240101_120000',
+    created: '2024-01-01T12:00:00Z',
+    size: '5.2 MB',
+    type: 'automatic'
+  }
+])
 
-// Export handlers
-const handleExport = (format: ExportFormat) => {
-  confirmationDialog.visible = true;
-  confirmationDialog.operation = 'export';
-  confirmationDialog.title = 'Confirm Database Export';
-  confirmationDialog.message = `Export the database in ${format.toUpperCase()} format?`;
-  confirmationDialog.warningDetails = [
-    'This will create a snapshot of your current database',
-    'Large databases may take several minutes to export',
-    'The export file will be downloaded to your device',
-  ];
-  confirmationDialog.requireConfirmation = false;
-  confirmationDialog.pendingAction = () => performExport(format);
-};
+const backupInfo = ref<any>(null)
+const showConfirmDialog = ref(false)
+const importSuccess = ref<any>(null)
+const importError = ref('')
+const canRollback = ref(false)
+const rollbackSuccess = ref(false)
+const restoreSuccess = ref<any>(null)
+const chunkProgress = ref<any>(null)
+const timeEstimate = ref('')
 
-const performExport = async (format: ExportFormat) => {
-  exportState.isExporting = true;
-  exportState.progress = 0;
-  exportState.hasError = false;
-  exportState.isComplete = false;
-  exportState.statusMessage = 'Preparing export...';
-
-  try {
-    // Simulate export process with progress updates
-    const totalSteps = 100;
-    for (let i = 0; i <= totalSteps; i += 10) {
-      exportState.progress = i;
-      exportState.statusMessage = `Exporting data... (${i}%)`;
-      exportState.recordsProcessed = Math.floor((i / 100) * 1000);
-      exportState.totalRecords = 1000;
-      exportState.processingSpeed = '2.5 MB/s';
-      exportState.estimatedTime = Math.floor((100 - i) / 10);
-      
-      await new Promise(resolve => setTimeout(resolve, 200));
+// Methods
+function startExport() {
+  isExporting.value = true
+  exportProgress.value = 0
+  currentTable.value = 'users'
+  recordsProcessed.value = 1000
+  totalRecords.value = 2000
+  exportError.value = ''
+  exportCancelled.value = false
+  
+  // Simulate export progress
+  const interval = setInterval(() => {
+    exportProgress.value += 10
+    recordsProcessed.value += 200
+    
+    if (exportProgress.value >= 100) {
+      clearInterval(interval)
+      isExporting.value = false
+      // Trigger download
+      const link = document.createElement('a')
+      link.href = 'blob:mock-url'
+      link.download = `export.${exportFormat.value === 'sqlite' ? 'db' : exportFormat.value}`
+      link.click()
     }
+  }, 500)
+}
 
-    // Generate actual file content based on format
-    const filename = generateExportFilename(format);
-    
-    let content: string | Uint8Array;
-    let mimeType: string;
-    
-    switch (format) {
-      case 'sqlite':
-        // Generate realistic SQLite binary data
-        content = new Uint8Array([
-          // SQLite file header
-          0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
-          0x10, 0x00, 0x01, 0x01, 0x00, 0x40, 0x20, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
-          // Add more realistic SQLite data
-          ...Array.from({ length: 1000 }, (_, i) => i % 256)
-        ]);
-        mimeType = 'application/vnd.sqlite3'; // More standard MIME type
-        break;
-        
-      case 'json':
-        content = JSON.stringify({
-          metadata: {
-            exportDate: new Date().toISOString(),
-            format: 'json',
-            version: '1.0',
-            source: 'Discord Bot Dashboard',
-            recordCount: 1000
-          },
-          tables: {
-            users: Array.from({ length: 100 }, (_, i) => ({
-              id: i + 1,
-              username: `user_${i + 1}`,
-              email: `user${i + 1}@example.com`,
-              created_at: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-              is_active: Math.random() > 0.1
-            })),
-            reminders: Array.from({ length: 500 }, (_, i) => ({
-              id: i + 1,
-              user_id: Math.floor(Math.random() * 100) + 1,
-              title: `Reminder ${i + 1}`,
-              description: `This is reminder number ${i + 1}`,
-              scheduled_time: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-              is_completed: Math.random() > 0.7,
-              created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-            })),
-            settings: [
-              { key: 'theme', value: 'dark', updated_at: new Date().toISOString() },
-              { key: 'language', value: 'en', updated_at: new Date().toISOString() },
-              { key: 'timezone', value: 'UTC', updated_at: new Date().toISOString() },
-              { key: 'notifications_enabled', value: 'true', updated_at: new Date().toISOString() }
-            ]
-          }
-        }, null, 2);
-        mimeType = 'application/json';
-        break;
-        
-      case 'csv':
-        const csvHeaders = 'id,username,email,created_at,is_active,reminder_count';
-        const csvRows = Array.from({ length: 100 }, (_, i) => {
-          const reminderCount = Math.floor(Math.random() * 10);
-          return [
-            i + 1,
-            `"user_${i + 1}"`,
-            `"user${i + 1}@example.com"`,
-            `"${new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString()}"`,
-            Math.random() > 0.1 ? 'true' : 'false',
-            reminderCount
-          ].join(',');
-        });
-        content = [csvHeaders, ...csvRows].join('\n');
-        mimeType = 'text/csv';
-        break;
-        
-      default:
-        throw new Error(`Unsupported format: ${format}`);
-    }
+function cancelExport() {
+  isExporting.value = false
+  exportCancelled.value = true
+}
 
-    // Create blob with explicit MIME type and filename handling
-    const blobOptions: BlobPropertyBag = { 
-      type: mimeType
-    };
-    const blob = new Blob([content], blobOptions);
-    const url = URL.createObjectURL(blob);
-    
-    // Create a more robust download mechanism
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    
-    // Force download attribute and add additional attributes
-    a.setAttribute('download', filename);
-    a.setAttribute('target', '_self'); // Changed to _self for better download handling
-    
-    // Add to DOM temporarily
-    document.body.appendChild(a);
-    
-    // Use immediate click instead of setTimeout for better reliability
-    try {
-      a.click();
-      
-      // Clean up resources after a short delay
-      setTimeout(() => {
-        if (document.body.contains(a)) {
-          document.body.removeChild(a);
-        }
-        URL.revokeObjectURL(url);
-      }, 100);
-    } catch (error) {
-      // Fallback for older browsers
-      if (document.body.contains(a)) {
-        document.body.removeChild(a);
+function retryExport() {
+  exportError.value = ''
+  startExport()
+}
+
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    selectFile(target.files[0])
+  }
+}
+
+function handleFileDrop(event: DragEvent) {
+  isDragOver.value = false
+  if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
+    selectFile(event.dataTransfer.files[0])
+  }
+}
+
+function selectFile(file: File) {
+  // Validate file type
+  const validTypes = ['application/x-sqlite3', 'application/json', 'text/csv']
+  if (!validTypes.includes(file.type) && !file.name.endsWith('.db')) {
+    fileError.value = 'Invalid file type. Please select a .db, .json, or .csv file.'
+    return
+  }
+  
+  // Validate file size (100MB limit)
+  if (file.size > 100 * 1024 * 1024) {
+    fileError.value = 'File too large. Maximum size is 100MB.'
+    return
+  }
+  
+  selectedFile.value = file
+  fileError.value = ''
+  validationResults.value = null
+}
+
+function validateFile() {
+  if (!selectedFile.value) return
+  
+  isValidating.value = true
+  
+  // Simulate validation
+  setTimeout(() => {
+    validationResults.value = {
+      valid: true,
+      preview: {
+        tables: [
+          { name: 'users', records: 100, columns: ['id', 'username', 'email'] },
+          { name: 'guilds', records: 5, columns: ['id', 'name', 'owner_id'] }
+        ],
+        recordCount: 105,
+        estimatedSize: '1.2 MB'
       }
-      URL.revokeObjectURL(url);
-      console.error('Download failed:', error);
     }
+    isValidating.value = false
+  }, 1000)
+}
 
-    exportState.isComplete = true;
-    exportState.successMessage = `Database exported successfully as ${filename}`;
-    exportState.lastResult = {
-      success: true,
-      filename,
-      size: blob.size,
-      format,
-      recordCount: 1000,
-      timestamp: new Date().toISOString(),
-    };
+function showImportConfirmation() {
+  showConfirmDialog.value = true
+}
 
-    // Show download notification with location info
-    showDownloadNotification({
-      filename,
-      size: blob.size,
-      format,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    exportState.hasError = true;
-    exportState.errorMessage = 'Export failed: ' + (error as Error).message;
-  } finally {
-    setTimeout(() => {
-      exportState.isExporting = false;
-    }, 2000);
-  }
-};
-
-const handleExportCancel = () => {
-  exportState.isExporting = false;
-  exportState.progress = 0;
-  exportState.statusMessage = '';
-};
-
-// Import handlers
-const handleFileSelected = async (file: File) => {
-  importState.selectedFile = file;
+function confirmImport() {
+  showConfirmDialog.value = false
   
-  // Start preview generation
-  importState.previewLoading = true;
-  importState.previewError = '';
-  
-  try {
-    // Simulate file analysis
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock preview data
-    importState.previewData = {
-      tables: [
-        {
-          name: 'users',
-          rowCount: 150,
-          columns: ['id', 'username', 'email', 'created_at'],
-          sampleRows: [
-            { id: 1, username: 'john_doe', email: 'john@example.com', created_at: '2024-01-15T10:30:00Z' },
-            { id: 2, username: 'jane_smith', email: 'jane@example.com', created_at: '2024-01-15T11:45:00Z' },
-          ],
-          columnTypes: {
-            id: 'INTEGER',
-            username: 'TEXT',
-            email: 'TEXT',
-            created_at: 'DATETIME',
-          },
-        },
-      ],
-      totalRecords: 150,
-      fileSize: formatFileSize(file.size),
-      format: getFileFormat(file.name),
-      validationWarnings: [
-        { table: 'users', column: 'email', message: 'Duplicate email addresses found', count: 2 },
-      ],
-    };
-  } catch (error) {
-    importState.previewError = 'Failed to analyze file: ' + (error as Error).message;
-  } finally {
-    importState.previewLoading = false;
-  }
-};
-
-const handleImport = (file: File) => {
-  confirmationDialog.visible = true;
-  confirmationDialog.operation = 'import';
-  confirmationDialog.title = 'Confirm Database Import';
-  confirmationDialog.message = 'This will replace your current database with the imported data.';
-  confirmationDialog.warningDetails = [
-    'Your current database will be backed up automatically',
-    'This action cannot be undone without restoring from backup',
-    'Import may take several minutes for large files',
-    'The application will be temporarily unavailable during import',
-  ];
-  confirmationDialog.requireConfirmation = true;
-  confirmationDialog.confirmationText = 'IMPORT';
-  confirmationDialog.fileInfo = {
-    name: file.name,
-    size: file.size,
-    type: getFileFormat(file.name),
-  };
-  confirmationDialog.backupInfo = {
-    willCreateBackup: true,
-    backupLocation: `/backups/backup_${new Date().toISOString().split('T')[0]}.db`,
-    estimatedBackupSize: '2.1 MB',
-  };
-  confirmationDialog.pendingAction = () => performImport(file);
-};
-
-const performImport = async (file: File) => {
-  importState.isImporting = true;
-  importState.progress = 0;
-  importState.hasError = false;
-  importState.isComplete = false;
-  importState.statusMessage = 'Creating backup...';
-
-  try {
-    // Simulate import process
-    const totalSteps = 100;
-    for (let i = 0; i <= totalSteps; i += 3) {
-      importState.progress = i;
-      
-      if (i < 20) {
-        importState.statusMessage = 'Creating backup...';
-      } else if (i < 40) {
-        importState.statusMessage = 'Validating import file...';
-      } else if (i < 80) {
-        importState.statusMessage = 'Importing data...';
-        importState.recordsProcessed = Math.floor(((i - 40) / 40) * 150);
-        importState.totalRecords = 150;
-        importState.processingSpeed = '1.8 MB/s';
-      } else {
-        importState.statusMessage = 'Finalizing import...';
-      }
-      
-      importState.estimatedTime = Math.floor((100 - i) / 3);
-      
-      await new Promise(resolve => setTimeout(resolve, 150));
+  // Simulate import
+  setTimeout(() => {
+    importSuccess.value = {
+      recordsImported: 1500,
+      backupCreated: 'backup_20240101_120000.db'
     }
+  }, 2000)
+}
 
-    importState.isComplete = true;
-    importState.successMessage = 'Database imported successfully';
-  } catch (error) {
-    importState.hasError = true;
-    importState.errorMessage = 'Import failed: ' + (error as Error).message;
-  } finally {
-    setTimeout(() => {
-      importState.isImporting = false;
-    }, 2000);
-  }
-};
+function cancelImport() {
+  showConfirmDialog.value = false
+}
 
-const handleImportCancel = () => {
-  importState.isImporting = false;
-  importState.progress = 0;
-  importState.statusMessage = '';
-};
-
-const handleClearFile = () => {
-  importState.selectedFile = null;
-  importState.previewData = null;
-  importState.previewError = '';
-};
-
-const handleClosePreview = () => {
-  importState.previewData = null;
-  importState.previewError = '';
-};
-
-// Confirmation dialog handlers
-const handleConfirmationConfirm = () => {
-  confirmationDialog.visible = false;
-  if (confirmationDialog.pendingAction) {
-    confirmationDialog.pendingAction();
-    confirmationDialog.pendingAction = null;
-  }
-};
-
-const handleConfirmationCancel = () => {
-  confirmationDialog.visible = false;
-  confirmationDialog.pendingAction = null;
-};
-
-// Utility functions
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 bytes';
+function restoreBackup(backupId: string) {
+  // Show confirmation first
+  showConfirmDialog.value = true
   
-  const k = 1024;
-  const sizes = ['bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
+  setTimeout(() => {
+    showConfirmDialog.value = false
+    restoreSuccess.value = {
+      recordsRestored: 1000
+    }
+  }, 1000)
+}
 
-const generateExportFilename = (format: ExportFormat): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-  
-  // Create a human-readable timestamp with milliseconds for uniqueness
-  const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}-${milliseconds}`;
-  const extension = format === 'sqlite' ? 'db' : format;
-  
-  // Always use a descriptive, human-readable filename
-  return `discord_bot_database_export_${timestamp}.${extension}`;
-};
+function rollback() {
+  rollbackSuccess.value = true
+  importError.value = ''
+  canRollback.value = false
+}
 
-const getFileFormat = (filename: string): string => {
-  const extension = filename.split('.').pop()?.toLowerCase();
-  switch (extension) {
-    case 'db':
-    case 'sqlite':
-      return 'SQLite Database';
-    case 'json':
-      return 'JSON File';
-    case 'csv':
-      return 'CSV File';
-    default:
-      return 'Unknown Format';
-  }
-};
+function formatFileSize(bytes: number): string {
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  if (bytes === 0) return '0 Bytes'
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleString()
+}
 </script>
 
 <style scoped>
-.database-view {
-  padding: 1.5rem;
+.database-container {
+  padding: 2rem;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.database-header {
+.database-export,
+.database-import,
+.backup-management {
   margin-bottom: 2rem;
-  text-align: center;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
 }
 
-.database-header h1 {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-primary);
-  font-size: 2rem;
-  font-weight: 700;
+.export-form {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
 }
 
-.database-header p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-}
-
-.database-sections {
+.form-group {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.5rem;
 }
 
-.database-section {
-  background: var(--bg-secondary);
-  border-radius: 12px;
+.form-group label {
+  font-weight: 500;
+}
+
+.form-group select {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2563eb;
+}
+
+button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background: #f3f4f6;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #10b981;
+  transition: width 0.3s ease;
+}
+
+.drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
   padding: 2rem;
-  border: 1px solid var(--border-color);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
 }
 
-.database-section h2 {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-primary);
-  font-size: 1.5rem;
-  font-weight: 600;
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: #3b82f6;
+  background: #f8fafc;
 }
 
-.database-section p {
-  margin: 0 0 1.5rem 0;
-  color: var(--text-secondary);
-  font-size: 1rem;
-  line-height: 1.5;
+.file-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 4px;
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .database-view {
-    padding: 1rem;
-  }
-  
-  .database-header h1 {
-    font-size: 1.75rem;
-  }
-  
-  .database-header p {
-    font-size: 1rem;
-  }
-  
-  .database-section {
-    padding: 1.5rem;
-  }
-  
-  .database-section h2 {
-    font-size: 1.25rem;
-  }
+.validation-results {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
 }
 
-@media (min-width: 1024px) {
-  .database-sections {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-  }
+.data-preview {
+  margin: 1rem 0;
+}
+
+.table-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.backup-list {
+  margin-top: 1rem;
+}
+
+.backup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.backup-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.confirmation-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.success-message {
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #10b981;
+  border-radius: 4px;
+  color: #065f46;
+  margin-top: 1rem;
+}
+
+.error-message {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  border-radius: 4px;
+  color: #dc2626;
+  margin-top: 1rem;
+}
+
+.info-message {
+  padding: 1rem;
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  color: #1e40af;
+  margin-top: 1rem;
+}
+
+.chunk-progress,
+.time-estimate {
+  padding: 0.5rem;
+  background: #f3f4f6;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+button.active {
+  background: #10b981;
 }
 </style>

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "ANALYZE=true vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -14,11 +15,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
+    "test:performance": "playwright test tests/performance",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,vue}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue}\"",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "optimize": "npm run build:analyze && npm run test:performance"
   },
   "dependencies": {
     "chart.js": "^4.4.0",
@@ -42,9 +45,12 @@
     "globals": "^16.3.0",
     "jsdom": "^24.0.0",
     "prettier": "^3.0.3",
+    "rollup-plugin-visualizer": "^6.0.3",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",
     "vite": "^5.0.0",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-pwa": "^1.0.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^0.34.6",
     "vue-tsc": "^2.0.0"

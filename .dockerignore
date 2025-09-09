@@ -84,11 +84,10 @@ bot_original.py
 bot_new.py
 bot_new_unused.py
 
-# Development and migration scripts
+# Development and migration scripts (but keep Docker migration scripts)
 verify_imports.py
 test_loading.py
 test_compatibility.json
-scripts/
 run_dev.sh
 Makefile
 

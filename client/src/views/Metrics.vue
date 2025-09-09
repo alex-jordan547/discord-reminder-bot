@@ -194,10 +194,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import SystemMetricsChart from '@/components/SystemMetricsChart.vue';
-import BotMetricsChart from '@/components/BotMetricsChart.vue';
-import InteractiveChart from '@/components/InteractiveChart.vue';
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
+const SystemMetricsChart = defineAsyncComponent(() => import('@/components/SystemMetricsChart.vue'));
+const BotMetricsChart = defineAsyncComponent(() => import('@/components/BotMetricsChart.vue'));
+const InteractiveChart = defineAsyncComponent(() => import('@/components/InteractiveChart.vue'));
 import AlertDisplay from '@/components/AlertDisplay.vue';
 import type { SystemMetrics, BotMetrics, MonitoringMetrics, Alert } from '@/types';
 
