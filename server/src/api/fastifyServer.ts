@@ -23,6 +23,8 @@ import {
   generateErrorReport,
 } from '#/utils/errorRecovery';
 import { getSecurityStats, generateSecurityReport, cleanupRateLimits } from '#/utils/permissions';
+import { registerDashboardRoutes } from './dashboardRoutes';
+import { registerWebSocketRoutes } from './websocketRoutes';
 
 const logger = createLogger('server');
 
@@ -744,6 +746,12 @@ export async function createServer(): Promise<FastifyInstance> {
       message: Settings.NODE_ENV === 'development' ? error.message : 'Something went wrong',
     };
   });
+
+  // Register dashboard routes
+  await registerDashboardRoutes(fastify);
+
+  // Register WebSocket routes
+  await registerWebSocketRoutes(fastify);
 
   // Schedule periodic cleanup
   setInterval(() => {
