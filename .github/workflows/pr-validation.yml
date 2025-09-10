@@ -1,0 +1,252 @@
+name: 🔍 PR Validation
+
+on:
+  pull_request:
+    branches: [main, preprod]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: 📁 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.changes.outputs.client }}
+      server: ${{ steps.changes.outputs.server }}
+      shared: ${{ steps.changes.outputs.shared }}
+      docker: ${{ steps.changes.outputs.docker }}
+      scripts: ${{ steps.changes.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            client:
+              - 'client/**'
+              - 'client/package.json'
+              - 'client/yarn.lock'
+            server:
+              - 'server/**'
+              - 'server/package.json'
+              - 'server/yarn.lock'
+            shared:
+              - 'shared/**'
+              - 'shared/package.json'
+            docker:
+              - 'Dockerfile*'
+              - 'docker-compose*.yml'
+            scripts:
+              - 'scripts/**'
+              - '.github/workflows/**'
+
+  lint-client:
+    name: 🎨 Client Lint & Format
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: 'client/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🎨 Lint check
+        run: yarn lint
+      
+      - name: 📝 Format check
+        run: yarn format:check
+
+  lint-server:
+    name: 🎨 Server Lint & Format  
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: 'server/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🎨 Lint check
+        run: yarn lint
+      
+      - name: 📝 Format check  
+        run: yarn format:check
+
+  typecheck:
+    name: 🔷 Type Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.client == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.shared == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install root dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🔷 Type check all projects
+        run: yarn type-check
+
+  test-client:
+    name: 🧪 Client Tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: 'client/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🧪 Run unit tests
+        run: yarn test:coverage
+      
+      - name: 📊 Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          flags: client
+          file: client/coverage/lcov.info
+
+  test-server:
+    name: 🧪 Server Tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: 'server/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🧪 Run unit tests
+        env:
+          DATABASE_TYPE: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        run: yarn test:coverage
+      
+      - name: 📊 Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          flags: server
+          file: server/coverage/lcov.info
+
+  build-check:
+    name: 🏗️ Build Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.client == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.shared == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🏗️ Build all projects
+        run: yarn build
+
+  security-audit:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🔒 Audit dependencies
+        run: |
+          echo "🔍 Root audit"
+          yarn audit --level high || true
+          
+          echo "🔍 Client audit" 
+          cd client && yarn audit --level high || true
+          
+          echo "🔍 Server audit"
+          cd ../server && yarn audit --level high || true
+
+  pr-summary:
+    name: 📋 PR Summary
+    runs-on: ubuntu-latest
+    needs: [changes, lint-client, lint-server, typecheck, test-client, test-server, build-check, security-audit]
+    if: always()
+    steps:
+      - name: 📋 Generate summary
+        run: |
+          echo "## 🔍 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎨 Client Lint | ${{ needs.lint-client.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎨 Server Lint | ${{ needs.lint-server.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔷 Type Check | ${{ needs.typecheck.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Client Tests | ${{ needs.test-client.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Server Tests | ${{ needs.test-server.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏗️ Build Check | ${{ needs.build-check.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Security | ${{ needs.security-audit.result }} |" >> $GITHUB_STEP_SUMMARY

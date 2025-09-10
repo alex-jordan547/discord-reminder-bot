@@ -1,0 +1,251 @@
+name: 📊 Quality Dashboard
+
+on:
+  schedule:
+    # Run every day at 08:00 UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      scan-type:
+        description: 'Type of scan to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - security
+          - dependencies
+          - performance
+
+concurrency:
+  group: quality-dashboard
+  cancel-in-progress: false
+
+jobs:
+  security-audit:
+    name: 🔒 Daily Security Audit
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan-type == 'security' || github.event.inputs.scan-type == 'full' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🔒 Comprehensive security audit
+        run: |
+          echo "## 🔒 Security Audit Report" >> security-report.md
+          echo "Date: $(date)" >> security-report.md
+          echo "" >> security-report.md
+          
+          echo "### Root Dependencies" >> security-report.md
+          yarn audit --json | jq -r '
+            select(.type == "auditSummary") | 
+            "- Vulnerabilities: \(.data.vulnerabilities.total // 0)\n- High: \(.data.vulnerabilities.high // 0)\n- Critical: \(.data.vulnerabilities.critical // 0)"
+          ' >> security-report.md || echo "- No vulnerabilities found" >> security-report.md
+          
+          echo "" >> security-report.md
+          echo "### Client Dependencies" >> security-report.md
+          cd client
+          yarn audit --json | jq -r '
+            select(.type == "auditSummary") | 
+            "- Vulnerabilities: \(.data.vulnerabilities.total // 0)\n- High: \(.data.vulnerabilities.high // 0)\n- Critical: \(.data.vulnerabilities.critical // 0)"
+          ' >> ../security-report.md || echo "- No vulnerabilities found" >> ../security-report.md
+          
+          cd ..
+          echo "" >> security-report.md
+          echo "### Server Dependencies" >> security-report.md
+          cd server
+          yarn audit --json | jq -r '
+            select(.type == "auditSummary") | 
+            "- Vulnerabilities: \(.data.vulnerabilities.total // 0)\n- High: \(.data.vulnerabilities.high // 0)\n- Critical: \(.data.vulnerabilities.critical // 0)"
+          ' >> ../security-report.md || echo "- No vulnerabilities found" >> ../security-report.md
+      
+      - name: 📊 Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-$(date +%Y%m%d)
+          path: security-report.md
+
+  dependency-analysis:
+    name: 📦 Dependency Analysis
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan-type == 'dependencies' || github.event.inputs.scan-type == 'full' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Analyze dependencies
+        run: |
+          echo "## 📦 Dependency Analysis" >> dependency-report.md
+          echo "Date: $(date)" >> dependency-report.md
+          echo "" >> dependency-report.md
+          
+          echo "### Outdated Dependencies" >> dependency-report.md
+          echo "\`\`\`" >> dependency-report.md
+          yarn outdated || true >> dependency-report.md
+          echo "\`\`\`" >> dependency-report.md
+          
+          echo "" >> dependency-report.md
+          echo "### License Information" >> dependency-report.md
+          yarn licenses list --json | jq -r '
+            .data.body[] | 
+            select(.vendorName != null) | 
+            "- \(.name): \(.license)"
+          ' >> dependency-report.md || echo "License information not available" >> dependency-report.md
+      
+      - name: 📊 Upload dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-analysis-$(date +%Y%m%d)
+          path: dependency-report.md
+
+  performance-benchmarks:
+    name: ⚡ Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan-type == 'performance' || github.event.inputs.scan-type == 'full' || github.event_name == 'schedule'
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: ⚡ Run performance benchmarks
+        env:
+          DATABASE_TYPE: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        run: |
+          echo "## ⚡ Performance Benchmarks" >> performance-report.md
+          echo "Date: $(date)" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          echo "### Build Performance" >> performance-report.md
+          START_TIME=$(date +%s)
+          yarn build
+          END_TIME=$(date +%s)
+          BUILD_TIME=$((END_TIME - START_TIME))
+          echo "- Build time: ${BUILD_TIME}s" >> performance-report.md
+          
+          echo "" >> performance-report.md
+          echo "### Bundle Sizes" >> performance-report.md
+          if [ -d "client/dist" ]; then
+            CLIENT_SIZE=$(du -sh client/dist | cut -f1)
+            echo "- Client bundle: $CLIENT_SIZE" >> performance-report.md
+          fi
+          
+          if [ -d "server/dist" ]; then
+            SERVER_SIZE=$(du -sh server/dist | cut -f1)
+            echo "- Server bundle: $SERVER_SIZE" >> performance-report.md
+          fi
+          
+          echo "" >> performance-report.md
+          echo "### Test Performance" >> performance-report.md
+          START_TIME=$(date +%s)
+          yarn test || true
+          END_TIME=$(date +%s)
+          TEST_TIME=$((END_TIME - START_TIME))
+          echo "- Test execution: ${TEST_TIME}s" >> performance-report.md
+      
+      - name: 📊 Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-benchmarks-$(date +%Y%m%d)
+          path: performance-report.md
+
+  code-metrics:
+    name: 📏 Code Metrics
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan-type == 'full' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 📏 Generate code metrics
+        run: |
+          echo "## 📏 Code Metrics" >> metrics-report.md
+          echo "Date: $(date)" >> metrics-report.md
+          echo "" >> metrics-report.md
+          
+          echo "### Repository Statistics" >> metrics-report.md
+          echo "- Total commits: $(git rev-list --count HEAD)" >> metrics-report.md
+          echo "- Contributors: $(git shortlog -sn | wc -l)" >> metrics-report.md
+          echo "- Branches: $(git branch -r | wc -l)" >> metrics-report.md
+          
+          echo "" >> metrics-report.md
+          echo "### File Statistics" >> metrics-report.md
+          echo "\`\`\`" >> metrics-report.md
+          find . -name "*.ts" -o -name "*.js" -o -name "*.vue" | grep -v node_modules | wc -l | xargs echo "TypeScript/JS/Vue files:"
+          find . -name "*.ts" -o -name "*.js" -o -name "*.vue" | grep -v node_modules | xargs wc -l | tail -1
+          echo "\`\`\`" >> metrics-report.md
+          
+          echo "" >> metrics-report.md
+          echo "### Recent Activity" >> metrics-report.md
+          echo "Last 10 commits:" >> metrics-report.md
+          echo "\`\`\`" >> metrics-report.md
+          git log --oneline -10 >> metrics-report.md
+          echo "\`\`\`" >> metrics-report.md
+      
+      - name: 📊 Upload metrics report
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-metrics-$(date +%Y%m%d)
+          path: metrics-report.md
+
+  quality-summary:
+    name: 📋 Quality Summary
+    runs-on: ubuntu-latest
+    needs: [security-audit, dependency-analysis, performance-benchmarks, code-metrics]
+    if: always()
+    steps:
+      - name: 📋 Generate quality dashboard
+        run: |
+          echo "## 📊 Daily Quality Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Security Audit | ${{ needs.security-audit.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Dependencies | ${{ needs.dependency-analysis.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⚡ Performance | ${{ needs.performance-benchmarks.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📏 Code Metrics | ${{ needs.code-metrics.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📈 Trends & Recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor security vulnerabilities daily" >> $GITHUB_STEP_SUMMARY
+          echo "- Keep dependencies up to date" >> $GITHUB_STEP_SUMMARY
+          echo "- Track build performance trends" >> $GITHUB_STEP_SUMMARY
+          echo "- Maintain code quality standards" >> $GITHUB_STEP_SUMMARY

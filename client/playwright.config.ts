@@ -54,7 +54,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run dev -- --port 3002',
+    command: 'yarn dev --port 3002',
     url: 'http://localhost:3002',
     reuseExistingServer: !process.env.CI,
   },

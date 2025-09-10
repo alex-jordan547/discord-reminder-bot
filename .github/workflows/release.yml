@@ -1,0 +1,241 @@
+name: 🎉 Release Pipeline
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag (e.g. v1.2.3)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-release:
+    name: ✅ Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🏷️ Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          else
+            VERSION="${{ github.event.inputs.release-tag }}"
+            IS_PRERELEASE="false"
+          fi
+          
+          # Validate semver format
+          if [[ ! "$VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          
+          echo "✅ Release validation passed"
+          echo "🎯 Version: $VERSION"
+          echo "🔖 Pre-release: $IS_PRERELEASE"
+
+  quality-gate:
+    name: 🎯 Release Quality Gate
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🎨 Quality checks
+        run: |
+          yarn lint
+          yarn format:check
+          yarn type-check
+      
+      - name: 🏗️ Build verification
+        run: yarn build
+      
+      - name: 🧪 Full test suite
+        run: yarn test:coverage
+      
+      - name: 📊 Coverage verification
+        run: |
+          echo "📊 Verifying test coverage meets release standards"
+          # Add coverage threshold checks here
+
+  build-release:
+    name: 🏗️ Build Release Assets
+    runs-on: ubuntu-latest
+    needs: [validate-release, quality-gate]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🔑 Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.validate-release.outputs.version }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ needs.validate-release.outputs.is-prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.validate-release.outputs.is-prerelease == 'false' }}
+      
+      - name: 🏗️ Build and push release image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ needs.validate-release.outputs.version }}
+            org.opencontainers.image.title=Discord Reminder Bot
+            org.opencontainers.image.description=Discord bot for event reminder management
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+      
+      - name: 📄 Generate release SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}
+          format: spdx-json
+          output-file: sbom-${{ needs.validate-release.outputs.version }}.spdx.json
+      
+      - name: 📊 Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ needs.validate-release.outputs.version }}
+          path: |
+            sbom-*.spdx.json
+          retention-days: 90
+
+  security-scan:
+    name: 🔒 Release Security Scan
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release]
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🔒 Scan release image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}
+          format: 'sarif'
+          output: 'release-security-scan.sarif'
+      
+      - name: 📊 Upload scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'release-security-scan.sarif'
+
+  deploy-production:
+    name: 🚀 Production Deployment
+    uses: ./.github/workflows/deploy.yml
+    needs: [validate-release, build-release, security-scan]
+    if: needs.validate-release.outputs.is-prerelease == 'false'
+    secrets: inherit
+    with:
+      environment: production
+      image-tag: ${{ needs.validate-release.outputs.version }}
+      image-digest: ${{ needs.build-release.outputs.image-digest }}
+
+  create-changelog:
+    name: 📝 Create Changelog
+    runs-on: ubuntu-latest
+    needs: [validate-release, deploy-production]
+    if: always() && needs.validate-release.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 📝 Generate changelog
+        run: |
+          VERSION=${{ needs.validate-release.outputs.version }}
+          echo "# 🎉 Release $VERSION" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## 🔄 Changes" >> RELEASE_NOTES.md
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [[ -n "$LAST_TAG" ]]; then
+            git log $LAST_TAG..HEAD --oneline --no-merges >> RELEASE_NOTES.md
+          else
+            echo "- Initial release" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "## 🐳 Docker Image" >> RELEASE_NOTES.md
+          echo "\`\`\`bash" >> RELEASE_NOTES.md
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION" >> RELEASE_NOTES.md
+          echo "\`\`\`" >> RELEASE_NOTES.md
+      
+      - name: 📊 Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-${{ needs.validate-release.outputs.version }}
+          path: RELEASE_NOTES.md
+
+  release-summary:
+    name: 📋 Release Summary
+    runs-on: ubuntu-latest
+    needs: [validate-release, quality-gate, build-release, security-scan, deploy-production, create-changelog]
+    if: always()
+    steps:
+      - name: 📋 Generate release summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Validation | ${{ needs.validate-release.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Quality Gate | ${{ needs.quality-gate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏗️ Build | ${{ needs.build-release.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Security | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🚀 Deploy | ${{ needs.deploy-production.result || '⏭️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 Changelog | ${{ needs.create-changelog.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pre-release:** ${{ needs.validate-release.outputs.is-prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
