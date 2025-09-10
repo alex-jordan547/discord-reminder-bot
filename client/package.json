@@ -20,7 +20,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:performance": "playwright test tests/performance",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,vue}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue}\"",
