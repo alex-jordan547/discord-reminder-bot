@@ -18,14 +18,14 @@ describe('DatabaseExportInterface', () => {
 
   it('should render export form with format selection', () => {
     const wrapper = mount(DatabaseExportInterface);
-    
+
     // Should have a form element
     expect(wrapper.find('form').exists()).toBe(true);
-    
+
     // Should have format selection dropdown
     const formatSelect = wrapper.find('select[data-testid="export-format-select"]');
     expect(formatSelect.exists()).toBe(true);
-    
+
     // Should have all format options (including placeholder)
     const options = formatSelect.findAll('option');
     expect(options).toHaveLength(4);
@@ -37,7 +37,7 @@ describe('DatabaseExportInterface', () => {
 
   it('should have export button initially enabled', () => {
     const wrapper = mount(DatabaseExportInterface);
-    
+
     const exportButton = wrapper.find('button[data-testid="export-button"]');
     expect(exportButton.exists()).toBe(true);
     expect(exportButton.attributes('disabled')).toBeUndefined();
@@ -46,15 +46,15 @@ describe('DatabaseExportInterface', () => {
 
   it('should emit export event with selected format when form is submitted', async () => {
     const wrapper = mount(DatabaseExportInterface);
-    
+
     // Select JSON format
     const formatSelect = wrapper.find('select[data-testid="export-format-select"]');
     await formatSelect.setValue('json');
-    
+
     // Submit form
     const form = wrapper.find('form');
     await form.trigger('submit.prevent');
-    
+
     // Should emit export event with correct format
     expect(wrapper.emitted('export')).toBeTruthy();
     expect(wrapper.emitted('export')?.[0]).toEqual(['json']);
@@ -66,7 +66,7 @@ describe('DatabaseExportInterface', () => {
         isExporting: true,
       },
     });
-    
+
     const exportButton = wrapper.find('button[data-testid="export-button"]');
     expect(exportButton.attributes('disabled')).toBeDefined();
     expect(exportButton.text()).toBe('Exporting...');
@@ -78,7 +78,7 @@ describe('DatabaseExportInterface', () => {
         isExporting: true,
       },
     });
-    
+
     const spinner = wrapper.find('[data-testid="export-spinner"]');
     expect(spinner.exists()).toBe(true);
   });
@@ -90,7 +90,7 @@ describe('DatabaseExportInterface', () => {
         exportProgress: 45,
       },
     });
-    
+
     const progressText = wrapper.find('[data-testid="export-progress"]');
     expect(progressText.exists()).toBe(true);
     expect(progressText.text()).toContain('45%');
@@ -98,18 +98,18 @@ describe('DatabaseExportInterface', () => {
 
   it('should validate format selection before export', async () => {
     const wrapper = mount(DatabaseExportInterface);
-    
+
     // Clear format selection
     const formatSelect = wrapper.find('select[data-testid="export-format-select"]');
     await formatSelect.setValue('');
-    
+
     // Try to submit form
     const form = wrapper.find('form');
     await form.trigger('submit.prevent');
-    
+
     // Should not emit export event
     expect(wrapper.emitted('export')).toBeFalsy();
-    
+
     // Should show validation error
     const errorMessage = wrapper.find('[data-testid="format-error"]');
     expect(errorMessage.exists()).toBe(true);
@@ -118,17 +118,17 @@ describe('DatabaseExportInterface', () => {
 
   it('should reset form after successful export', async () => {
     const wrapper = mount(DatabaseExportInterface);
-    
+
     // Select format and submit
     const formatSelect = wrapper.find('select[data-testid="export-format-select"]');
     await formatSelect.setValue('sqlite');
-    
+
     const form = wrapper.find('form');
     await form.trigger('submit.prevent');
-    
+
     // Simulate successful export
     await wrapper.setProps({ isExporting: false, lastExportResult: { success: true } });
-    
+
     // Format should be reset to default
     expect(formatSelect.element.value).toBe('sqlite');
   });

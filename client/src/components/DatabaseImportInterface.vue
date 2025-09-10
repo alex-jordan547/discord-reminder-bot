@@ -13,13 +13,14 @@
       <div class="drop-zone-content">
         <div class="upload-icon">📁</div>
         <div data-testid="upload-instructions" class="upload-instructions">
-          <strong>Drag and drop</strong> your database file here, or <strong>click to browse</strong>
+          <strong>Drag and drop</strong> your database file here, or
+          <strong>click to browse</strong>
         </div>
         <div data-testid="supported-formats" class="supported-formats">
           Supported formats: SQLite (.db, .sqlite), JSON (.json), CSV (.csv)
         </div>
       </div>
-      
+
       <input
         ref="fileInputRef"
         type="file"
@@ -53,10 +54,7 @@
           :disabled="isImporting"
           @click="handleImport"
         >
-          <span
-            v-if="isImporting"
-            class="spinner"
-          ></span>
+          <span v-if="isImporting" class="spinner"></span>
           {{ isImporting ? 'Importing...' : 'Import Database' }}
         </button>
       </div>
@@ -70,11 +68,7 @@
       </div>
     </div>
 
-    <div
-      v-if="fileError"
-      data-testid="file-error"
-      class="error-message"
-    >
+    <div v-if="fileError" data-testid="file-error" class="error-message">
       {{ fileError }}
     </div>
   </div>
@@ -139,7 +133,7 @@ const handleDragLeave = (event: DragEvent) => {
 const handleDrop = (event: DragEvent) => {
   event.preventDefault();
   isDragOver.value = false;
-  
+
   const files = event.dataTransfer?.files;
   if (files && files.length > 0) {
     handleFile(files[0]);
@@ -158,9 +152,10 @@ const handleFile = (file: File) => {
   fileError.value = '';
 
   // Validate file type
-  const isValidType = supportedTypes.includes(file.type) || 
+  const isValidType =
+    supportedTypes.includes(file.type) ||
     supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-  
+
   if (!isValidType) {
     fileError.value = 'Invalid file type. Please select a SQLite, JSON, or CSV file.';
     return;
@@ -188,11 +183,11 @@ const clearFile = () => {
 
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 bytes';
-  
+
   const k = 1024;
   const sizes = ['bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
@@ -383,25 +378,25 @@ const getFileType = (file: File): string => {
   .database-import-interface {
     padding: 1rem;
   }
-  
+
   .drop-zone {
     padding: 2rem 1rem;
   }
-  
+
   .upload-icon {
     font-size: 2rem;
   }
-  
+
   .file-info {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .import-actions {
     justify-content: stretch;
   }
-  
+
   .btn {
     width: 100%;
     justify-content: center;

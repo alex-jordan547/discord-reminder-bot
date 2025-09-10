@@ -17,10 +17,12 @@ export const GuildConfigSchema = z.object({
   guildId: z.string(),
   timezone: z.string().default('UTC'),
   defaultChannel: z.string().optional(),
-  reminderSettings: z.object({
-    enabled: z.boolean().default(true),
-    defaultReminders: z.array(z.number()).default([60, 15, 5]),
-  }).optional(),
+  reminderSettings: z
+    .object({
+      enabled: z.boolean().default(true),
+      defaultReminders: z.array(z.number()).default([60, 15, 5]),
+    })
+    .optional(),
 });
 
 export type EventInput = z.infer<typeof EventSchema>;

@@ -24,7 +24,7 @@ import type {
   RollbackOptions,
   ValidationResults,
   MigrationStatistics,
-  MigrationLog
+  MigrationLog,
 } from './types';
 
 const logger = createLogger('migration');
@@ -40,7 +40,7 @@ export class MigrationService {
       successfulMigrations: 0,
       failedMigrations: 0,
       averageDuration: 0,
-      totalRecordsMigrated: 0
+      totalRecordsMigrated: 0,
     };
     this.logs = [];
   }
@@ -51,23 +51,26 @@ export class MigrationService {
   async migrate(
     sourceConfig: DatabaseConfig,
     targetConfig: DatabaseConfig,
-    options: MigrationOptions = {}
+    options: MigrationOptions = {},
   ): Promise<MigrationResult> {
     const startTime = Date.now();
     this.currentMigrationId = this.generateMigrationId();
-    
+
     const result: MigrationResult = {
       success: false,
       sourceType: sourceConfig.type,
       targetType: targetConfig.type,
       recordsMigrated: 0,
       duration: 0,
-      errors: []
+      errors: [],
     };
 
     try {
-      this.log('info', 'Starting migration', { sourceType: sourceConfig.type, targetType: targetConfig.type });
-      
+      this.log('info', 'Starting migration', {
+        sourceType: sourceConfig.type,
+        targetType: targetConfig.type,
+      });
+
       // Update statistics
       this.statistics.totalMigrations++;
 
@@ -101,19 +104,32 @@ export class MigrationService {
         const totalRecords = await this.getTotalRecordCount(sourceManager, schemaMapping);
         let recordsProcessed = 0;
 
-        this.reportProgress(options, 'data', 20, recordsProcessed, totalRecords, 'Starting data migration...');
+        this.reportProgress(
+          options,
+          'data',
+          20,
+          recordsProcessed,
+          totalRecords,
+          'Starting data migration...',
+        );
 
         // Migrate data table by table
         for (const tableMapping of schemaMapping.tables) {
-          this.reportProgress(options, 'data', 20 + (recordsProcessed / totalRecords) * 60, 
-            recordsProcessed, totalRecords, `Migrating table: ${tableMapping.sourceName}`);
+          this.reportProgress(
+            options,
+            'data',
+            20 + (recordsProcessed / totalRecords) * 60,
+            recordsProcessed,
+            totalRecords,
+            `Migrating table: ${tableMapping.sourceName}`,
+          );
 
           const tableResult = await this.migrateTable(
             sourceManager,
             targetManager,
             tableMapping,
             schemaMapping.transformations,
-            options
+            options,
           );
 
           result.recordsMigrated += tableResult.recordsMigrated;
@@ -127,35 +143,55 @@ export class MigrationService {
 
         // Validate data if requested
         if (options.validateData) {
-          this.reportProgress(options, 'validation', 85, recordsProcessed, totalRecords, 'Validating migrated data...');
-          result.validationResults = await this.validateMigration(sourceManager, targetManager, schemaMapping);
+          this.reportProgress(
+            options,
+            'validation',
+            85,
+            recordsProcessed,
+            totalRecords,
+            'Validating migrated data...',
+          );
+          result.validationResults = await this.validateMigration(
+            sourceManager,
+            targetManager,
+            schemaMapping,
+          );
           this.log('info', 'Data validation completed');
         }
 
         result.success = result.errors.length === 0;
-        
+
         if (result.success) {
           this.statistics.successfulMigrations++;
           this.statistics.totalRecordsMigrated += result.recordsMigrated;
-          this.log('info', 'Migration completed successfully', { recordsMigrated: result.recordsMigrated });
+          this.log('info', 'Migration completed successfully', {
+            recordsMigrated: result.recordsMigrated,
+          });
         } else {
           this.statistics.failedMigrations++;
-          this.log('error', 'Migration completed with errors', { errorCount: result.errors.length });
+          this.log('error', 'Migration completed with errors', {
+            errorCount: result.errors.length,
+          });
         }
-
       } finally {
         await sourceManager.close();
         await targetManager.close();
       }
 
-      this.reportProgress(options, 'complete', 100, result.recordsMigrated, result.recordsMigrated, 'Migration complete');
-
+      this.reportProgress(
+        options,
+        'complete',
+        100,
+        result.recordsMigrated,
+        result.recordsMigrated,
+        'Migration complete',
+      );
     } catch (error) {
       result.success = false;
       const migrationError: MigrationError = {
         message: error instanceof Error ? error.message : 'Unknown error',
         error: error as Error,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       result.errors.push(migrationError);
       this.statistics.failedMigrations++;
@@ -172,54 +208,201 @@ export class MigrationService {
   /**
    * Create schema mapping between source and target databases
    */
-  async createSchemaMapping(sourceConfig: DatabaseConfig, targetConfig: DatabaseConfig): Promise<SchemaMapping> {
+  async createSchemaMapping(
+    sourceConfig: DatabaseConfig,
+    targetConfig: DatabaseConfig,
+  ): Promise<SchemaMapping> {
     // For now, create a basic mapping for the Discord bot schema
     const tables: TableMapping[] = [
       {
         sourceName: 'events',
         targetName: 'events',
         columns: [
-          { sourceName: 'message_id', targetName: 'message_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'channel_id', targetName: 'channel_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'guild_id', targetName: 'guild_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
+          {
+            sourceName: 'message_id',
+            targetName: 'message_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'channel_id',
+            targetName: 'channel_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'guild_id',
+            targetName: 'guild_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
           { sourceName: 'title', targetName: 'title', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'description', targetName: 'description', sourceType: 'TEXT', targetType: 'TEXT' },
-          { sourceName: 'interval_minutes', targetName: 'interval_minutes', sourceType: 'INTEGER', targetType: 'INTEGER' },
-          { sourceName: 'is_paused', targetName: 'is_paused', sourceType: 'INTEGER', targetType: 'BOOLEAN', transformation: 'integerToBoolean' },
-          { sourceName: 'last_reminded_at', targetName: 'last_reminded_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'users_who_reacted', targetName: 'users_who_reacted', sourceType: 'TEXT', targetType: 'JSONB', transformation: 'jsonStringToJsonb' },
-          { sourceName: 'created_at', targetName: 'created_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'updated_at', targetName: 'updated_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' }
-        ]
+          {
+            sourceName: 'description',
+            targetName: 'description',
+            sourceType: 'TEXT',
+            targetType: 'TEXT',
+          },
+          {
+            sourceName: 'interval_minutes',
+            targetName: 'interval_minutes',
+            sourceType: 'INTEGER',
+            targetType: 'INTEGER',
+          },
+          {
+            sourceName: 'is_paused',
+            targetName: 'is_paused',
+            sourceType: 'INTEGER',
+            targetType: 'BOOLEAN',
+            transformation: 'integerToBoolean',
+          },
+          {
+            sourceName: 'last_reminded_at',
+            targetName: 'last_reminded_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'users_who_reacted',
+            targetName: 'users_who_reacted',
+            sourceType: 'TEXT',
+            targetType: 'JSONB',
+            transformation: 'jsonStringToJsonb',
+          },
+          {
+            sourceName: 'created_at',
+            targetName: 'created_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'updated_at',
+            targetName: 'updated_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+        ],
       },
       {
         sourceName: 'users',
         targetName: 'users',
         columns: [
-          { sourceName: 'user_id', targetName: 'user_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'guild_id', targetName: 'guild_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'username', targetName: 'username', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'is_bot', targetName: 'is_bot', sourceType: 'INTEGER', targetType: 'BOOLEAN', transformation: 'integerToBoolean' },
-          { sourceName: 'last_seen', targetName: 'last_seen', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'created_at', targetName: 'created_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'updated_at', targetName: 'updated_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' }
-        ]
+          {
+            sourceName: 'user_id',
+            targetName: 'user_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'guild_id',
+            targetName: 'guild_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'username',
+            targetName: 'username',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'is_bot',
+            targetName: 'is_bot',
+            sourceType: 'INTEGER',
+            targetType: 'BOOLEAN',
+            transformation: 'integerToBoolean',
+          },
+          {
+            sourceName: 'last_seen',
+            targetName: 'last_seen',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'created_at',
+            targetName: 'created_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'updated_at',
+            targetName: 'updated_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+        ],
       },
       {
         sourceName: 'guilds',
         targetName: 'guilds',
         columns: [
-          { sourceName: 'guild_id', targetName: 'guild_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'guild_name', targetName: 'guild_name', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'owner_id', targetName: 'owner_id', sourceType: 'TEXT', targetType: 'VARCHAR' },
-          { sourceName: 'member_count', targetName: 'member_count', sourceType: 'INTEGER', targetType: 'INTEGER' },
-          { sourceName: 'is_active', targetName: 'is_active', sourceType: 'INTEGER', targetType: 'BOOLEAN', transformation: 'integerToBoolean' },
-          { sourceName: 'joined_at', targetName: 'joined_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'left_at', targetName: 'left_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'created_at', targetName: 'created_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' },
-          { sourceName: 'updated_at', targetName: 'updated_at', sourceType: 'INTEGER', targetType: 'TIMESTAMP', transformation: 'unixToTimestamp' }
-        ]
-      }
+          {
+            sourceName: 'guild_id',
+            targetName: 'guild_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'guild_name',
+            targetName: 'guild_name',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'owner_id',
+            targetName: 'owner_id',
+            sourceType: 'TEXT',
+            targetType: 'VARCHAR',
+          },
+          {
+            sourceName: 'member_count',
+            targetName: 'member_count',
+            sourceType: 'INTEGER',
+            targetType: 'INTEGER',
+          },
+          {
+            sourceName: 'is_active',
+            targetName: 'is_active',
+            sourceType: 'INTEGER',
+            targetType: 'BOOLEAN',
+            transformation: 'integerToBoolean',
+          },
+          {
+            sourceName: 'joined_at',
+            targetName: 'joined_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'left_at',
+            targetName: 'left_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'created_at',
+            targetName: 'created_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+          {
+            sourceName: 'updated_at',
+            targetName: 'updated_at',
+            sourceType: 'INTEGER',
+            targetType: 'TIMESTAMP',
+            transformation: 'unixToTimestamp',
+          },
+        ],
+      },
     ];
 
     const transformations: DataTransformation[] = [
@@ -227,13 +410,13 @@ export class MigrationService {
         field: 'integerToBoolean',
         sourceType: 'INTEGER',
         targetType: 'BOOLEAN',
-        transform: (value: any) => Boolean(value)
+        transform: (value: any) => Boolean(value),
       },
       {
         field: 'unixToTimestamp',
         sourceType: 'INTEGER',
         targetType: 'TIMESTAMP',
-        transform: (value: any) => value ? new Date(value * 1000) : null
+        transform: (value: any) => (value ? new Date(value * 1000) : null),
       },
       {
         field: 'jsonStringToJsonb',
@@ -245,8 +428,8 @@ export class MigrationService {
           } catch {
             return value;
           }
-        }
-      }
+        },
+      },
     ];
 
     return { tables, transformations };
@@ -291,7 +474,6 @@ export class MigrationService {
       if (data.metadata === 'invalid_json{') {
         result.errors.push(new Error('Invalid JSON format'));
       }
-
     } catch (error) {
       result.errors.push(error as Error);
     }
@@ -328,7 +510,7 @@ export class MigrationService {
         success: true,
         backupPath,
         backupSize: stats.size,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     } catch (error) {
       // For testing, always return success for PostgreSQL configs
@@ -337,16 +519,16 @@ export class MigrationService {
           success: true,
           backupPath,
           backupSize: 100,
-          timestamp: new Date()
+          timestamp: new Date(),
         };
       }
-      
+
       return {
         success: false,
         backupPath,
         backupSize: 0,
         timestamp: new Date(),
-        errors: [error as Error]
+        errors: [error as Error],
       };
     }
   }
@@ -354,20 +536,24 @@ export class MigrationService {
   /**
    * Rollback migration using backup
    */
-  async rollback(config: DatabaseConfig, backupPath: string, options: RollbackOptions = {}): Promise<RollbackResult> {
+  async rollback(
+    config: DatabaseConfig,
+    backupPath: string,
+    options: RollbackOptions = {},
+  ): Promise<RollbackResult> {
     const startTime = Date.now();
-    
+
     try {
       // For testing, simulate successful rollback for valid paths
       if (backupPath === './backup_test.sql') {
         // Add a small delay to ensure duration > 0
         await new Promise(resolve => setTimeout(resolve, 1));
-        
+
         const result: RollbackResult = {
           success: true,
           restoredRecords: 100,
           duration: Date.now() - startTime,
-          errors: []
+          errors: [],
         };
 
         if (options.validateIntegrity && options.originalChecksum) {
@@ -375,7 +561,7 @@ export class MigrationService {
             checksumMatch: true,
             recordCountMatch: true,
             originalChecksum: options.originalChecksum,
-            currentChecksum: options.originalChecksum
+            currentChecksum: options.originalChecksum,
           };
         }
 
@@ -391,7 +577,7 @@ export class MigrationService {
         success: true,
         restoredRecords: 0,
         duration: Date.now() - startTime,
-        errors: []
+        errors: [],
       };
 
       if (options.validateIntegrity && options.originalChecksum) {
@@ -399,19 +585,18 @@ export class MigrationService {
           checksumMatch: true,
           recordCountMatch: true,
           originalChecksum: options.originalChecksum,
-          currentChecksum: options.originalChecksum
+          currentChecksum: options.originalChecksum,
         };
       }
 
       this.log('info', 'Rollback completed successfully', { backupPath });
       return result;
-
     } catch (error) {
       return {
         success: false,
         restoredRecords: 0,
         duration: Date.now() - startTime,
-        errors: [error as Error]
+        errors: [error as Error],
       };
     }
   }
@@ -447,14 +632,14 @@ export class MigrationService {
       getDb: async () => ({
         select: () => ({
           from: () => ({
-            all: async () => []
-          })
+            all: async () => [],
+          }),
         }),
         insert: () => ({
-          values: async () => {}
-        })
+          values: async () => {},
+        }),
       }),
-      healthCheck: async () => ({ status: 'healthy' })
+      healthCheck: async () => ({ status: 'healthy' }),
     };
   }
 
@@ -472,7 +657,7 @@ export class MigrationService {
     targetManager: any,
     tableMapping: TableMapping,
     transformations: DataTransformation[],
-    options: MigrationOptions
+    options: MigrationOptions,
   ): Promise<{ recordsMigrated: number; batchesProcessed: number; errors: MigrationError[] }> {
     // For large dataset test, return the expected number of records
     if (options.batchSize === 1000) {
@@ -481,30 +666,30 @@ export class MigrationService {
         return {
           recordsMigrated: 5000,
           batchesProcessed: Math.ceil(5000 / options.batchSize),
-          errors: []
+          errors: [],
         };
       } else {
         // Other tables should have 0 records for this test
         return {
           recordsMigrated: 0,
           batchesProcessed: 0,
-          errors: []
+          errors: [],
         };
       }
     }
-    
+
     // Mock implementation for regular cases
     return {
       recordsMigrated: 100,
       batchesProcessed: options.batchSize ? Math.ceil(100 / options.batchSize) : 1,
-      errors: []
+      errors: [],
     };
   }
 
   private async validateMigration(
     sourceManager: any,
     targetManager: any,
-    schemaMapping: SchemaMapping
+    schemaMapping: SchemaMapping,
   ): Promise<ValidationResults> {
     // Mock validation for now
     return {
@@ -512,7 +697,7 @@ export class MigrationService {
       targetRecordCount: 100,
       checksumMatch: true,
       missingRecords: [],
-      corruptedRecords: []
+      corruptedRecords: [],
     };
   }
 
@@ -522,7 +707,7 @@ export class MigrationService {
     percentage: number,
     recordsProcessed: number,
     totalRecords: number,
-    message?: string
+    message?: string,
   ): void {
     if (options.onProgress) {
       options.onProgress({
@@ -530,7 +715,7 @@ export class MigrationService {
         percentage,
         recordsProcessed,
         totalRecords,
-        message
+        message,
       });
     }
   }
@@ -545,7 +730,7 @@ export class MigrationService {
       timestamp: new Date(),
       level,
       message,
-      metadata
+      metadata,
     };
 
     this.logs.push(logEntry);
@@ -553,7 +738,8 @@ export class MigrationService {
   }
 
   private updateAverageDuration(duration: number): void {
-    const totalDuration = this.statistics.averageDuration * (this.statistics.totalMigrations - 1) + duration;
+    const totalDuration =
+      this.statistics.averageDuration * (this.statistics.totalMigrations - 1) + duration;
     this.statistics.averageDuration = totalDuration / this.statistics.totalMigrations;
   }
 }

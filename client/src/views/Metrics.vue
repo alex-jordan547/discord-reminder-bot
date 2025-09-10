@@ -3,13 +3,13 @@
     <div class="metrics-header">
       <h1>Metrics Dashboard</h1>
       <p>Real-time monitoring and visualization of system and bot metrics</p>
-      
+
       <div class="metrics-controls">
         <div class="time-range-selector">
           <label for="time-range">Time Range:</label>
-          <select 
-            id="time-range" 
-            v-model="selectedTimeRange" 
+          <select
+            id="time-range"
+            v-model="selectedTimeRange"
             data-testid="time-range-select"
             @change="handleTimeRangeChange"
           >
@@ -19,16 +19,16 @@
             <option value="7d">Last 7 Days</option>
           </select>
         </div>
-        
+
         <div class="refresh-controls">
-          <button 
+          <button
             :class="['refresh-btn', { active: autoRefresh }]"
             data-testid="auto-refresh-toggle"
             @click="toggleAutoRefresh"
           >
             {{ autoRefresh ? '⏸️ Pause' : '▶️ Auto Refresh' }}
           </button>
-          <button 
+          <button
             class="manual-refresh-btn"
             data-testid="manual-refresh"
             @click="refreshMetrics"
@@ -60,7 +60,7 @@
               data-testid="cpu-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Memory Usage</h3>
             <SystemMetricsChart
@@ -71,7 +71,7 @@
               data-testid="memory-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Network Activity</h3>
             <SystemMetricsChart
@@ -82,7 +82,7 @@
               data-testid="network-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Disk Usage</h3>
             <SystemMetricsChart
@@ -110,7 +110,7 @@
               data-testid="guilds-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Events Processed</h3>
             <BotMetricsChart
@@ -120,7 +120,7 @@
               data-testid="events-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Commands Success Rate</h3>
             <BotMetricsChart
@@ -130,7 +130,7 @@
               data-testid="commands-chart"
             />
           </div>
-          
+
           <div class="metric-card">
             <h3>Response Time</h3>
             <BotMetricsChart
@@ -157,7 +157,7 @@
               data-testid="interactive-chart"
               @time-range-change="handleTimeRangeChange"
             />
-            
+
             <div class="metric-type-selector">
               <label>Metric Type:</label>
               <select v-model="selectedMetricType" data-testid="metric-type-select">
@@ -195,7 +195,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
-const SystemMetricsChart = defineAsyncComponent(() => import('@/components/SystemMetricsChart.vue'));
+const SystemMetricsChart = defineAsyncComponent(
+  () => import('@/components/SystemMetricsChart.vue'),
+);
 const BotMetricsChart = defineAsyncComponent(() => import('@/components/BotMetricsChart.vue'));
 const InteractiveChart = defineAsyncComponent(() => import('@/components/InteractiveChart.vue'));
 import AlertDisplay from '@/components/AlertDisplay.vue';
@@ -214,7 +216,7 @@ const currentSystemMetrics = ref<SystemMetrics>({
   cpu: { percentage: 0, cores: 4 },
   memory: { percentage: 0, used: 0, total: 8589934592 },
   disk: { percentage: 0, used: 0, total: 1000000000000 },
-  network: { bytesIn: 0, bytesOut: 0 }
+  network: { bytesIn: 0, bytesOut: 0 },
 });
 
 const currentBotMetrics = ref<BotMetrics>({
@@ -226,13 +228,13 @@ const currentBotMetrics = ref<BotMetrics>({
     total: 0,
     successful: 0,
     failed: 0,
-    averageResponseTime: 0
+    averageResponseTime: 0,
   },
   errors: {
     critical: 0,
     warnings: 0,
-    info: 0
-  }
+    info: 0,
+  },
 });
 
 const metricsHistory = ref<MonitoringMetrics[]>([]);
@@ -243,9 +245,11 @@ let refreshInterval: NodeJS.Timeout | null = null;
 
 // Computed properties
 const hasData = computed(() => {
-  return metricsHistory.value.length > 0 || 
-         currentSystemMetrics.value.cpu.percentage > 0 ||
-         currentBotMetrics.value.guilds > 0;
+  return (
+    metricsHistory.value.length > 0 ||
+    currentSystemMetrics.value.cpu.percentage > 0 ||
+    currentBotMetrics.value.guilds > 0
+  );
 });
 
 // Methods
@@ -254,22 +258,22 @@ function generateMockSystemMetrics(): SystemMetrics {
     uptime: Date.now() - Math.random() * 86400000, // Random uptime up to 24 hours
     cpu: {
       percentage: Math.random() * 100,
-      cores: 4
+      cores: 4,
     },
     memory: {
       percentage: Math.random() * 80 + 10, // 10-90%
       used: Math.random() * 6000000000 + 1000000000, // 1-7GB
-      total: 8589934592 // 8GB
+      total: 8589934592, // 8GB
     },
     disk: {
       percentage: Math.random() * 60 + 20, // 20-80%
       used: Math.random() * 500000000000 + 200000000000, // 200-700GB
-      total: 1000000000000 // 1TB
+      total: 1000000000000, // 1TB
     },
     network: {
       bytesIn: Math.random() * 1000000 + 100000, // 100KB-1MB
-      bytesOut: Math.random() * 500000 + 50000   // 50KB-500KB
-    }
+      bytesOut: Math.random() * 500000 + 50000, // 50KB-500KB
+    },
   };
 }
 
@@ -283,13 +287,13 @@ function generateMockBotMetrics(): BotMetrics {
       total: Math.floor(Math.random() * 500) + 50,
       successful: Math.floor(Math.random() * 450) + 40,
       failed: Math.floor(Math.random() * 50) + 5,
-      averageResponseTime: Math.random() * 200 + 50 // 50-250ms
+      averageResponseTime: Math.random() * 200 + 50, // 50-250ms
     },
     errors: {
       critical: Math.floor(Math.random() * 3),
       warnings: Math.floor(Math.random() * 10) + 2,
-      info: Math.floor(Math.random() * 20) + 5
-    }
+      info: Math.floor(Math.random() * 20) + 5,
+    },
   };
 }
 
@@ -297,14 +301,18 @@ function generateMockAlert(): Alert {
   const types: Alert['type'][] = ['critical', 'error', 'warning', 'info'];
   const sources = ['System', 'Bot', 'Database', 'Network'];
   const type = types[Math.floor(Math.random() * types.length)];
-  
+
   const alertMessages = {
-    critical: ['System CPU usage above 95%', 'Bot disconnected from Discord', 'Database connection lost'],
+    critical: [
+      'System CPU usage above 95%',
+      'Bot disconnected from Discord',
+      'Database connection lost',
+    ],
     error: ['Failed to process command', 'Memory usage high', 'Network timeout'],
     warning: ['High response time detected', 'Disk space running low', 'Rate limit approaching'],
-    info: ['New guild joined', 'Scheduled maintenance reminder', 'Backup completed successfully']
+    info: ['New guild joined', 'Scheduled maintenance reminder', 'Backup completed successfully'],
   };
-  
+
   return {
     id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     type,
@@ -312,28 +320,37 @@ function generateMockAlert(): Alert {
     message: alertMessages[type][Math.floor(Math.random() * alertMessages[type].length)],
     source: sources[Math.floor(Math.random() * sources.length)],
     timestamp: new Date().toISOString(),
-    acknowledged: Math.random() > 0.7 // 30% chance of being acknowledged
+    acknowledged: Math.random() > 0.7, // 30% chance of being acknowledged
   };
 }
 
 function generateHistoricalData() {
   const now = Date.now();
-  const points = selectedTimeRange.value === '1h' ? 60 : 
-                selectedTimeRange.value === '6h' ? 72 : 
-                selectedTimeRange.value === '24h' ? 96 : 168;
-  
-  const interval = selectedTimeRange.value === '1h' ? 60000 : // 1 minute
-                  selectedTimeRange.value === '6h' ? 300000 : // 5 minutes
-                  selectedTimeRange.value === '24h' ? 900000 : // 15 minutes
-                  3600000; // 1 hour
-  
+  const points =
+    selectedTimeRange.value === '1h'
+      ? 60
+      : selectedTimeRange.value === '6h'
+        ? 72
+        : selectedTimeRange.value === '24h'
+          ? 96
+          : 168;
+
+  const interval =
+    selectedTimeRange.value === '1h'
+      ? 60000 // 1 minute
+      : selectedTimeRange.value === '6h'
+        ? 300000 // 5 minutes
+        : selectedTimeRange.value === '24h'
+          ? 900000 // 15 minutes
+          : 3600000; // 1 hour
+
   const history: MonitoringMetrics[] = [];
-  
+
   for (let i = points; i >= 0; i--) {
-    const timestamp = new Date(now - (i * interval)).toISOString();
+    const timestamp = new Date(now - i * interval).toISOString();
     const systemMetrics = generateMockSystemMetrics();
     const botMetrics = generateMockBotMetrics();
-    
+
     history.push({
       timestamp,
       system: systemMetrics,
@@ -342,28 +359,28 @@ function generateHistoricalData() {
         responseTime: botMetrics.commands.averageResponseTime,
         throughput: botMetrics.events,
         errorRate: (botMetrics.commands.failed / botMetrics.commands.total) * 100,
-        availability: botMetrics.connected ? 100 : 0
-      }
+        availability: botMetrics.connected ? 100 : 0,
+      },
     });
   }
-  
+
   return history;
 }
 
 async function refreshMetrics() {
   loading.value = true;
-  
+
   try {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     // Update current metrics
     currentSystemMetrics.value = generateMockSystemMetrics();
     currentBotMetrics.value = generateMockBotMetrics();
-    
+
     // Update historical data
     metricsHistory.value = generateHistoricalData();
-    
+
     // Occasionally add new alerts
     if (Math.random() > 0.8) {
       alerts.value.unshift(generateMockAlert());
@@ -372,7 +389,6 @@ async function refreshMetrics() {
         alerts.value = alerts.value.slice(0, 20);
       }
     }
-    
   } catch (error) {
     console.error('Failed to refresh metrics:', error);
   } finally {
@@ -384,18 +400,23 @@ function handleTimeRangeChange(range?: '1h' | '6h' | '24h' | '7d') {
   if (range) {
     selectedTimeRange.value = range;
   }
-  
+
   // Update max data points based on time range
-  maxDataPoints.value = selectedTimeRange.value === '1h' ? 60 : 
-                       selectedTimeRange.value === '6h' ? 72 : 
-                       selectedTimeRange.value === '24h' ? 96 : 168;
-  
+  maxDataPoints.value =
+    selectedTimeRange.value === '1h'
+      ? 60
+      : selectedTimeRange.value === '6h'
+        ? 72
+        : selectedTimeRange.value === '24h'
+          ? 96
+          : 168;
+
   refreshMetrics();
 }
 
 function toggleAutoRefresh() {
   autoRefresh.value = !autoRefresh.value;
-  
+
   if (autoRefresh.value) {
     startAutoRefresh();
   } else {
@@ -407,7 +428,7 @@ function startAutoRefresh() {
   if (refreshInterval) {
     clearInterval(refreshInterval);
   }
-  
+
   refreshInterval = setInterval(() => {
     refreshMetrics();
   }, 5000); // Refresh every 5 seconds
@@ -435,12 +456,12 @@ function handleAlertDismiss(alertId: string) {
 onMounted(async () => {
   // Initial data load
   await refreshMetrics();
-  
+
   // Generate some initial alerts
   for (let i = 0; i < 5; i++) {
     alerts.value.push(generateMockAlert());
   }
-  
+
   // Start auto-refresh if enabled
   if (autoRefresh.value) {
     startAutoRefresh();
@@ -560,8 +581,12 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .metrics-content {
@@ -669,21 +694,21 @@ onUnmounted(() => {
   .metrics-view {
     padding: 1rem;
   }
-  
+
   .metrics-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .refresh-controls {
     justify-content: center;
   }
-  
+
   .system-metrics,
   .bot-metrics {
     grid-template-columns: 1fr;
   }
-  
+
   .metric-type-selector {
     flex-direction: column;
     align-items: stretch;
@@ -694,11 +719,11 @@ onUnmounted(() => {
   .metrics-header h1 {
     font-size: 1.5rem;
   }
-  
+
   .metrics-header p {
     font-size: 1rem;
   }
-  
+
   .refresh-controls {
     flex-direction: column;
   }

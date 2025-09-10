@@ -14,10 +14,10 @@ describe('DatabaseProgressIndicator', () => {
         operation: 'export',
       },
     });
-    
+
     const progressBar = wrapper.find('[data-testid="progress-bar"]');
     expect(progressBar.exists()).toBe(true);
-    
+
     const progressFill = wrapper.find('[data-testid="progress-fill"]');
     expect(progressFill.exists()).toBe(true);
     expect(progressFill.attributes('style')).toContain('width: 45%');
@@ -30,7 +30,7 @@ describe('DatabaseProgressIndicator', () => {
         operation: 'import',
       },
     });
-    
+
     const progressText = wrapper.find('[data-testid="progress-text"]');
     expect(progressText.exists()).toBe(true);
     expect(progressText.text()).toBe('67%');
@@ -44,7 +44,7 @@ describe('DatabaseProgressIndicator', () => {
         statusMessage: 'Exporting table: users',
       },
     });
-    
+
     const statusMessage = wrapper.find('[data-testid="status-message"]');
     expect(statusMessage.exists()).toBe(true);
     expect(statusMessage.text()).toBe('Exporting table: users');
@@ -58,7 +58,7 @@ describe('DatabaseProgressIndicator', () => {
         estimatedTimeRemaining: 120, // 2 minutes
       },
     });
-    
+
     const timeRemaining = wrapper.find('[data-testid="time-remaining"]');
     expect(timeRemaining.exists()).toBe(true);
     expect(timeRemaining.text()).toContain('2m 0s remaining');
@@ -72,7 +72,7 @@ describe('DatabaseProgressIndicator', () => {
         processingSpeed: '1.2 MB/s',
       },
     });
-    
+
     const speed = wrapper.find('[data-testid="processing-speed"]');
     expect(speed.exists()).toBe(true);
     expect(speed.text()).toContain('1.2 MB/s');
@@ -87,7 +87,7 @@ describe('DatabaseProgressIndicator', () => {
         totalRecords: 2500,
       },
     });
-    
+
     const recordsCount = wrapper.find('[data-testid="records-count"]');
     expect(recordsCount.exists()).toBe(true);
     expect(recordsCount.text()).toContain('1,500 / 2,500 records');
@@ -100,10 +100,10 @@ describe('DatabaseProgressIndicator', () => {
         isIndeterminate: true,
       },
     });
-    
+
     const progressBar = wrapper.find('[data-testid="progress-bar"]');
     expect(progressBar.classes()).toContain('indeterminate');
-    
+
     const progressText = wrapper.find('[data-testid="progress-text"]');
     expect(progressText.text()).toBe('Processing...');
   });
@@ -115,17 +115,17 @@ describe('DatabaseProgressIndicator', () => {
         operation: 'export',
       },
     });
-    
+
     const exportProgressFill = exportWrapper.find('[data-testid="progress-fill"]');
     expect(exportProgressFill.classes()).toContain('export-color');
-    
+
     const importWrapper = mount(DatabaseProgressIndicator, {
       props: {
         progress: 50,
         operation: 'import',
       },
     });
-    
+
     const importProgressFill = importWrapper.find('[data-testid="progress-fill"]');
     expect(importProgressFill.classes()).toContain('import-color');
   });
@@ -138,7 +138,7 @@ describe('DatabaseProgressIndicator', () => {
         cancellable: true,
       },
     });
-    
+
     const cancelButton = wrapper.find('[data-testid="cancel-button"]');
     expect(cancelButton.exists()).toBe(true);
     expect(cancelButton.text()).toBe('Cancel');
@@ -152,10 +152,10 @@ describe('DatabaseProgressIndicator', () => {
         cancellable: true,
       },
     });
-    
+
     const cancelButton = wrapper.find('[data-testid="cancel-button"]');
     await cancelButton.trigger('click');
-    
+
     expect(wrapper.emitted('cancel')).toBeTruthy();
   });
 
@@ -168,10 +168,10 @@ describe('DatabaseProgressIndicator', () => {
         errorMessage: 'Import failed: Invalid data format',
       },
     });
-    
+
     const progressBar = wrapper.find('[data-testid="progress-bar"]');
     expect(progressBar.classes()).toContain('error-state');
-    
+
     const errorMessage = wrapper.find('[data-testid="error-message"]');
     expect(errorMessage.exists()).toBe(true);
     expect(errorMessage.text()).toBe('❌ Import failed: Invalid data format');
@@ -186,10 +186,10 @@ describe('DatabaseProgressIndicator', () => {
         successMessage: 'Export completed successfully',
       },
     });
-    
+
     const progressBar = wrapper.find('[data-testid="progress-bar"]');
     expect(progressBar.classes()).toContain('success-state');
-    
+
     const successMessage = wrapper.find('[data-testid="success-message"]');
     expect(successMessage.exists()).toBe(true);
     expect(successMessage.text()).toBe('✅ Export completed successfully');
@@ -202,13 +202,13 @@ describe('DatabaseProgressIndicator', () => {
         operation: 'export',
       },
     });
-    
+
     const progressFill = wrapper.find('[data-testid="progress-fill"]');
     expect(progressFill.attributes('style')).toContain('width: 25%');
-    
+
     // Update progress
     await wrapper.setProps({ progress: 75 });
-    
+
     // Should have transition class
     expect(progressFill.classes()).toContain('progress-transition');
     expect(progressFill.attributes('style')).toContain('width: 75%');
@@ -222,7 +222,7 @@ describe('DatabaseProgressIndicator', () => {
         estimatedTimeRemaining: 3665, // 1 hour, 1 minute, 5 seconds
       },
     });
-    
+
     const timeRemaining = wrapper.find('[data-testid="time-remaining"]');
     expect(timeRemaining.text()).toContain('1h 1m 5s remaining');
   });
@@ -235,7 +235,7 @@ describe('DatabaseProgressIndicator', () => {
         estimatedTimeRemaining: 5, // 5 seconds
       },
     });
-    
+
     const timeRemaining = wrapper.find('[data-testid="time-remaining"]');
     expect(timeRemaining.text()).toContain('5s remaining');
   });
@@ -249,7 +249,7 @@ describe('DatabaseProgressIndicator', () => {
         isPaused: false,
       },
     });
-    
+
     const pauseButton = wrapper.find('[data-testid="pause-button"]');
     expect(pauseButton.exists()).toBe(true);
     expect(pauseButton.text()).toBe('Pause');
@@ -264,17 +264,17 @@ describe('DatabaseProgressIndicator', () => {
         isPaused: false,
       },
     });
-    
+
     const pauseButton = wrapper.find('[data-testid="pause-button"]');
     await pauseButton.trigger('click');
-    
+
     expect(wrapper.emitted('pause')).toBeTruthy();
-    
+
     // Test resume
     await wrapper.setProps({ isPaused: true });
     const resumeButton = wrapper.find('[data-testid="pause-button"]');
     expect(resumeButton.text()).toBe('Resume');
-    
+
     await resumeButton.trigger('click');
     expect(wrapper.emitted('resume')).toBeTruthy();
   });

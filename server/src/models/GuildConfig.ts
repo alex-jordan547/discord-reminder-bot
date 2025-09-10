@@ -307,9 +307,9 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
   getAdminRolesDisplay(): string {
     const configuredRoles = this.data.adminRoleNames;
     const defaultRoles = Settings.ADMIN_ROLES; // Rôles par défaut depuis .env
-    
+
     let display = '';
-    
+
     if (this.data.adminRoleIds.length === 0 && configuredRoles.length > 0) {
       // Mode automatique (administrateurs serveur)
       display = `**Mode automatique**: ${configuredRoles.join(', ')}`;
@@ -320,14 +320,14 @@ export class GuildConfig extends BaseModel<GuildConfigData> {
       // Pas de configuration spécifique
       display = `**Par défaut**: ${defaultRoles.join(', ')}`;
     }
-    
+
     // Ajout des rôles effectifs si différents
     if (defaultRoles.length > 0 && configuredRoles.length === 0) {
       display += `\n💡 *Utilise les rôles par défaut*`;
     } else if (configuredRoles.length > 0) {
       display += `\n💡 *+ administrateurs Discord*`;
     }
-    
+
     return display;
   }
 

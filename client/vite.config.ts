@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [
     // Vue.js 3 support
     vue(),
-    
+
     // Support des chemins TypeScript définis dans tsconfig.json
     tsconfigPaths(),
 
@@ -33,10 +33,10 @@ export default defineConfig({
             options: {
               cacheName: 'api-cache',
               cacheableResponse: {
-                statuses: [0, 200]
+                statuses: [0, 200],
               },
-              networkTimeoutSeconds: 10
-            }
+              networkTimeoutSeconds: 10,
+            },
           },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
@@ -45,11 +45,11 @@ export default defineConfig({
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              }
-            }
-          }
-        ]
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+        ],
       },
       manifest: {
         name: 'Discord Reminder Bot Dashboard',
@@ -63,36 +63,40 @@ export default defineConfig({
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
+            type: 'image/png',
+          },
+        ],
+      },
     }),
 
     // Gzip compression for production
     compression({
       algorithm: 'gzip',
-      ext: '.gz'
+      ext: '.gz',
     }),
 
     // Brotli compression for modern browsers
     compression({
       algorithm: 'brotliCompress',
-      ext: '.br'
+      ext: '.br',
     }),
 
     // Bundle analyzer
-    ...(process.env.ANALYZE ? [visualizer({
-      filename: 'dist/stats.html',
-      open: true,
-      gzipSize: true,
-      brotliSize: true
-    })] : [])
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: 'dist/stats.html',
+            open: true,
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
   ],
 
   // Configuration pour le build du dashboard
@@ -111,14 +115,16 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'chart-vendor': ['chart.js', 'vue-chartjs']
+          'chart-vendor': ['chart.js', 'vue-chartjs'],
         },
         // Dynamic import chunk naming
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId ? chunkInfo.facadeModuleId.split('/').pop() : 'chunk';
+        chunkFileNames: chunkInfo => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+            ? chunkInfo.facadeModuleId.split('/').pop()
+            : 'chunk';
           return `js/[name]-[hash].js`;
         },
-        assetFileNames: (assetInfo) => {
+        assetFileNames: assetInfo => {
           const extType = assetInfo.name.split('.').at(1);
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {
             return `images/[name]-[hash][extname]`;
@@ -127,8 +133,8 @@ export default defineConfig({
             return `css/[name]-[hash][extname]`;
           }
           return `assets/[name]-[hash][extname]`;
-        }
-      }
+        },
+      },
     },
   },
 
@@ -137,14 +143,14 @@ export default defineConfig({
     port: 3002,
     hmr: {
       overlay: true,
-      clientPort: 3002
+      clientPort: 3002,
     },
     proxy: {
       // Proxy API calls to the Fastify server
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        timeout: 30000
+        timeout: 30000,
       },
       '/ws': {
         target: 'ws://localhost:3000',
@@ -156,19 +162,19 @@ export default defineConfig({
   // Preview server configuration
   preview: {
     port: 3003,
-    host: true
+    host: true,
   },
 
   // Performance optimizations
   optimizeDeps: {
     include: ['vue', 'vue-router', 'pinia', 'chart.js', 'vue-chartjs'],
-    exclude: ['@vueuse/core']
+    exclude: ['@vueuse/core'],
   },
 
   // ESBuild optimizations
   esbuild: {
     target: 'es2022',
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : []
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
   },
 
   // Résolution des modules

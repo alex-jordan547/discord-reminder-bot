@@ -14,9 +14,7 @@ export const testFiles = {
         { id: 1, name: 'John Doe', email: 'john@example.com' },
         { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
       ],
-      guilds: [
-        { id: 1, name: 'Test Guild', owner_id: 1 },
-      ],
+      guilds: [{ id: 1, name: 'Test Guild', owner_id: 1 }],
     }),
   },
   validCsv: {
@@ -43,9 +41,24 @@ export const mockPreviewData = {
       rowCount: 150,
       columns: ['id', 'username', 'email', 'created_at'],
       sampleRows: [
-        { id: 1, username: 'john_doe', email: 'john@example.com', created_at: '2024-01-15T10:30:00Z' },
-        { id: 2, username: 'jane_smith', email: 'jane@example.com', created_at: '2024-01-15T11:45:00Z' },
-        { id: 3, username: 'bob_wilson', email: 'bob@example.com', created_at: '2024-01-15T12:15:00Z' },
+        {
+          id: 1,
+          username: 'john_doe',
+          email: 'john@example.com',
+          created_at: '2024-01-15T10:30:00Z',
+        },
+        {
+          id: 2,
+          username: 'jane_smith',
+          email: 'jane@example.com',
+          created_at: '2024-01-15T11:45:00Z',
+        },
+        {
+          id: 3,
+          username: 'bob_wilson',
+          email: 'bob@example.com',
+          created_at: '2024-01-15T12:15:00Z',
+        },
       ],
       columnTypes: {
         id: 'INTEGER',

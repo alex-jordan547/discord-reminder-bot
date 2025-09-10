@@ -64,7 +64,7 @@ const { isDark, toggleTheme } = themeStore;
     min-height: 48px;
     justify-content: center;
   }
-  
+
   .theme-text {
     display: none;
   }
@@ -75,7 +75,7 @@ const { isDark, toggleTheme } = themeStore;
   .theme-toggle {
     border-width: 2px;
   }
-  
+
   .theme-toggle:focus {
     outline-width: 3px;
   }

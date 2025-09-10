@@ -72,7 +72,7 @@ describe('DashboardLayout', () => {
     it('should highlight active navigation item', async () => {
       await router.push('/metrics');
       await wrapper.vm.$nextTick();
-      
+
       const activeItem = wrapper.find('.nav-item.active');
       expect(activeItem.exists()).toBe(true);
     });
@@ -80,7 +80,7 @@ describe('DashboardLayout', () => {
     it('should navigate when clicking nav items', async () => {
       const metricsLink = wrapper.find('[data-testid="nav-metrics"]');
       await metricsLink.trigger('click');
-      
+
       expect(router.currentRoute.value.name).toBe('metrics');
     });
   });
@@ -93,7 +93,7 @@ describe('DashboardLayout', () => {
     it('should toggle sidebar on mobile menu click', async () => {
       const toggleButton = wrapper.find('.mobile-menu-toggle');
       await toggleButton.trigger('click');
-      
+
       expect(wrapper.find('.dashboard-sidebar').classes()).toContain('mobile-open');
     });
 
@@ -101,7 +101,7 @@ describe('DashboardLayout', () => {
       // Open sidebar first
       await wrapper.find('.mobile-menu-toggle').trigger('click');
       expect(wrapper.find('.dashboard-sidebar').classes()).toContain('mobile-open');
-      
+
       // Click outside
       await wrapper.find('.dashboard-overlay').trigger('click');
       expect(wrapper.find('.dashboard-sidebar').classes()).not.toContain('mobile-open');
@@ -111,10 +111,10 @@ describe('DashboardLayout', () => {
   describe('Touch Interactions', () => {
     it('should handle touch events on navigation items', async () => {
       const navItem = wrapper.find('[data-testid="nav-overview"]');
-      
+
       await navItem.trigger('touchstart');
       await navItem.trigger('touchend');
-      
+
       // Touch events should work with router-link navigation
       expect(navItem.exists()).toBe(true);
       expect(navItem.attributes('data-testid')).toBe('nav-overview');
@@ -123,15 +123,15 @@ describe('DashboardLayout', () => {
     it('should provide visual feedback on touch', async () => {
       const navItem = wrapper.find('[data-testid="nav-overview"]');
       const navItemElement = navItem.element.parentElement; // Get the li element
-      
+
       await navItem.trigger('touchstart');
       await wrapper.vm.$nextTick();
-      
+
       expect(navItemElement?.classList.contains('touch-active')).toBe(true);
-      
+
       await navItem.trigger('touchend');
       await wrapper.vm.$nextTick();
-      
+
       expect(navItemElement?.classList.contains('touch-active')).toBe(false);
     });
   });

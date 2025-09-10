@@ -66,7 +66,7 @@ describe('Overview', () => {
     it('should display system status', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -78,7 +78,7 @@ describe('Overview', () => {
     it('should display bot status', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -91,7 +91,7 @@ describe('Overview', () => {
     it('should display database status', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -104,7 +104,7 @@ describe('Overview', () => {
     it('should display uptime information', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -116,7 +116,7 @@ describe('Overview', () => {
     it('should show correct status colors', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       // Test healthy status
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
@@ -146,7 +146,7 @@ describe('Overview', () => {
     it('should display key metrics', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -160,7 +160,7 @@ describe('Overview', () => {
     it('should show metric values', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -174,7 +174,7 @@ describe('Overview', () => {
     it('should render mini charts', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -185,7 +185,7 @@ describe('Overview', () => {
     it('should link to detailed metrics view', async () => {
       const viewDetailsLink = wrapper.find('[data-testid="view-metrics-details"]');
       expect(viewDetailsLink.exists()).toBe(true);
-      
+
       await viewDetailsLink.trigger('click');
       expect(router.currentRoute.value.name).toBe('metrics');
     });
@@ -195,7 +195,7 @@ describe('Overview', () => {
     it('should display recent activities', async () => {
       const store = useDashboardStore();
       const mockActivity = createMockActivity();
-      
+
       store.addActivity(mockActivity);
       await wrapper.vm.$nextTick();
 
@@ -207,7 +207,7 @@ describe('Overview', () => {
     it('should show activity timestamps', async () => {
       const store = useDashboardStore();
       const mockActivity = createMockActivity();
-      
+
       store.addActivity(mockActivity);
       await wrapper.vm.$nextTick();
 
@@ -223,13 +223,13 @@ describe('Overview', () => {
         { ...createMockActivity(), id: '2', type: 'error', description: 'Error occurred' },
         { ...createMockActivity(), id: '3', type: 'system', description: 'System event' },
       ];
-      
+
       activities.forEach(activity => store.addActivity(activity));
       await wrapper.vm.$nextTick();
 
       const activityItems = wrapper.findAll('.activity-item');
       expect(activityItems.length).toBe(3);
-      
+
       activityItems.forEach(item => {
         expect(item.find('.activity-icon').exists()).toBe(true);
       });
@@ -237,7 +237,7 @@ describe('Overview', () => {
 
     it('should limit displayed activities', async () => {
       const store = useDashboardStore();
-      
+
       // Add more activities than the display limit
       for (let i = 0; i < 15; i++) {
         store.addActivity({
@@ -246,7 +246,7 @@ describe('Overview', () => {
           description: `Activity ${i}`,
         });
       }
-      
+
       await wrapper.vm.$nextTick();
 
       const activityItems = wrapper.findAll('.activity-item');
@@ -264,7 +264,7 @@ describe('Overview', () => {
     it('should display alert count', async () => {
       const store = useDashboardStore();
       const mockAlert = createMockAlert();
-      
+
       store.addAlert(mockAlert);
       await wrapper.vm.$nextTick();
 
@@ -276,7 +276,7 @@ describe('Overview', () => {
     it('should show critical alerts prominently', async () => {
       const store = useDashboardStore();
       const criticalAlert = { ...createMockAlert(), type: 'critical' as const, id: 'critical-1' };
-      
+
       store.addAlert(criticalAlert);
       await wrapper.vm.$nextTick();
 
@@ -293,7 +293,7 @@ describe('Overview', () => {
         { ...createMockAlert(), id: '3', type: 'warning' as const },
         { ...createMockAlert(), id: '4', type: 'info' as const },
       ];
-      
+
       alerts.forEach(alert => store.addAlert(alert));
       await wrapper.vm.$nextTick();
 
@@ -306,7 +306,7 @@ describe('Overview', () => {
     it('should link to alerts view', async () => {
       const viewAlertsLink = wrapper.find('[data-testid="view-all-alerts"]');
       expect(viewAlertsLink.exists()).toBe(true);
-      
+
       await viewAlertsLink.trigger('click');
       expect(router.currentRoute.value.name).toBe('alerts');
     });
@@ -322,7 +322,7 @@ describe('Overview', () => {
     it('should update when metrics change', async () => {
       const store = useDashboardStore();
       const initialMetrics = createMockMetrics();
-      
+
       store.updateMetrics(initialMetrics);
       await wrapper.vm.$nextTick();
 
@@ -332,7 +332,7 @@ describe('Overview', () => {
       // Update metrics
       const updatedMetrics = { ...initialMetrics };
       updatedMetrics.system.memory.percentage = 75;
-      
+
       store.updateMetrics(updatedMetrics);
       await wrapper.vm.$nextTick();
 
@@ -342,7 +342,7 @@ describe('Overview', () => {
 
     it('should update when new alerts are added', async () => {
       const store = useDashboardStore();
-      
+
       let alertCount = wrapper.find('[data-testid="alert-count"]');
       expect(alertCount.text()).toContain('0');
 
@@ -355,7 +355,7 @@ describe('Overview', () => {
 
     it('should update when new activities are added', async () => {
       const store = useDashboardStore();
-      
+
       expect(wrapper.findAll('.activity-item').length).toBe(0);
 
       store.addActivity(createMockActivity());
@@ -372,13 +372,13 @@ describe('Overview', () => {
 
     it('should show connected state', async () => {
       const store = useDashboardStore();
-      
+
       store.updateConnectionStatus({
         status: 'connected',
         lastConnected: new Date().toISOString(),
         reconnectAttempts: 0,
       });
-      
+
       await wrapper.vm.$nextTick();
 
       const statusIndicator = wrapper.find('.connection-status');
@@ -388,13 +388,13 @@ describe('Overview', () => {
 
     it('should show disconnected state', async () => {
       const store = useDashboardStore();
-      
+
       store.updateConnectionStatus({
         status: 'disconnected',
         lastConnected: new Date().toISOString(),
         reconnectAttempts: 0,
       });
-      
+
       await wrapper.vm.$nextTick();
 
       const statusIndicator = wrapper.find('.connection-status');
@@ -404,13 +404,13 @@ describe('Overview', () => {
 
     it('should show reconnecting state', async () => {
       const store = useDashboardStore();
-      
+
       store.updateConnectionStatus({
         status: 'reconnecting',
         lastConnected: new Date().toISOString(),
         reconnectAttempts: 2,
       });
-      
+
       await wrapper.vm.$nextTick();
 
       const statusIndicator = wrapper.find('.connection-status');
@@ -446,7 +446,7 @@ describe('Overview', () => {
     it('should hide loading state when data is available', async () => {
       const store = useDashboardStore();
       const mockMetrics = createMockMetrics();
-      
+
       store.updateMetrics(mockMetrics);
       await wrapper.vm.$nextTick();
 
@@ -459,14 +459,14 @@ describe('Overview', () => {
     it('should handle missing metrics gracefully', () => {
       const store = useDashboardStore();
       store.updateMetrics(null);
-      
+
       expect(() => wrapper.vm.$nextTick()).not.toThrow();
       expect(wrapper.find('.error-state').exists()).toBe(true);
     });
 
     it('should show error message for failed data loading', async () => {
       const store = useDashboardStore();
-      
+
       // Simulate error state
       store.$patch({ error: 'Failed to load dashboard data' });
       await wrapper.vm.$nextTick();
@@ -478,13 +478,13 @@ describe('Overview', () => {
     it('should provide retry functionality on error', async () => {
       const store = useDashboardStore();
       const retrySpy = vi.spyOn(store, 'fetchDashboardData');
-      
+
       store.$patch({ error: 'Network error' });
       await wrapper.vm.$nextTick();
 
       const retryButton = wrapper.find('[data-testid="retry-button"]');
       expect(retryButton.exists()).toBe(true);
-      
+
       await retryButton.trigger('click');
       expect(retrySpy).toHaveBeenCalled();
     });
@@ -500,7 +500,7 @@ describe('Overview', () => {
     it('should have proper heading structure', () => {
       const headings = wrapper.findAll('h1, h2, h3, h4, h5, h6');
       expect(headings.length).toBeGreaterThan(0);
-      
+
       const mainHeading = wrapper.find('h1');
       expect(mainHeading.exists()).toBe(true);
       expect(mainHeading.text()).toContain('Dashboard');
@@ -509,10 +509,10 @@ describe('Overview', () => {
     it('should support keyboard navigation', async () => {
       const focusableElements = wrapper.findAll('button, a, [tabindex="0"]');
       expect(focusableElements.length).toBeGreaterThan(0);
-      
+
       const firstFocusable = focusableElements[0];
       await firstFocusable.trigger('focus');
-      
+
       expect(document.activeElement).toBe(firstFocusable.element);
     });
 

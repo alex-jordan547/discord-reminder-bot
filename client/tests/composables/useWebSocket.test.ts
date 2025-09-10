@@ -82,50 +82,50 @@ describe('useWebSocket', () => {
   describe('WebSocket client with automatic reconnection', () => {
     it('should establish WebSocket connection', async () => {
       const { connect, connectionStatus, isConnected } = useWebSocket('ws://localhost:3000/ws');
-      
+
       expect(connectionStatus.value.status).toBe('disconnected');
       expect(isConnected.value).toBe(false);
-      
+
       connect();
       expect(connectionStatus.value.status).toBe('connecting');
-      
+
       // Advance timers to trigger connection
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.status).toBe('connected');
       expect(isConnected.value).toBe(true);
     });
 
     it('should implement automatic reconnection on connection failure', async () => {
       const { connect, connectionStatus } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       // Simulate connection failure (not manual close)
       const ws = mockInstances[0];
       if (ws) {
         ws.simulateClose(1006, 'Connection lost'); // Abnormal closure
       }
-      
+
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.status).toBe('reconnecting');
       expect(connectionStatus.value.reconnectAttempts).toBeGreaterThan(0);
     });
 
     it('should update connection status correctly', async () => {
       const { connect, connectionStatus } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       expect(connectionStatus.value.status).toBe('connecting');
-      
+
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.status).toBe('connected');
       expect(connectionStatus.value.lastConnected).toBeDefined();
     });
@@ -134,23 +134,23 @@ describe('useWebSocket', () => {
   describe('Message handling system for different metric types', () => {
     it('should handle incoming messages correctly', async () => {
       const { connect, lastMessage } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       const testMessage: WebSocketMessage = {
         type: 'metrics',
         data: { cpu: 50, memory: 75 },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-      
+
       // Simulate receiving a message
       const ws = mockInstances[0];
       if (ws) {
         ws.simulateMessage(testMessage);
       }
-      
+
       await nextTick();
       expect(lastMessage.value).toEqual(testMessage);
     });
@@ -160,24 +160,36 @@ describe('useWebSocket', () => {
       const metricsHandler = vi.fn();
       const alertHandler = vi.fn();
       const activityHandler = vi.fn();
-      
+
       onMessage('metrics', metricsHandler);
       onMessage('alert', alertHandler);
       onMessage('activity', activityHandler);
-      
+
       connect();
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       const ws = mockInstances[0];
       if (ws) {
-        ws.simulateMessage({ type: 'metrics', data: { cpu: 50 }, timestamp: new Date().toISOString() });
-        ws.simulateMessage({ type: 'alert', data: { level: 'warning' }, timestamp: new Date().toISOString() });
-        ws.simulateMessage({ type: 'activity', data: { action: 'login' }, timestamp: new Date().toISOString() });
+        ws.simulateMessage({
+          type: 'metrics',
+          data: { cpu: 50 },
+          timestamp: new Date().toISOString(),
+        });
+        ws.simulateMessage({
+          type: 'alert',
+          data: { level: 'warning' },
+          timestamp: new Date().toISOString(),
+        });
+        ws.simulateMessage({
+          type: 'activity',
+          data: { action: 'login' },
+          timestamp: new Date().toISOString(),
+        });
       }
-      
+
       await nextTick();
-      
+
       expect(metricsHandler).toHaveBeenCalledWith({ cpu: 50 });
       expect(alertHandler).toHaveBeenCalledWith({ level: 'warning' });
       expect(activityHandler).toHaveBeenCalledWith({ action: 'login' });
@@ -187,31 +199,31 @@ describe('useWebSocket', () => {
   describe('Connection status indicators and error handling', () => {
     it('should show correct connection status indicators', async () => {
       const { connect, connectionStatus } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       expect(connectionStatus.value.status).toBe('connecting');
-      
+
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.status).toBe('connected');
     });
 
     it('should handle errors correctly', async () => {
       const { connect, connectionStatus } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.status).toBe('connected');
-      
+
       // Simulate error
       const ws = mockInstances[0];
       if (ws) {
         ws.simulateError();
       }
-      
+
       await nextTick();
       // After error, should immediately start reconnecting
       expect(connectionStatus.value.status).toBe('reconnecting');
@@ -220,20 +232,20 @@ describe('useWebSocket', () => {
 
     it('should track reconnection attempts', async () => {
       const { connect, connectionStatus } = useWebSocket('ws://localhost:3000/ws');
-      
+
       connect();
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       // Simulate connection failure
       const ws = mockInstances[0];
       if (ws) {
         ws.simulateClose(1006, 'Connection lost');
       }
-      
+
       vi.advanceTimersByTime(100);
       await nextTick();
-      
+
       expect(connectionStatus.value.reconnectAttempts).toBeGreaterThan(0);
     });
   });

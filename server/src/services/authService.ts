@@ -62,7 +62,7 @@ export class AuthService {
       if (config.bcryptRounds < 1 || config.bcryptRounds > 20) {
         throw new Error('Invalid bcrypt rounds');
       }
-      
+
       this.jwtSecret = config.jwtSecret;
       this.tokenExpiry = config.tokenExpiry;
       this.saltRounds = config.bcryptRounds;
@@ -70,9 +70,11 @@ export class AuthService {
       this.jwtSecret = process.env.JWT_SECRET || this.generateSecureSecret();
       this.tokenExpiry = '1h';
       this.saltRounds = 12;
-      
+
       if (!process.env.JWT_SECRET) {
-        logger.warn('JWT_SECRET not set in environment, using generated secret. This should be set in production!');
+        logger.warn(
+          'JWT_SECRET not set in environment, using generated secret. This should be set in production!',
+        );
       }
     }
   }
@@ -96,9 +98,9 @@ export class AuthService {
       const expiry = expiresIn || this.tokenExpiry;
       const tokenPayload = {
         ...payload,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
       };
-      
+
       return jwt.sign(tokenPayload, this.jwtSecret, { expiresIn: expiry });
     } catch (error) {
       throw error;
@@ -112,7 +114,7 @@ export class AuthService {
     try {
       const tokenId = crypto.randomUUID();
       const role = this.determineRole(options.permissions);
-      
+
       // Calculate expiration
       const expiresIn = options.expiresIn || '30d';
       const expirationMs = this.parseExpiration(expiresIn);
@@ -124,7 +126,7 @@ export class AuthService {
         role,
         permissions: options.permissions,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(expiresAt.getTime() / 1000)
+        exp: Math.floor(expiresAt.getTime() / 1000),
       };
 
       // Sign the token
@@ -132,7 +134,7 @@ export class AuthService {
         algorithm: 'HS256',
         jwtid: tokenId,
         issuer: 'discord-reminder-bot',
-        audience: 'dashboard-api'
+        audience: 'dashboard-api',
       });
 
       // Store token metadata
@@ -144,7 +146,7 @@ export class AuthService {
         permissions: options.permissions,
         expiresAt,
         createdAt: new Date(),
-        metadata: options.metadata
+        metadata: options.metadata,
       };
 
       this.tokens.set(tokenId, apiToken);
@@ -154,7 +156,7 @@ export class AuthService {
         userId,
         role,
         permissions: options.permissions,
-        expiresAt: expiresAt.toISOString()
+        expiresAt: expiresAt.toISOString(),
       });
 
       return token;
@@ -184,7 +186,7 @@ export class AuthService {
       const payload = jwt.verify(token, this.jwtSecret, {
         algorithms: ['HS256'],
         issuer: 'discord-reminder-bot',
-        audience: 'dashboard-api'
+        audience: 'dashboard-api',
       }) as TokenPayload;
 
       // Check if token exists in our store
@@ -195,7 +197,7 @@ export class AuthService {
       }
 
       const storedToken = this.tokens.get(tokenId)!;
-      
+
       // Verify token hash matches
       const isValidHash = await bcrypt.compare(token, storedToken.token);
       if (!isValidHash) {
@@ -205,7 +207,10 @@ export class AuthService {
 
       // Check expiration
       if (storedToken.expiresAt < new Date()) {
-        logger.warn('Token validation failed: token expired', { tokenId, expiresAt: storedToken.expiresAt });
+        logger.warn('Token validation failed: token expired', {
+          tokenId,
+          expiresAt: storedToken.expiresAt,
+        });
         this.tokens.delete(tokenId);
         return null;
       }
@@ -216,7 +221,7 @@ export class AuthService {
       logger.debug('Token validated successfully', {
         tokenId,
         userId: payload.userId,
-        role: payload.role
+        role: payload.role,
       });
 
       return payload;
@@ -238,13 +243,13 @@ export class AuthService {
   async revokeToken(tokenId: string): Promise<boolean> {
     try {
       const deleted = this.tokens.delete(tokenId);
-      
+
       if (deleted) {
         logger.info('Token revoked', { tokenId });
       } else {
         logger.warn('Token revocation failed: token not found', { tokenId });
       }
-      
+
       return deleted;
     } catch (error) {
       logger.error('Token revocation error', { tokenId, error: error.message });
@@ -258,11 +263,11 @@ export class AuthService {
   requirePermission(requiredPermission: string) {
     return async (request: any, reply: any) => {
       const user = request.user;
-      
+
       if (!user) {
         return reply.status(401).send({
           error: 'Unauthorized',
-          message: 'Authentication required'
+          message: 'Authentication required',
         });
       }
 
@@ -270,12 +275,12 @@ export class AuthService {
         logger.warn('Permission denied', {
           userId: user.userId,
           required: requiredPermission,
-          userPermissions: user.permissions
+          userPermissions: user.permissions,
         });
 
         return reply.status(403).send({
           error: 'Forbidden',
-          message: 'Insufficient permissions'
+          message: 'Insufficient permissions',
         });
       }
     };
@@ -289,7 +294,7 @@ export class AuthService {
       .filter(token => token.userId === userId && token.expiresAt > new Date())
       .map(token => ({
         ...token,
-        token: '[HIDDEN]' // Don't expose actual token
+        token: '[HIDDEN]', // Don't expose actual token
       }));
 
     return userTokens as ApiToken[];
@@ -322,15 +327,15 @@ export class AuthService {
   getStats() {
     const now = new Date();
     const activeTokens = Array.from(this.tokens.values()).filter(t => t.expiresAt > now);
-    
+
     return {
       totalTokens: this.tokens.size,
       activeTokens: activeTokens.length,
       expiredTokens: this.tokens.size - activeTokens.length,
       tokensByRole: this.groupBy(activeTokens, 'role'),
-      recentActivity: activeTokens
-        .filter(t => t.lastUsed && t.lastUsed > new Date(Date.now() - 24 * 60 * 60 * 1000))
-        .length
+      recentActivity: activeTokens.filter(
+        t => t.lastUsed && t.lastUsed > new Date(Date.now() - 24 * 60 * 60 * 1000),
+      ).length,
     };
   }
 
@@ -388,7 +393,7 @@ export class AuthService {
       h: 60 * 60 * 1000,
       d: 24 * 60 * 60 * 1000,
       w: 7 * 24 * 60 * 60 * 1000,
-      ms: 1
+      ms: 1,
     };
 
     return num * (multipliers[unit] || multipliers.d);
@@ -430,14 +435,14 @@ export class AuthService {
     const sessionId = crypto.randomUUID();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + (expiryMs || 24 * 60 * 60 * 1000)); // 24h default
-    
+
     this.sessions.set(sessionId, {
       ...data,
       createdAt: now,
       lastAccessed: now,
-      expiresAt
+      expiresAt,
     });
-    
+
     return sessionId;
   }
 
@@ -447,12 +452,12 @@ export class AuthService {
   async getSession(sessionId: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
-    
+
     if (session.expiresAt < new Date()) {
       this.sessions.delete(sessionId);
       return null;
     }
-    
+
     return session;
   }
 
@@ -479,14 +484,14 @@ export class AuthService {
   async cleanupExpiredSessions(): Promise<number> {
     const now = new Date();
     let count = 0;
-    
+
     for (const [sessionId, session] of this.sessions.entries()) {
       if (session.expiresAt < now) {
         this.sessions.delete(sessionId);
         count++;
       }
     }
-    
+
     return count;
   }
 
@@ -494,8 +499,12 @@ export class AuthService {
    * Record authentication attempt
    */
   async recordAuthAttempt(identifier: string, successful: boolean): Promise<void> {
-    const attempt = this.authAttempts.get(identifier) || { count: 0, lastAttempt: null, successful: false };
-    
+    const attempt = this.authAttempts.get(identifier) || {
+      count: 0,
+      lastAttempt: null,
+      successful: false,
+    };
+
     if (successful) {
       this.authAttempts.delete(identifier);
     } else {
@@ -516,9 +525,13 @@ export class AuthService {
   /**
    * Check if user is rate limited
    */
-  async isRateLimited(identifier: string, maxAttempts: number, windowMs?: number): Promise<boolean> {
+  async isRateLimited(
+    identifier: string,
+    maxAttempts: number,
+    windowMs?: number,
+  ): Promise<boolean> {
     const attempts = await this.getAuthAttempts(identifier);
-    
+
     if (windowMs && attempts.lastAttempt) {
       const timeSinceLastAttempt = Date.now() - attempts.lastAttempt.getTime();
       if (timeSinceLastAttempt > windowMs) {
@@ -526,7 +539,7 @@ export class AuthService {
         return false;
       }
     }
-    
+
     return attempts.count >= maxAttempts;
   }
 
@@ -577,7 +590,7 @@ export class AuthService {
    */
   constantTimeCompare(a: string, b: string): boolean {
     if (a.length !== b.length) return false;
-    
+
     let result = 0;
     for (let i = 0; i < a.length; i++) {
       result |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -589,9 +602,10 @@ export class AuthService {
    * Sanitize user input
    */
   sanitizeInput(input: string): string {
-    return input.replace(/<script[^>]*>.*?<\/script>/gi, '')
-                .replace(/<[^>]*>/g, '')
-                .replace(/javascript:/gi, '');
+    return input
+      .replace(/<script[^>]*>.*?<\/script>/gi, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/javascript:/gi, '');
   }
 
   /**
@@ -605,11 +619,14 @@ export class AuthService {
    * Group array by property
    */
   private groupBy<T>(array: T[], property: keyof T): Record<string, number> {
-    return array.reduce((groups, item) => {
-      const key = String(item[property]);
-      groups[key] = (groups[key] || 0) + 1;
-      return groups;
-    }, {} as Record<string, number>);
+    return array.reduce(
+      (groups, item) => {
+        const key = String(item[property]);
+        groups[key] = (groups[key] || 0) + 1;
+        return groups;
+      },
+      {} as Record<string, number>,
+    );
   }
 }
 
@@ -617,6 +634,9 @@ export class AuthService {
 export const authService = new AuthService();
 
 // Cleanup expired tokens every hour
-setInterval(() => {
-  authService.cleanupExpiredTokens();
-}, 60 * 60 * 1000);
+setInterval(
+  () => {
+    authService.cleanupExpiredTokens();
+  },
+  60 * 60 * 1000,
+);

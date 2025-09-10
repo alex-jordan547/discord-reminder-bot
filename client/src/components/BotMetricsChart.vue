@@ -1,7 +1,7 @@
 <template>
   <div class="bot-metrics-chart">
     <div v-if="showConnectionStatus" class="connection-status-container">
-      <div 
+      <div
         :class="['connection-status', metrics.connected ? 'connected' : 'disconnected']"
         data-testid="connection-status"
       >
@@ -16,14 +16,14 @@
       :options="chartOptions"
       data-testid="line-chart"
     />
-    
+
     <Bar
       v-else-if="chartType === 'bar'"
       :data="chartData"
       :options="chartOptions"
       data-testid="bar-chart"
     />
-    
+
     <Doughnut
       v-else-if="chartType === 'doughnut'"
       :data="chartData"
@@ -62,7 +62,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 interface Props {
@@ -116,13 +116,10 @@ const chartData = computed(() => {
           {
             data: [props.metrics.commands.successful, props.metrics.commands.failed],
             backgroundColor: [
-              'rgba(34, 197, 94, 0.8)',  // Success - green
-              'rgba(239, 68, 68, 0.8)',  // Failed - red
+              'rgba(34, 197, 94, 0.8)', // Success - green
+              'rgba(239, 68, 68, 0.8)', // Failed - red
             ],
-            borderColor: [
-              'rgba(34, 197, 94, 1)',
-              'rgba(239, 68, 68, 1)',
-            ],
+            borderColor: ['rgba(34, 197, 94, 1)', 'rgba(239, 68, 68, 1)'],
             borderWidth: 2,
           },
         ],
@@ -139,15 +136,11 @@ const chartData = computed(() => {
               props.metrics.errors.info,
             ],
             backgroundColor: [
-              'rgba(239, 68, 68, 0.8)',   // Critical - red
-              'rgba(245, 158, 11, 0.8)',  // Warning - yellow
-              'rgba(59, 130, 246, 0.8)',  // Info - blue
+              'rgba(239, 68, 68, 0.8)', // Critical - red
+              'rgba(245, 158, 11, 0.8)', // Warning - yellow
+              'rgba(59, 130, 246, 0.8)', // Info - blue
             ],
-            borderColor: [
-              'rgba(239, 68, 68, 1)',
-              'rgba(245, 158, 11, 1)',
-              'rgba(59, 130, 246, 1)',
-            ],
+            borderColor: ['rgba(239, 68, 68, 1)', 'rgba(245, 158, 11, 1)', 'rgba(59, 130, 246, 1)'],
             borderWidth: 2,
           },
         ],
@@ -188,11 +181,14 @@ const chartOptions = computed(() => ({
       enabled: true,
     },
   },
-  scales: props.chartType === 'doughnut' ? undefined : {
-    y: {
-      beginAtZero: true,
-    },
-  },
+  scales:
+    props.chartType === 'doughnut'
+      ? undefined
+      : {
+          y: {
+            beginAtZero: true,
+          },
+        },
 }));
 </script>
 

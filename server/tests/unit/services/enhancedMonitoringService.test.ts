@@ -58,7 +58,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should calculate memory usage percentage correctly', async () => {
       const metrics = await monitoringService.getSystemMetrics();
-      
+
       expect(metrics.memory.percentage).toBeGreaterThanOrEqual(0);
       expect(metrics.memory.percentage).toBeLessThanOrEqual(100);
       expect(typeof metrics.memory.percentage).toBe('number');
@@ -66,7 +66,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should provide CPU load average', async () => {
       const metrics = await monitoringService.getSystemMetrics();
-      
+
       expect(Array.isArray(metrics.cpu.loadAverage)).toBe(true);
       expect(metrics.cpu.loadAverage).toHaveLength(3); // 1min, 5min, 15min
       expect(metrics.cpu.cores).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should collect disk usage information', async () => {
       const metrics = await monitoringService.getSystemMetrics();
-      
+
       expect(metrics.disk.used).toBeGreaterThanOrEqual(0);
       expect(metrics.disk.total).toBeGreaterThan(0);
       expect(metrics.disk.percentage).toBeGreaterThanOrEqual(0);
@@ -83,7 +83,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should track network statistics', async () => {
       const metrics = await monitoringService.getSystemMetrics();
-      
+
       expect(metrics.network.bytesReceived).toBeGreaterThanOrEqual(0);
       expect(metrics.network.bytesSent).toBeGreaterThanOrEqual(0);
       expect(metrics.network.packetsReceived).toBeGreaterThanOrEqual(0);
@@ -126,7 +126,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should track slow queries', async () => {
       const metrics = await monitoringService.getDatabaseMetrics();
-      
+
       expect(Array.isArray(metrics.queryPerformance.slowQueries)).toBe(true);
       expect(metrics.queryPerformance.averageQueryTime).toBeGreaterThanOrEqual(0);
       expect(metrics.queryPerformance.totalQueries).toBeGreaterThanOrEqual(0);
@@ -134,7 +134,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should monitor connection pool status', async () => {
       const metrics = await monitoringService.getDatabaseMetrics();
-      
+
       expect(metrics.connectionPool.active).toBeGreaterThanOrEqual(0);
       expect(metrics.connectionPool.idle).toBeGreaterThanOrEqual(0);
       expect(metrics.connectionPool.total).toBeGreaterThanOrEqual(0);
@@ -143,7 +143,7 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should provide index usage statistics', async () => {
       const metrics = await monitoringService.getDatabaseMetrics();
-      
+
       expect(Array.isArray(metrics.indexStats)).toBe(true);
       if (metrics.indexStats.length > 0) {
         expect(metrics.indexStats[0]).toHaveProperty('name');
@@ -160,35 +160,35 @@ describe('Enhanced Monitoring Service', () => {
         memory: 80,
         cpu: 75,
         disk: 85,
-        responseTime: 1000
+        responseTime: 1000,
       };
 
       monitoringService.setAlertThresholds(thresholds);
-      
+
       // Mock high memory usage
       const mockMetrics = {
         memory: { percentage: 85 },
         cpu: { usage: 70 },
         disk: { percentage: 90 },
-        responseTime: 1200
+        responseTime: 1200,
       };
 
       const alerts = await monitoringService.checkAlerts(mockMetrics);
-      
+
       expect(Array.isArray(alerts)).toBe(true);
-      
+
       // Should generate alerts for memory, disk, and response time
       const memoryAlert = alerts.find(alert => alert.type === 'memory');
       const diskAlert = alerts.find(alert => alert.type === 'disk');
       const responseTimeAlert = alerts.find(alert => alert.type === 'response_time');
-      
+
       expect(memoryAlert).toBeDefined();
       expect(memoryAlert?.severity).toBe('warning');
       expect(memoryAlert?.message).toContain('85%');
-      
+
       expect(diskAlert).toBeDefined();
       expect(diskAlert?.severity).toBe('warning');
-      
+
       expect(responseTimeAlert).toBeDefined();
       expect(responseTimeAlert?.severity).toBe('warning');
     });
@@ -197,23 +197,23 @@ describe('Enhanced Monitoring Service', () => {
       const thresholds = {
         memory: { warning: 70, critical: 90 },
         cpu: { warning: 75, critical: 95 },
-        disk: { warning: 80, critical: 95 }
+        disk: { warning: 80, critical: 95 },
       };
 
       monitoringService.setAlertThresholds(thresholds);
-      
+
       const criticalMetrics = {
         memory: { percentage: 95 },
         cpu: { usage: 98 },
-        disk: { percentage: 85 }
+        disk: { percentage: 85 },
       };
 
       const alerts = await monitoringService.checkAlerts(criticalMetrics);
-      
+
       const memoryAlert = alerts.find(alert => alert.type === 'memory');
       const cpuAlert = alerts.find(alert => alert.type === 'cpu');
       const diskAlert = alerts.find(alert => alert.type === 'disk');
-      
+
       expect(memoryAlert?.severity).toBe('critical');
       expect(cpuAlert?.severity).toBe('critical');
       expect(diskAlert?.severity).toBe('warning');
@@ -222,10 +222,10 @@ describe('Enhanced Monitoring Service', () => {
     it('should include alert metadata and timestamps', async () => {
       const thresholds = { memory: 50 };
       monitoringService.setAlertThresholds(thresholds);
-      
+
       const metrics = { memory: { percentage: 60 } };
       const alerts = await monitoringService.checkAlerts(metrics);
-      
+
       if (alerts.length > 0) {
         const alert = alerts[0];
         expect(alert).toHaveProperty('id');
@@ -241,10 +241,10 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should allow alert acknowledgment', async () => {
       const alertId = 'test-alert-123';
-      
+
       await monitoringService.acknowledgeAlert(alertId);
       const acknowledgedAlert = await monitoringService.getAlert(alertId);
-      
+
       expect(acknowledgedAlert?.acknowledged).toBe(true);
       expect(acknowledgedAlert?.acknowledgedAt).toBeDefined();
     });
@@ -252,13 +252,13 @@ describe('Enhanced Monitoring Service', () => {
     it('should support alert suppression', async () => {
       const thresholds = { memory: 50 };
       monitoringService.setAlertThresholds(thresholds);
-      
+
       // Suppress memory alerts for 5 minutes
       monitoringService.suppressAlerts('memory', 5 * 60 * 1000);
-      
+
       const metrics = { memory: { percentage: 80 } };
       const alerts = await monitoringService.checkAlerts(metrics);
-      
+
       const memoryAlerts = alerts.filter(alert => alert.type === 'memory');
       expect(memoryAlerts).toHaveLength(0);
     });
@@ -269,11 +269,11 @@ describe('Enhanced Monitoring Service', () => {
       const metrics = {
         timestamp: new Date().toISOString(),
         memory: { percentage: 75 },
-        cpu: { usage: 60 }
+        cpu: { usage: 60 },
       };
 
       await monitoringService.storeMetrics(metrics);
-      
+
       const history = await monitoringService.getMetricsHistory('1h');
       expect(Array.isArray(history)).toBe(true);
       expect(history.length).toBeGreaterThan(0);
@@ -284,11 +284,11 @@ describe('Enhanced Monitoring Service', () => {
       const now = new Date();
       const metrics1 = {
         timestamp: new Date(now.getTime() - 30 * 60 * 1000).toISOString(), // 30 min ago
-        memory: { percentage: 70 }
+        memory: { percentage: 70 },
       };
       const metrics2 = {
         timestamp: new Date(now.getTime() - 10 * 60 * 1000).toISOString(), // 10 min ago
-        memory: { percentage: 80 }
+        memory: { percentage: 80 },
       };
 
       await monitoringService.storeMetrics(metrics1);
@@ -296,14 +296,14 @@ describe('Enhanced Monitoring Service', () => {
 
       const history1h = await monitoringService.getMetricsHistory('1h');
       const history6h = await monitoringService.getMetricsHistory('6h');
-      
+
       expect(history1h.length).toBeGreaterThanOrEqual(2);
       expect(history6h.length).toBeGreaterThanOrEqual(history1h.length);
     });
 
     it('should support metrics aggregation', async () => {
       const aggregated = await monitoringService.getAggregatedMetrics('1h', 'average');
-      
+
       expect(aggregated).toHaveProperty('memory');
       expect(aggregated).toHaveProperty('cpu');
       expect(aggregated).toHaveProperty('disk');
@@ -313,16 +313,16 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should clean up old metrics data', async () => {
       const initialCount = (await monitoringService.getMetricsHistory('30d')).length;
-      
+
       await monitoringService.cleanupOldMetrics(7); // Keep only 7 days
-      
+
       const afterCleanupCount = (await monitoringService.getMetricsHistory('30d')).length;
       expect(afterCleanupCount).toBeLessThanOrEqual(initialCount);
     });
 
     it('should export metrics data', async () => {
       const exportData = await monitoringService.exportMetrics('1h', 'json');
-      
+
       expect(exportData).toHaveProperty('format', 'json');
       expect(exportData).toHaveProperty('data');
       expect(exportData).toHaveProperty('metadata');
@@ -335,7 +335,7 @@ describe('Enhanced Monitoring Service', () => {
   describe('Service Lifecycle', () => {
     it('should start monitoring service', async () => {
       await monitoringService.start();
-      
+
       expect(monitoringService.isRunning()).toBe(true);
       expect(monitoringService.getStatus()).toHaveProperty('running', true);
       expect(monitoringService.getStatus()).toHaveProperty('startedAt');
@@ -344,7 +344,7 @@ describe('Enhanced Monitoring Service', () => {
     it('should stop monitoring service', async () => {
       await monitoringService.start();
       await monitoringService.stop();
-      
+
       expect(monitoringService.isRunning()).toBe(false);
       expect(monitoringService.getStatus()).toHaveProperty('running', false);
       expect(monitoringService.getStatus()).toHaveProperty('stoppedAt');
@@ -352,10 +352,10 @@ describe('Enhanced Monitoring Service', () => {
 
     it('should collect metrics automatically when running', async () => {
       await monitoringService.start();
-      
+
       // Wait for automatic collection
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       const history = await monitoringService.getMetricsHistory('1m');
       expect(history.length).toBeGreaterThan(0);
     });
@@ -364,27 +364,27 @@ describe('Enhanced Monitoring Service', () => {
       // Mock an error in metrics collection
       const originalGetSystemMetrics = monitoringService.getSystemMetrics;
       monitoringService.getSystemMetrics = vi.fn().mockRejectedValue(new Error('Test error'));
-      
+
       await monitoringService.start();
-      
+
       // Service should still be running despite errors
       expect(monitoringService.isRunning()).toBe(true);
-      
+
       // Restore original method
       monitoringService.getSystemMetrics = originalGetSystemMetrics;
     });
 
     it('should provide service statistics', async () => {
       await monitoringService.start();
-      
+
       const stats = monitoringService.getServiceStats();
-      
+
       expect(stats).toHaveProperty('metricsCollected');
       expect(stats).toHaveProperty('alertsGenerated');
       expect(stats).toHaveProperty('errorsEncountered');
       expect(stats).toHaveProperty('uptime');
       expect(stats).toHaveProperty('lastCollection');
-      
+
       expect(typeof stats.metricsCollected).toBe('number');
       expect(typeof stats.alertsGenerated).toBe('number');
       expect(typeof stats.errorsEncountered).toBe('number');

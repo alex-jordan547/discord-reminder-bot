@@ -20,7 +20,7 @@ describe('Dashboard API Routes', () => {
 
   beforeEach(async () => {
     app = Fastify({ logger: false });
-    
+
     // Create mock services
     mockMonitoringService = {
       getSystemMetrics: vi.fn(),
@@ -68,7 +68,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const config = JSON.parse(response.payload);
       expect(config).toHaveProperty('refreshInterval');
       expect(config).toHaveProperty('theme');
@@ -143,7 +143,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('config');
@@ -171,7 +171,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('validation');
@@ -224,7 +224,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const metrics = JSON.parse(response.payload);
       expect(metrics).toHaveProperty('timestamp');
       expect(metrics).toHaveProperty('system');
@@ -232,7 +232,7 @@ describe('Dashboard API Routes', () => {
       expect(metrics).toHaveProperty('database');
       expect(metrics).toHaveProperty('security');
       expect(metrics).toHaveProperty('performance');
-      
+
       expect(metrics.system.memory.percentage).toBe(75);
       expect(metrics.bot.connected).toBe(true);
     });
@@ -252,7 +252,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(500);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Failed to fetch metrics');
@@ -324,13 +324,13 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const history = JSON.parse(response.payload);
       expect(Array.isArray(history)).toBe(true);
       expect(history).toHaveLength(2);
       expect(history[0]).toHaveProperty('timestamp');
       expect(history[0]).toHaveProperty('system');
-      
+
       expect(mockMonitoringService.getMetricsHistory).toHaveBeenCalledWith('1h');
     });
 
@@ -347,7 +347,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Invalid time range');
@@ -377,11 +377,11 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('aggregation', 'average');
       expect(result).toHaveProperty('data');
-      
+
       expect(mockMonitoringService.getAggregatedMetrics).toHaveBeenCalledWith('1h', 'average');
     });
 
@@ -392,7 +392,7 @@ describe('Dashboard API Routes', () => {
       // Create large history array
       const largeHistory = Array.from({ length: 2000 }, (_, i) => ({
         timestamp: new Date(Date.now() - i * 60000).toISOString(),
-        system: { memory: { percentage: 50 + i % 50 } },
+        system: { memory: { percentage: 50 + (i % 50) } },
       }));
 
       mockMonitoringService.getMetricsHistory.mockResolvedValue(largeHistory);
@@ -406,7 +406,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const history = JSON.parse(response.payload);
       expect(history.length).toBeLessThanOrEqual(100);
     });
@@ -447,7 +447,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const alerts = JSON.parse(response.payload);
       expect(Array.isArray(alerts)).toBe(true);
       expect(alerts).toHaveLength(2);
@@ -460,9 +460,7 @@ describe('Dashboard API Routes', () => {
       mockAuthService.verifyToken.mockResolvedValue({ userId: 'user123', role: 'admin' });
       mockAuthService.hasPermission.mockReturnValue(true);
 
-      const mockAlerts = [
-        { id: 'alert-1', type: 'critical', title: 'Critical Alert' },
-      ];
+      const mockAlerts = [{ id: 'alert-1', type: 'critical', title: 'Critical Alert' }];
 
       mockMonitoringService.getAlerts.mockResolvedValue(mockAlerts);
 
@@ -518,12 +516,12 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('alert');
       expect(result.alert.acknowledged).toBe(true);
-      
+
       expect(mockMonitoringService.acknowledgeAlert).toHaveBeenCalledWith('alert-1', 'user123');
     });
 
@@ -542,7 +540,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(404);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error', 'Alert not found');
     });
@@ -564,10 +562,10 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('success', true);
-      
+
       expect(mockMonitoringService.removeAlert).toHaveBeenCalledWith('alert-1');
     });
 
@@ -611,7 +609,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const stats = JSON.parse(response.payload);
       expect(stats).toHaveProperty('uptime', 3600000);
       expect(stats).toHaveProperty('metricsCollected', 1000);
@@ -636,7 +634,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(500);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result).toHaveProperty('statusCode', 500);
@@ -655,7 +653,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('validation');
@@ -676,7 +674,7 @@ describe('Dashboard API Routes', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Invalid JSON');
@@ -694,11 +692,11 @@ describe('Dashboard API Routes', () => {
           method: 'GET',
           url: '/api/metrics/realtime',
           headers: { authorization: 'Bearer valid-token' },
-        })
+        }),
       );
 
       const responses = await Promise.all(requests);
-      
+
       // Some requests should be rate limited
       const rateLimitedResponses = responses.filter(r => r.statusCode === 429);
       expect(rateLimitedResponses.length).toBeGreaterThan(0);

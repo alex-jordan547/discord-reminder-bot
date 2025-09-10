@@ -5,59 +5,59 @@
  * with context preservation and intelligent error categorization.
  */
 
-import fs from 'fs/promises'
-import path from 'path'
-import { createLogger } from '#/utils/loggingConfig'
+import fs from 'fs/promises';
+import path from 'path';
+import { createLogger } from '#/utils/loggingConfig';
 
-const logger = createLogger('error-reporting')
+const logger = createLogger('error-reporting');
 
 export interface ErrorContext {
-  userId?: string
-  sessionId?: string
-  requestId?: string
-  operation?: string
-  url?: string
-  method?: string
-  userAgent?: string
-  ipAddress?: string
-  timestamp: Date
-  stack?: string
-  environment: string
+  userId?: string;
+  sessionId?: string;
+  requestId?: string;
+  operation?: string;
+  url?: string;
+  method?: string;
+  userAgent?: string;
+  ipAddress?: string;
+  timestamp: Date;
+  stack?: string;
+  environment: string;
 }
 
 export interface ErrorReport {
-  id: string
-  level: 'low' | 'medium' | 'high' | 'critical'
-  category: 'network' | 'database' | 'authentication' | 'validation' | 'business' | 'system'
-  message: string
-  error?: Error
-  context: ErrorContext
-  metadata: Record<string, any>
-  resolved: boolean
-  acknowledgedBy?: string
-  acknowledgedAt?: Date
-  createdAt: Date
+  id: string;
+  level: 'low' | 'medium' | 'high' | 'critical';
+  category: 'network' | 'database' | 'authentication' | 'validation' | 'business' | 'system';
+  message: string;
+  error?: Error;
+  context: ErrorContext;
+  metadata: Record<string, any>;
+  resolved: boolean;
+  acknowledgedBy?: string;
+  acknowledgedAt?: Date;
+  createdAt: Date;
 }
 
 export interface ErrorStats {
-  total: number
-  byLevel: Record<ErrorReport['level'], number>
-  byCategory: Record<ErrorReport['category'], number>
-  resolved: number
-  unresolved: number
-  recentErrors: number // Last 24 hours
+  total: number;
+  byLevel: Record<ErrorReport['level'], number>;
+  byCategory: Record<ErrorReport['category'], number>;
+  resolved: number;
+  unresolved: number;
+  recentErrors: number; // Last 24 hours
 }
 
 export interface NotificationConfig {
-  webhookUrl?: string
-  emailEndpoint?: string
-  slackWebhook?: string
+  webhookUrl?: string;
+  emailEndpoint?: string;
+  slackWebhook?: string;
   threshold: {
-    critical: number  // Notify immediately
-    high: number      // Notify after N occurrences
-    medium: number    // Notify after N occurrences
-    low: number       // Daily summary
-  }
+    critical: number; // Notify immediately
+    high: number; // Notify after N occurrences
+    medium: number; // Notify after N occurrences
+    low: number; // Daily summary
+  };
 }
 
 const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
@@ -65,19 +65,19 @@ const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
     critical: 1,
     high: 3,
     medium: 10,
-    low: 50
-  }
-}
+    low: 50,
+  },
+};
 
 export class ErrorReportingService {
-  private errors: Map<string, ErrorReport> = new Map()
-  private notificationConfig: NotificationConfig
-  private errorCounts: Map<string, number> = new Map()
-  private lastNotification: Map<string, Date> = new Map()
+  private errors: Map<string, ErrorReport> = new Map();
+  private notificationConfig: NotificationConfig;
+  private errorCounts: Map<string, number> = new Map();
+  private lastNotification: Map<string, Date> = new Map();
 
   constructor(config: Partial<NotificationConfig> = {}) {
-    this.notificationConfig = { ...DEFAULT_NOTIFICATION_CONFIG, ...config }
-    this.initializeService()
+    this.notificationConfig = { ...DEFAULT_NOTIFICATION_CONFIG, ...config };
+    this.initializeService();
   }
 
   /**
@@ -85,12 +85,15 @@ export class ErrorReportingService {
    */
   private async initializeService() {
     // Load existing errors from file
-    await this.loadErrorsFromDisk()
-    
+    await this.loadErrorsFromDisk();
+
     // Set up cleanup interval (daily)
-    setInterval(() => {
-      this.cleanupOldErrors()
-    }, 24 * 60 * 60 * 1000) // 24 hours
+    setInterval(
+      () => {
+        this.cleanupOldErrors();
+      },
+      24 * 60 * 60 * 1000,
+    ); // 24 hours
   }
 
   /**
@@ -100,13 +103,12 @@ export class ErrorReportingService {
     message: string,
     error: Error | null = null,
     context: Partial<ErrorContext> = {},
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
   ): Promise<ErrorReport> {
-    
-    const errorId = this.generateErrorId()
-    const level = this.determineErrorLevel(error, context)
-    const category = this.categorizeError(error, context)
-    
+    const errorId = this.generateErrorId();
+    const level = this.determineErrorLevel(error, context);
+    const category = this.categorizeError(error, context);
+
     const errorReport: ErrorReport = {
       id: errorId,
       level,
@@ -117,125 +119,140 @@ export class ErrorReportingService {
         timestamp: new Date(),
         environment: process.env.NODE_ENV || 'development',
         ...context,
-        stack: error?.stack
+        stack: error?.stack,
       },
       metadata,
       resolved: false,
-      createdAt: new Date()
-    }
+      createdAt: new Date(),
+    };
 
     // Store error
-    this.errors.set(errorId, errorReport)
-    
+    this.errors.set(errorId, errorReport);
+
     // Log error with appropriate level
-    this.logError(errorReport)
-    
+    this.logError(errorReport);
+
     // Update error counts for notification logic
-    const errorKey = `${category}-${level}`
-    this.errorCounts.set(errorKey, (this.errorCounts.get(errorKey) || 0) + 1)
-    
+    const errorKey = `${category}-${level}`;
+    this.errorCounts.set(errorKey, (this.errorCounts.get(errorKey) || 0) + 1);
+
     // Check if notification should be sent
-    await this.checkNotificationThreshold(errorReport)
-    
+    await this.checkNotificationThreshold(errorReport);
+
     // Save to disk
-    await this.saveErrorToDisk(errorReport)
-    
-    return errorReport
+    await this.saveErrorToDisk(errorReport);
+
+    return errorReport;
   }
 
   /**
    * Determine error severity level
    */
-  private determineErrorLevel(error: Error | null, context: Partial<ErrorContext>): ErrorReport['level'] {
+  private determineErrorLevel(
+    error: Error | null,
+    context: Partial<ErrorContext>,
+  ): ErrorReport['level'] {
     // Critical: System crashes, database failures, security breaches
-    if (error?.message.includes('ECONNREFUSED') || 
-        error?.message.includes('database') ||
-        context.operation?.includes('auth') ||
-        error?.message.includes('EPERM')) {
-      return 'critical'
+    if (
+      error?.message.includes('ECONNREFUSED') ||
+      error?.message.includes('database') ||
+      context.operation?.includes('auth') ||
+      error?.message.includes('EPERM')
+    ) {
+      return 'critical';
     }
-    
+
     // High: API failures, important operation failures
-    if (error?.name === 'ValidationError' ||
-        error?.message.includes('timeout') ||
-        context.operation?.includes('payment') ||
-        context.operation?.includes('export')) {
-      return 'high'
+    if (
+      error?.name === 'ValidationError' ||
+      error?.message.includes('timeout') ||
+      context.operation?.includes('payment') ||
+      context.operation?.includes('export')
+    ) {
+      return 'high';
     }
-    
+
     // Medium: User errors, recoverable failures
-    if (error?.name === 'TypeError' ||
-        error?.message.includes('not found') ||
-        context.operation?.includes('upload')) {
-      return 'medium'
+    if (
+      error?.name === 'TypeError' ||
+      error?.message.includes('not found') ||
+      context.operation?.includes('upload')
+    ) {
+      return 'medium';
     }
-    
+
     // Low: Minor issues, warnings
-    return 'low'
+    return 'low';
   }
 
   /**
    * Categorize error by type
    */
-  private categorizeError(error: Error | null, context: Partial<ErrorContext>): ErrorReport['category'] {
-    if (error?.message.includes('fetch') || 
-        error?.message.includes('network') ||
-        context.url) {
-      return 'network'
+  private categorizeError(
+    error: Error | null,
+    context: Partial<ErrorContext>,
+  ): ErrorReport['category'] {
+    if (error?.message.includes('fetch') || error?.message.includes('network') || context.url) {
+      return 'network';
     }
-    
-    if (error?.message.includes('database') ||
-        error?.message.includes('sql') ||
-        error?.message.includes('connection')) {
-      return 'database'
+
+    if (
+      error?.message.includes('database') ||
+      error?.message.includes('sql') ||
+      error?.message.includes('connection')
+    ) {
+      return 'database';
     }
-    
-    if (context.operation?.includes('auth') ||
-        error?.message.includes('unauthorized') ||
-        error?.message.includes('forbidden')) {
-      return 'authentication'
+
+    if (
+      context.operation?.includes('auth') ||
+      error?.message.includes('unauthorized') ||
+      error?.message.includes('forbidden')
+    ) {
+      return 'authentication';
     }
-    
-    if (error?.name === 'ValidationError' ||
-        error?.message.includes('validation') ||
-        error?.message.includes('invalid')) {
-      return 'validation'
+
+    if (
+      error?.name === 'ValidationError' ||
+      error?.message.includes('validation') ||
+      error?.message.includes('invalid')
+    ) {
+      return 'validation';
     }
-    
-    if (error?.message.includes('business') ||
-        context.operation?.includes('business')) {
-      return 'business'
+
+    if (error?.message.includes('business') || context.operation?.includes('business')) {
+      return 'business';
     }
-    
-    return 'system'
+
+    return 'system';
   }
 
   /**
    * Log error with appropriate level
    */
   private logError(errorReport: ErrorReport) {
-    const logMessage = `[${errorReport.category.toUpperCase()}] ${errorReport.message}`
+    const logMessage = `[${errorReport.category.toUpperCase()}] ${errorReport.message}`;
     const contextInfo = {
       id: errorReport.id,
       level: errorReport.level,
       category: errorReport.category,
       context: errorReport.context,
-      metadata: errorReport.metadata
-    }
-    
+      metadata: errorReport.metadata,
+    };
+
     switch (errorReport.level) {
       case 'critical':
-        logger.error(logMessage, contextInfo)
-        break
+        logger.error(logMessage, contextInfo);
+        break;
       case 'high':
-        logger.error(logMessage, contextInfo)
-        break
+        logger.error(logMessage, contextInfo);
+        break;
       case 'medium':
-        logger.warn(logMessage, contextInfo)
-        break
+        logger.warn(logMessage, contextInfo);
+        break;
       case 'low':
-        logger.info(logMessage, contextInfo)
-        break
+        logger.info(logMessage, contextInfo);
+        break;
     }
   }
 
@@ -243,15 +260,15 @@ export class ErrorReportingService {
    * Check if notification threshold is reached
    */
   private async checkNotificationThreshold(errorReport: ErrorReport) {
-    const threshold = this.notificationConfig.threshold[errorReport.level]
-    const errorKey = `${errorReport.category}-${errorReport.level}`
-    const currentCount = this.errorCounts.get(errorKey) || 0
-    
+    const threshold = this.notificationConfig.threshold[errorReport.level];
+    const errorKey = `${errorReport.category}-${errorReport.level}`;
+    const currentCount = this.errorCounts.get(errorKey) || 0;
+
     if (currentCount >= threshold) {
-      await this.sendNotification(errorReport, currentCount)
+      await this.sendNotification(errorReport, currentCount);
       // Reset counter after notification
-      this.errorCounts.set(errorKey, 0)
-      this.lastNotification.set(errorKey, new Date())
+      this.errorCounts.set(errorKey, 0);
+      this.lastNotification.set(errorKey, new Date());
     }
   }
 
@@ -270,30 +287,30 @@ export class ErrorReportingService {
       context: {
         operation: errorReport.context.operation,
         userId: errorReport.context.userId,
-        url: errorReport.context.url
+        url: errorReport.context.url,
       },
-      environment: errorReport.context.environment
-    }
+      environment: errorReport.context.environment,
+    };
 
-    const promises: Promise<void>[] = []
+    const promises: Promise<void>[] = [];
 
     // Webhook notification
     if (this.notificationConfig.webhookUrl) {
-      promises.push(this.sendWebhookNotification(notification))
+      promises.push(this.sendWebhookNotification(notification));
     }
 
     // Email notification
     if (this.notificationConfig.emailEndpoint) {
-      promises.push(this.sendEmailNotification(notification))
+      promises.push(this.sendEmailNotification(notification));
     }
 
     // Slack notification
     if (this.notificationConfig.slackWebhook) {
-      promises.push(this.sendSlackNotification(notification))
+      promises.push(this.sendSlackNotification(notification));
     }
 
     // Wait for all notifications to complete (with error handling)
-    await Promise.allSettled(promises)
+    await Promise.allSettled(promises);
   }
 
   /**
@@ -304,14 +321,14 @@ export class ErrorReportingService {
       const response = await fetch(this.notificationConfig.webhookUrl!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(notification)
-      })
-      
+        body: JSON.stringify(notification),
+      });
+
       if (!response.ok) {
-        throw new Error(`Webhook notification failed: ${response.status}`)
+        throw new Error(`Webhook notification failed: ${response.status}`);
       }
     } catch (error) {
-      logger.error('Failed to send webhook notification:', error)
+      logger.error('Failed to send webhook notification:', error);
     }
   }
 
@@ -323,20 +340,20 @@ export class ErrorReportingService {
       const emailData = {
         to: 'admin@example.com',
         subject: notification.title,
-        html: this.generateEmailTemplate(notification)
-      }
-      
+        html: this.generateEmailTemplate(notification),
+      };
+
       const response = await fetch(this.notificationConfig.emailEndpoint!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailData)
-      })
-      
+        body: JSON.stringify(emailData),
+      });
+
       if (!response.ok) {
-        throw new Error(`Email notification failed: ${response.status}`)
+        throw new Error(`Email notification failed: ${response.status}`);
       }
     } catch (error) {
-      logger.error('Failed to send email notification:', error)
+      logger.error('Failed to send email notification:', error);
     }
   }
 
@@ -347,31 +364,33 @@ export class ErrorReportingService {
     try {
       const slackPayload = {
         text: notification.title,
-        attachments: [{
-          color: this.getSlackColor(notification.level),
-          fields: [
-            { title: 'Message', value: notification.message, short: false },
-            { title: 'Level', value: notification.level.toUpperCase(), short: true },
-            { title: 'Category', value: notification.category, short: true },
-            { title: 'Count', value: notification.count.toString(), short: true },
-            { title: 'Environment', value: notification.environment, short: true },
-            { title: 'Error ID', value: notification.errorId, short: true },
-            { title: 'Time', value: notification.timestamp, short: true }
-          ]
-        }]
-      }
-      
+        attachments: [
+          {
+            color: this.getSlackColor(notification.level),
+            fields: [
+              { title: 'Message', value: notification.message, short: false },
+              { title: 'Level', value: notification.level.toUpperCase(), short: true },
+              { title: 'Category', value: notification.category, short: true },
+              { title: 'Count', value: notification.count.toString(), short: true },
+              { title: 'Environment', value: notification.environment, short: true },
+              { title: 'Error ID', value: notification.errorId, short: true },
+              { title: 'Time', value: notification.timestamp, short: true },
+            ],
+          },
+        ],
+      };
+
       const response = await fetch(this.notificationConfig.slackWebhook!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slackPayload)
-      })
-      
+        body: JSON.stringify(slackPayload),
+      });
+
       if (!response.ok) {
-        throw new Error(`Slack notification failed: ${response.status}`)
+        throw new Error(`Slack notification failed: ${response.status}`);
       }
     } catch (error) {
-      logger.error('Failed to send Slack notification:', error)
+      logger.error('Failed to send Slack notification:', error);
     }
   }
 
@@ -390,7 +409,7 @@ export class ErrorReportingService {
       <p><strong>Timestamp:</strong> ${notification.timestamp}</p>
       ${notification.context.operation ? `<p><strong>Operation:</strong> ${notification.context.operation}</p>` : ''}
       ${notification.context.url ? `<p><strong>URL:</strong> ${notification.context.url}</p>` : ''}
-    `
+    `;
   }
 
   /**
@@ -398,11 +417,16 @@ export class ErrorReportingService {
    */
   private getSlackColor(level: string): string {
     switch (level) {
-      case 'critical': return 'danger'
-      case 'high': return 'warning'
-      case 'medium': return 'good'
-      case 'low': return '#439FE0'
-      default: return 'good'
+      case 'critical':
+        return 'danger';
+      case 'high':
+        return 'warning';
+      case 'medium':
+        return 'good';
+      case 'low':
+        return '#439FE0';
+      default:
+        return 'good';
     }
   }
 
@@ -410,42 +434,42 @@ export class ErrorReportingService {
    * Acknowledge error
    */
   public acknowledgeError(errorId: string, acknowledgedBy: string): boolean {
-    const error = this.errors.get(errorId)
-    if (!error) return false
-    
-    error.acknowledgedBy = acknowledgedBy
-    error.acknowledgedAt = new Date()
-    
-    logger.info(`Error ${errorId} acknowledged by ${acknowledgedBy}`)
-    return true
+    const error = this.errors.get(errorId);
+    if (!error) return false;
+
+    error.acknowledgedBy = acknowledgedBy;
+    error.acknowledgedAt = new Date();
+
+    logger.info(`Error ${errorId} acknowledged by ${acknowledgedBy}`);
+    return true;
   }
 
   /**
    * Resolve error
    */
   public resolveError(errorId: string): boolean {
-    const error = this.errors.get(errorId)
-    if (!error) return false
-    
-    error.resolved = true
-    logger.info(`Error ${errorId} marked as resolved`)
-    return true
+    const error = this.errors.get(errorId);
+    if (!error) return false;
+
+    error.resolved = true;
+    logger.info(`Error ${errorId} marked as resolved`);
+    return true;
   }
 
   /**
    * Get error statistics
    */
   public getErrorStats(): ErrorStats {
-    const errors = Array.from(this.errors.values())
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    
+    const errors = Array.from(this.errors.values());
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     return {
       total: errors.length,
       byLevel: {
         low: errors.filter(e => e.level === 'low').length,
         medium: errors.filter(e => e.level === 'medium').length,
         high: errors.filter(e => e.level === 'high').length,
-        critical: errors.filter(e => e.level === 'critical').length
+        critical: errors.filter(e => e.level === 'critical').length,
       },
       byCategory: {
         network: errors.filter(e => e.category === 'network').length,
@@ -453,71 +477,86 @@ export class ErrorReportingService {
         authentication: errors.filter(e => e.category === 'authentication').length,
         validation: errors.filter(e => e.category === 'validation').length,
         business: errors.filter(e => e.category === 'business').length,
-        system: errors.filter(e => e.category === 'system').length
+        system: errors.filter(e => e.category === 'system').length,
       },
       resolved: errors.filter(e => e.resolved).length,
       unresolved: errors.filter(e => !e.resolved).length,
-      recentErrors: errors.filter(e => e.createdAt > oneDayAgo).length
-    }
+      recentErrors: errors.filter(e => e.createdAt > oneDayAgo).length,
+    };
   }
 
   /**
    * Get errors by criteria
    */
-  public getErrors(criteria: {
-    level?: ErrorReport['level']
-    category?: ErrorReport['category']
-    resolved?: boolean
-    limit?: number
-    offset?: number
-  } = {}): ErrorReport[] {
-    let errors = Array.from(this.errors.values())
-    
+  public getErrors(
+    criteria: {
+      level?: ErrorReport['level'];
+      category?: ErrorReport['category'];
+      resolved?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): ErrorReport[] {
+    let errors = Array.from(this.errors.values());
+
     if (criteria.level) {
-      errors = errors.filter(e => e.level === criteria.level)
+      errors = errors.filter(e => e.level === criteria.level);
     }
-    
+
     if (criteria.category) {
-      errors = errors.filter(e => e.category === criteria.category)
+      errors = errors.filter(e => e.category === criteria.category);
     }
-    
+
     if (typeof criteria.resolved === 'boolean') {
-      errors = errors.filter(e => e.resolved === criteria.resolved)
+      errors = errors.filter(e => e.resolved === criteria.resolved);
     }
-    
+
     // Sort by creation date (newest first)
-    errors.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    
+    errors.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
     // Apply pagination
-    const offset = criteria.offset || 0
-    const limit = criteria.limit || errors.length
-    return errors.slice(offset, offset + limit)
+    const offset = criteria.offset || 0;
+    const limit = criteria.limit || errors.length;
+    return errors.slice(offset, offset + limit);
   }
 
   /**
    * Export error log
    */
   public async exportErrorLog(format: 'json' | 'csv' = 'json'): Promise<string> {
-    const errors = Array.from(this.errors.values())
-    
+    const errors = Array.from(this.errors.values());
+
     if (format === 'json') {
-      return JSON.stringify({
-        exportedAt: new Date().toISOString(),
-        stats: this.getErrorStats(),
-        errors: errors.map(e => ({
-          ...e,
-          createdAt: e.createdAt.toISOString(),
-          acknowledgedAt: e.acknowledgedAt?.toISOString(),
-          context: {
-            ...e.context,
-            timestamp: e.context.timestamp.toISOString()
-          }
-        }))
-      }, null, 2)
+      return JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          stats: this.getErrorStats(),
+          errors: errors.map(e => ({
+            ...e,
+            createdAt: e.createdAt.toISOString(),
+            acknowledgedAt: e.acknowledgedAt?.toISOString(),
+            context: {
+              ...e.context,
+              timestamp: e.context.timestamp.toISOString(),
+            },
+          })),
+        },
+        null,
+        2,
+      );
     }
-    
+
     // CSV format
-    const headers = ['ID', 'Level', 'Category', 'Message', 'Resolved', 'Created At', 'Operation', 'User ID']
+    const headers = [
+      'ID',
+      'Level',
+      'Category',
+      'Message',
+      'Resolved',
+      'Created At',
+      'Operation',
+      'User ID',
+    ];
     const rows = errors.map(e => [
       e.id,
       e.level,
@@ -526,17 +565,17 @@ export class ErrorReportingService {
       e.resolved ? 'Yes' : 'No',
       e.createdAt.toISOString(),
       e.context.operation || '',
-      e.context.userId || ''
-    ])
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n')
+      e.context.userId || '',
+    ]);
+
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   }
 
   /**
    * Generate unique error ID
    */
   private generateErrorId(): string {
-    return `err-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    return `err-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
@@ -544,25 +583,26 @@ export class ErrorReportingService {
    */
   private async saveErrorToDisk(errorReport: ErrorReport) {
     try {
-      const logsDir = path.resolve(process.cwd(), 'logs', 'errors')
-      await fs.mkdir(logsDir, { recursive: true })
-      
-      const filename = `${errorReport.createdAt.toISOString().split('T')[0]}.jsonl`
-      const filepath = path.join(logsDir, filename)
-      
-      const logEntry = JSON.stringify({
-        ...errorReport,
-        createdAt: errorReport.createdAt.toISOString(),
-        acknowledgedAt: errorReport.acknowledgedAt?.toISOString(),
-        context: {
-          ...errorReport.context,
-          timestamp: errorReport.context.timestamp.toISOString()
-        }
-      }) + '\n'
-      
-      await fs.appendFile(filepath, logEntry)
+      const logsDir = path.resolve(process.cwd(), 'logs', 'errors');
+      await fs.mkdir(logsDir, { recursive: true });
+
+      const filename = `${errorReport.createdAt.toISOString().split('T')[0]}.jsonl`;
+      const filepath = path.join(logsDir, filename);
+
+      const logEntry =
+        JSON.stringify({
+          ...errorReport,
+          createdAt: errorReport.createdAt.toISOString(),
+          acknowledgedAt: errorReport.acknowledgedAt?.toISOString(),
+          context: {
+            ...errorReport.context,
+            timestamp: errorReport.context.timestamp.toISOString(),
+          },
+        }) + '\n';
+
+      await fs.appendFile(filepath, logEntry);
     } catch (error) {
-      logger.error('Failed to save error to disk:', error)
+      logger.error('Failed to save error to disk:', error);
     }
   }
 
@@ -571,43 +611,45 @@ export class ErrorReportingService {
    */
   private async loadErrorsFromDisk() {
     try {
-      const logsDir = path.resolve(process.cwd(), 'logs', 'errors')
-      const files = await fs.readdir(logsDir).catch(() => [])
-      
+      const logsDir = path.resolve(process.cwd(), 'logs', 'errors');
+      const files = await fs.readdir(logsDir).catch(() => []);
+
       // Load recent error files (last 7 days)
       const recentFiles = files
         .filter(f => f.endsWith('.jsonl'))
         .sort()
-        .slice(-7) // Last 7 files
-      
+        .slice(-7); // Last 7 files
+
       for (const file of recentFiles) {
-        const filepath = path.join(logsDir, file)
-        const content = await fs.readFile(filepath, 'utf-8')
-        const lines = content.trim().split('\n').filter(Boolean)
-        
+        const filepath = path.join(logsDir, file);
+        const content = await fs.readFile(filepath, 'utf-8');
+        const lines = content.trim().split('\n').filter(Boolean);
+
         for (const line of lines) {
           try {
-            const errorData = JSON.parse(line)
+            const errorData = JSON.parse(line);
             const errorReport: ErrorReport = {
               ...errorData,
               createdAt: new Date(errorData.createdAt),
-              acknowledgedAt: errorData.acknowledgedAt ? new Date(errorData.acknowledgedAt) : undefined,
+              acknowledgedAt: errorData.acknowledgedAt
+                ? new Date(errorData.acknowledgedAt)
+                : undefined,
               context: {
                 ...errorData.context,
-                timestamp: new Date(errorData.context.timestamp)
-              }
-            }
-            
-            this.errors.set(errorReport.id, errorReport)
+                timestamp: new Date(errorData.context.timestamp),
+              },
+            };
+
+            this.errors.set(errorReport.id, errorReport);
           } catch (parseError) {
-            logger.warn(`Failed to parse error log entry: ${parseError}`)
+            logger.warn(`Failed to parse error log entry: ${parseError}`);
           }
         }
       }
-      
-      logger.info(`Loaded ${this.errors.size} errors from disk`)
+
+      logger.info(`Loaded ${this.errors.size} errors from disk`);
     } catch (error) {
-      logger.error('Failed to load errors from disk:', error)
+      logger.error('Failed to load errors from disk:', error);
     }
   }
 
@@ -615,22 +657,22 @@ export class ErrorReportingService {
    * Clean up old errors (keep last 30 days)
    */
   private async cleanupOldErrors() {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const toDelete: string[] = []
-    
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const toDelete: string[] = [];
+
     for (const [id, error] of this.errors) {
       if (error.createdAt < thirtyDaysAgo) {
-        toDelete.push(id)
+        toDelete.push(id);
       }
     }
-    
-    toDelete.forEach(id => this.errors.delete(id))
-    
+
+    toDelete.forEach(id => this.errors.delete(id));
+
     if (toDelete.length > 0) {
-      logger.info(`Cleaned up ${toDelete.length} old error reports`)
+      logger.info(`Cleaned up ${toDelete.length} old error reports`);
     }
   }
 }
 
 // Singleton instance
-export const errorReporting = new ErrorReportingService()
+export const errorReporting = new ErrorReportingService();

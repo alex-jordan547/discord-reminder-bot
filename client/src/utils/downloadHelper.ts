@@ -160,11 +160,11 @@ export const showDownloadNotification = (info: DownloadInfo): void => {
  */
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 bytes';
-  
+
   const k = 1024;
   const sizes = ['bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
@@ -174,7 +174,7 @@ const formatFileSize = (bytes: number): string => {
 export const openDownloadsManager = (): void => {
   // Try to open browser downloads page
   const userAgent = navigator.userAgent.toLowerCase();
-  
+
   if (userAgent.includes('chrome') || userAgent.includes('chromium')) {
     window.open('chrome://downloads/', '_blank');
   } else if (userAgent.includes('firefox')) {
@@ -184,6 +184,8 @@ export const openDownloadsManager = (): void => {
     alert('To view downloads in Safari:\n1. Press ⌘+Option+L\n2. Or go to View > Show Downloads');
   } else {
     // Generic instruction
-    alert('To view downloads:\n• Press Ctrl+J (Windows/Linux)\n• Press ⌘+Shift+J (Mac)\n• Or check your browser menu');
+    alert(
+      'To view downloads:\n• Press Ctrl+J (Windows/Linux)\n• Press ⌘+Shift+J (Mac)\n• Or check your browser menu',
+    );
   }
 };

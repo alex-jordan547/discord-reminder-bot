@@ -35,14 +35,14 @@ describe('Authentication System', () => {
       // Act
       const response = await server.inject({
         method: 'GET',
-        url: '/protected'
+        url: '/protected',
       });
 
       // Assert
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Unauthorized',
-        message: 'API token required'
+        message: 'API token required',
       });
     });
 
@@ -57,15 +57,15 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: 'InvalidTokenFormat'
-        }
+          authorization: 'InvalidTokenFormat',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Unauthorized',
-        message: 'Invalid token format'
+        message: 'Invalid token format',
       });
     });
 
@@ -80,21 +80,23 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: 'Bearer invalid-token-123'
-        }
+          authorization: 'Bearer invalid-token-123',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Unauthorized',
-        message: 'Invalid or expired token'
+        message: 'Invalid or expired token',
       });
     });
 
     it('should succeed with valid token', async () => {
       // Arrange
-      const validToken = await authService.generateApiToken('admin', { permissions: ['read', 'write'] });
+      const validToken = await authService.generateApiToken('admin', {
+        permissions: ['read', 'write'],
+      });
       server.get('/protected', { preHandler: requireAuth }, async () => {
         return { message: 'success' };
       });
@@ -104,71 +106,75 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: `Bearer ${validToken}`
-        }
+          authorization: `Bearer ${validToken}`,
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({
-        message: 'success'
+        message: 'success',
       });
     });
 
     it('should validate token permissions', async () => {
       // Arrange
       const readOnlyToken = await authService.generateApiToken('user', { permissions: ['read'] });
-      server.post('/admin-action', { 
-        preHandler: [requireAuth, authService.requirePermission('admin')] 
-      }, async () => {
-        return { message: 'admin action completed' };
-      });
+      server.post(
+        '/admin-action',
+        {
+          preHandler: [requireAuth, authService.requirePermission('admin')],
+        },
+        async () => {
+          return { message: 'admin action completed' };
+        },
+      );
 
       // Act
       const response = await server.inject({
         method: 'POST',
         url: '/admin-action',
         headers: {
-          authorization: `Bearer ${readOnlyToken}`
-        }
+          authorization: `Bearer ${readOnlyToken}`,
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(403);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Forbidden',
-        message: 'Insufficient permissions'
+        message: 'Insufficient permissions',
       });
     });
 
     it('should handle token expiration', async () => {
       // Arrange
       vi.useFakeTimers();
-      const shortLivedToken = await authService.generateApiToken('user', { 
+      const shortLivedToken = await authService.generateApiToken('user', {
         permissions: ['read'],
-        expiresIn: '1ms'
+        expiresIn: '1ms',
       });
-      
+
       server.get('/protected', { preHandler: requireAuth }, async () => {
         return { message: 'success' };
       });
 
       // Act - wait for token to expire
       await vi.advanceTimersByTimeAsync(10);
-      
+
       const response = await server.inject({
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: `Bearer ${shortLivedToken}`
-        }
+          authorization: `Bearer ${shortLivedToken}`,
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Unauthorized',
-        message: 'Invalid or expired token'
+        message: 'Invalid or expired token',
       });
 
       vi.useRealTimers();
@@ -182,7 +188,7 @@ describe('Authentication System', () => {
       const sessionData = {
         username: 'testuser',
         permissions: ['read', 'write'],
-        loginTime: new Date()
+        loginTime: new Date(),
       };
 
       // Act
@@ -200,7 +206,7 @@ describe('Authentication System', () => {
       const sessionData = {
         username: 'testuser',
         permissions: ['read', 'write'],
-        loginTime: new Date()
+        loginTime: new Date(),
       };
       const sessionId = await sessionManager.createSession(userId, sessionData);
 
@@ -260,7 +266,9 @@ describe('Authentication System', () => {
 
       // Assert
       expect(updatedSession?.lastActivity).not.toEqual(originalActivity);
-      expect(updatedSession?.lastActivity.getTime()).toBeGreaterThan(originalActivity?.getTime() || 0);
+      expect(updatedSession?.lastActivity.getTime()).toBeGreaterThan(
+        originalActivity?.getTime() || 0,
+      );
     });
   });
 
@@ -269,13 +277,13 @@ describe('Authentication System', () => {
       // Arrange
       server.register(require('@fastify/rate-limit'), {
         max: 5,
-        timeWindow: 60000 // 1 minute
+        timeWindow: 60000, // 1 minute
       });
       server.get('/api/test', async () => ({ message: 'ok' }));
 
       // Act - make 5 requests (within limit)
       const promises = Array.from({ length: 5 }, () =>
-        server.inject({ method: 'GET', url: '/api/test' })
+        server.inject({ method: 'GET', url: '/api/test' }),
       );
       const responses = await Promise.all(promises);
 
@@ -289,7 +297,7 @@ describe('Authentication System', () => {
       // Arrange
       server.register(require('@fastify/rate-limit'), {
         max: 3,
-        timeWindow: 60000 // 1 minute
+        timeWindow: 60000, // 1 minute
       });
       server.get('/api/test', async () => ({ message: 'ok' }));
 
@@ -310,32 +318,36 @@ describe('Authentication System', () => {
     it('should have different rate limits for different endpoints', async () => {
       // Arrange
       server.register(require('@fastify/rate-limit'), {
-        global: false
+        global: false,
       });
 
-      server.get('/api/public', {
-        config: {
-          rateLimit: { max: 10, timeWindow: 60000 }
-        }
-      }, async () => ({ message: 'public' }));
+      server.get(
+        '/api/public',
+        {
+          config: {
+            rateLimit: { max: 10, timeWindow: 60000 },
+          },
+        },
+        async () => ({ message: 'public' }),
+      );
 
-      server.get('/api/admin', {
-        config: {
-          rateLimit: { max: 2, timeWindow: 60000 }
-        }
-      }, async () => ({ message: 'admin' }));
+      server.get(
+        '/api/admin',
+        {
+          config: {
+            rateLimit: { max: 2, timeWindow: 60000 },
+          },
+        },
+        async () => ({ message: 'admin' }),
+      );
 
       // Act
       const publicResponses = await Promise.all(
-        Array.from({ length: 10 }, () =>
-          server.inject({ method: 'GET', url: '/api/public' })
-        )
+        Array.from({ length: 10 }, () => server.inject({ method: 'GET', url: '/api/public' })),
       );
 
       const adminResponses = await Promise.all(
-        Array.from({ length: 3 }, () =>
-          server.inject({ method: 'GET', url: '/api/admin' })
-        )
+        Array.from({ length: 3 }, () => server.inject({ method: 'GET', url: '/api/admin' })),
       );
 
       // Assert
@@ -355,7 +367,7 @@ describe('Authentication System', () => {
       vi.useFakeTimers();
       server.register(require('@fastify/rate-limit'), {
         max: 1,
-        timeWindow: 1000 // 1 second
+        timeWindow: 1000, // 1 second
       });
       server.get('/api/test', async () => ({ message: 'ok' }));
 
@@ -371,7 +383,7 @@ describe('Authentication System', () => {
       // Assert
       expect(firstResponse.statusCode).toBe(200);
       expect(secondResponse.statusCode).toBe(429); // Rate limited
-      expect(thirdResponse.statusCode).toBe(200);  // Reset after window
+      expect(thirdResponse.statusCode).toBe(200); // Reset after window
 
       vi.useRealTimers();
     });
@@ -389,15 +401,15 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: 'Malformed Header Without Bearer'
-        }
+          authorization: 'Malformed Header Without Bearer',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(401);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Unauthorized',
-        message: 'Invalid token format'
+        message: 'Invalid token format',
       });
     });
 
@@ -405,9 +417,9 @@ describe('Authentication System', () => {
       // Arrange
       const mockAuthService = {
         ...authService,
-        validateToken: vi.fn().mockRejectedValue(new Error('Database connection failed'))
+        validateToken: vi.fn().mockRejectedValue(new Error('Database connection failed')),
       };
-      
+
       server.decorateRequest('authService', mockAuthService);
       server.get('/protected', { preHandler: requireAuth }, async () => {
         return { message: 'success' };
@@ -418,15 +430,15 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: 'Bearer valid-looking-token'
-        }
+          authorization: 'Bearer valid-looking-token',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Internal Server Error',
-        message: 'Authentication service unavailable'
+        message: 'Authentication service unavailable',
       });
     });
 
@@ -442,8 +454,8 @@ describe('Authentication System', () => {
         method: 'GET',
         url: '/protected',
         headers: {
-          authorization: 'Bearer invalid-token'
-        }
+          authorization: 'Bearer invalid-token',
+        },
       });
 
       // Assert
@@ -452,8 +464,8 @@ describe('Authentication System', () => {
         expect.objectContaining({
           reason: 'Invalid or expired token',
           ip: expect.any(String),
-          userAgent: expect.any(String)
-        })
+          userAgent: expect.any(String),
+        }),
       );
 
       logSpy.mockRestore();

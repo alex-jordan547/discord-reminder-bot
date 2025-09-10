@@ -24,10 +24,7 @@ export interface AuthenticatedRequest extends FastifyRequest {
  * Main authentication middleware
  * Supports both API tokens (Bearer) and session-based authentication
  */
-export async function authMiddleware(
-  request: AuthenticatedRequest, 
-  reply: FastifyReply
-) {
+export async function authMiddleware(request: AuthenticatedRequest, reply: FastifyReply) {
   try {
     const authorization = request.headers.authorization;
     const sessionCookie = request.cookies?.session;
@@ -46,20 +43,19 @@ export async function authMiddleware(
     logAuthFailure(request, 'No authentication provided');
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'Authentication required'
+      message: 'Authentication required',
     });
-
   } catch (error) {
     logger.error('Authentication middleware error', {
       error: error.message,
       stack: error.stack,
       ip: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return reply.status(500).send({
       error: 'Internal Server Error',
-      message: 'Authentication service unavailable'
+      message: 'Authentication service unavailable',
     });
   }
 }
@@ -68,16 +64,13 @@ export async function authMiddleware(
  * Require authentication middleware
  * Ensures request has a valid user
  */
-export async function requireAuth(
-  request: AuthenticatedRequest,
-  reply: FastifyReply
-) {
+export async function requireAuth(request: AuthenticatedRequest, reply: FastifyReply) {
   await authMiddleware(request, reply);
 
   if (!request.user) {
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'Valid authentication required'
+      message: 'Valid authentication required',
     });
   }
 }
@@ -91,10 +84,10 @@ export function requireRole(role: string) {
 
     if (!request.user || request.user.role !== role) {
       logAuthFailure(request, `Insufficient role: required ${role}, has ${request.user?.role}`);
-      
+
       return reply.status(403).send({
         error: 'Forbidden',
-        message: 'Insufficient permissions'
+        message: 'Insufficient permissions',
       });
     }
   };
@@ -110,10 +103,10 @@ export function requirePermission(permission: string) {
     const user = request.user;
     if (!user || (!user.permissions.includes(permission) && !user.permissions.includes('admin'))) {
       logAuthFailure(request, `Insufficient permissions: required ${permission}`);
-      
+
       return reply.status(403).send({
         error: 'Forbidden',
-        message: 'Insufficient permissions'
+        message: 'Insufficient permissions',
       });
     }
   };
@@ -123,10 +116,7 @@ export function requirePermission(permission: string) {
  * Optional authentication middleware
  * Populates user if authenticated, but doesn't require it
  */
-export async function optionalAuth(
-  request: AuthenticatedRequest,
-  reply: FastifyReply
-) {
+export async function optionalAuth(request: AuthenticatedRequest, reply: FastifyReply) {
   try {
     await authMiddleware(request, reply);
   } catch (error) {
@@ -141,35 +131,35 @@ export async function optionalAuth(
 async function authenticateWithToken(
   request: AuthenticatedRequest,
   reply: FastifyReply,
-  authorization: string
+  authorization: string,
 ) {
   // Check Bearer format
   if (!authorization.startsWith('Bearer ')) {
     logAuthFailure(request, 'Invalid token format - missing Bearer prefix');
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'Invalid token format'
+      message: 'Invalid token format',
     });
   }
 
   const token = authorization.substring(7); // Remove 'Bearer '
-  
+
   if (!token || token.trim().length === 0) {
     logAuthFailure(request, 'Empty token');
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'API token required'
+      message: 'API token required',
     });
   }
 
   try {
     const payload = await authService.validateToken(token);
-    
+
     if (!payload) {
       logAuthFailure(request, 'Invalid or expired token');
       return reply.status(401).send({
         error: 'Unauthorized',
-        message: 'Invalid or expired token'
+        message: 'Invalid or expired token',
       });
     }
 
@@ -177,32 +167,31 @@ async function authenticateWithToken(
     request.user = {
       userId: payload.userId,
       role: payload.role,
-      permissions: payload.permissions
+      permissions: payload.permissions,
     };
 
     logger.debug('API token authentication successful', {
       userId: payload.userId,
       role: payload.role,
-      permissions: payload.permissions
+      permissions: payload.permissions,
     });
-
   } catch (error) {
-    logger.error('Token validation error', { 
+    logger.error('Token validation error', {
       error: error.message,
-      tokenPreview: token.substring(0, 10) + '...'
+      tokenPreview: token.substring(0, 10) + '...',
     });
 
     if (error.message.includes('Database connection failed')) {
       return reply.status(500).send({
         error: 'Internal Server Error',
-        message: 'Authentication service unavailable'
+        message: 'Authentication service unavailable',
       });
     }
 
     logAuthFailure(request, 'Token validation failed');
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'Invalid or expired token'
+      message: 'Invalid or expired token',
     });
   }
 }
@@ -213,25 +202,25 @@ async function authenticateWithToken(
 async function authenticateWithSession(
   request: AuthenticatedRequest,
   reply: FastifyReply,
-  sessionId: string
+  sessionId: string,
 ) {
   try {
     const session = await sessionManager.getSession(sessionId);
-    
+
     if (!session) {
       logAuthFailure(request, 'Invalid or expired session');
-      
+
       // Clear the invalid session cookie
-      reply.setCookie('session', '', { 
+      reply.setCookie('session', '', {
         maxAge: 0,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        sameSite: 'strict',
       });
-      
+
       return reply.status(401).send({
         error: 'Unauthorized',
-        message: 'Session expired'
+        message: 'Session expired',
       });
     }
 
@@ -243,25 +232,24 @@ async function authenticateWithSession(
       userId: session.userId,
       role: session.data.role || 'user',
       permissions: session.data.permissions || ['read'],
-      sessionId
+      sessionId,
     };
 
     logger.debug('Session authentication successful', {
       userId: session.userId,
       sessionId,
-      role: request.user.role
+      role: request.user.role,
     });
-
   } catch (error) {
-    logger.error('Session validation error', { 
+    logger.error('Session validation error', {
       error: error.message,
-      sessionId: sessionId.substring(0, 8) + '...'
+      sessionId: sessionId.substring(0, 8) + '...',
     });
 
     logAuthFailure(request, 'Session validation failed');
     return reply.status(401).send({
       error: 'Unauthorized',
-      message: 'Session validation failed'
+      message: 'Session validation failed',
     });
   }
 }
@@ -276,7 +264,7 @@ function logAuthFailure(request: AuthenticatedRequest, reason: string) {
     userAgent: request.headers['user-agent'],
     path: request.url,
     method: request.method,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 }
 
@@ -289,21 +277,21 @@ export async function handleLogin(
       username: string;
       password: string;
       remember?: boolean;
-    }
+    };
   }>,
-  reply: FastifyReply
+  reply: FastifyReply,
 ) {
   try {
     const { username, password, remember = false } = request.body;
 
     // Validate credentials (implement your authentication logic)
     const user = await validateUserCredentials(username, password);
-    
+
     if (!user) {
       logAuthFailure(request as AuthenticatedRequest, 'Invalid credentials');
       return reply.status(401).send({
         error: 'Unauthorized',
-        message: 'Invalid username or password'
+        message: 'Invalid username or password',
       });
     }
 
@@ -315,13 +303,13 @@ export async function handleLogin(
         username: user.username,
         role: user.role,
         permissions: user.permissions,
-        loginTime: new Date()
+        loginTime: new Date(),
       },
       maxAge,
       {
         userAgent: request.headers['user-agent'],
-        ipAddress: request.ip
-      }
+        ipAddress: request.ip,
+      },
     );
 
     // Set session cookie
@@ -329,7 +317,7 @@ export async function handleLogin(
       maxAge: Math.floor(maxAge / 1000),
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      sameSite: 'strict',
     });
 
     logger.info('User login successful', {
@@ -337,7 +325,7 @@ export async function handleLogin(
       username: user.username,
       sessionId,
       ip: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return reply.send({
@@ -346,15 +334,14 @@ export async function handleLogin(
         id: user.id,
         username: user.username,
         role: user.role,
-        permissions: user.permissions
-      }
+        permissions: user.permissions,
+      },
     });
-
   } catch (error) {
     logger.error('Login error', { error: error.message });
     return reply.status(500).send({
       error: 'Internal Server Error',
-      message: 'Login service unavailable'
+      message: 'Login service unavailable',
     });
   }
 }
@@ -362,37 +349,33 @@ export async function handleLogin(
 /**
  * Create logout route handler
  */
-export async function handleLogout(
-  request: AuthenticatedRequest,
-  reply: FastifyReply
-) {
+export async function handleLogout(request: AuthenticatedRequest, reply: FastifyReply) {
   try {
     const sessionId = request.user?.sessionId || request.cookies?.session;
-    
+
     if (sessionId) {
       await sessionManager.destroySession(sessionId);
-      
+
       // Clear session cookie
       reply.setCookie('session', '', {
         maxAge: 0,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        sameSite: 'strict',
       });
 
       logger.info('User logout successful', {
         userId: request.user?.userId,
-        sessionId
+        sessionId,
       });
     }
 
     return reply.send({ success: true, message: 'Logged out successfully' });
-
   } catch (error) {
     logger.error('Logout error', { error: error.message });
     return reply.status(500).send({
       error: 'Internal Server Error',
-      message: 'Logout service unavailable'
+      message: 'Logout service unavailable',
     });
   }
 }
@@ -404,15 +387,15 @@ export async function handleLogout(
 async function validateUserCredentials(username: string, password: string) {
   // This is a placeholder - implement your actual user authentication logic
   // For example, check against database, LDAP, etc.
-  
+
   if (username === 'admin' && password === 'admin') {
     return {
       id: 'admin-user',
       username: 'admin',
       role: 'admin',
-      permissions: ['admin', 'read', 'write']
+      permissions: ['admin', 'read', 'write'],
     };
   }
-  
+
   return null;
 }

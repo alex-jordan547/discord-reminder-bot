@@ -1,27 +1,16 @@
 <template>
   <Teleport to="body">
-    <Transition
-      name="toast"
-      appear
-      @enter="onEnter"
-      @leave="onLeave"
-    >
-      <div
-        v-if="visible"
-        :class="toastClasses"
-        class="toast"
-        role="alert"
-        aria-live="polite"
-      >
+    <Transition name="toast" appear @enter="onEnter" @leave="onLeave">
+      <div v-if="visible" :class="toastClasses" class="toast" role="alert" aria-live="polite">
         <div class="toast-content">
           <div class="toast-icon">
             <component :is="iconComponent" class="w-5 h-5" />
           </div>
-          
+
           <div class="toast-body">
             <h4 class="toast-title">{{ notification.title }}</h4>
             <p class="toast-message">{{ notification.message }}</p>
-            
+
             <div v-if="notification.actions" class="toast-actions">
               <button
                 v-for="action in notification.actions"
@@ -35,7 +24,7 @@
               </button>
             </div>
           </div>
-          
+
           <button
             data-testid="close-button"
             class="toast-close"
@@ -43,16 +32,18 @@
             aria-label="Close notification"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
-        
+
         <div v-if="showProgress" class="toast-progress">
-          <div 
-            class="toast-progress-bar"
-            :style="{ width: `${progressWidth}%` }"
-          ></div>
+          <div class="toast-progress-bar" :style="{ width: `${progressWidth}%` }"></div>
         </div>
       </div>
     </Transition>
@@ -88,16 +79,16 @@ const toastClasses = computed(() => [
   `toast-${props.notification.priority}`,
   {
     'toast-persistent': props.notification.persistent,
-    'toast-with-actions': props.notification.actions?.length
-  }
+    'toast-with-actions': props.notification.actions?.length,
+  },
 ]);
 
 const iconComponent = computed(() => {
   const icons = {
     info: InfoIcon,
-    success: CheckIcon, 
+    success: CheckIcon,
     warning: ExclamationIcon,
-    error: XCircleIcon
+    error: XCircleIcon,
   };
   return icons[props.notification.type] || InfoIcon;
 });
@@ -125,9 +116,9 @@ const getActionClasses = (style?: string) => {
   const styleClasses = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-    danger: 'bg-red-600 text-white hover:bg-red-700'
+    danger: 'bg-red-600 text-white hover:bg-red-700',
   };
-  
+
   return [baseClasses, styleClasses[style as keyof typeof styleClasses] || styleClasses.secondary];
 };
 
@@ -156,7 +147,7 @@ const startAutoHide = () => {
   progressTimer = window.setInterval(() => {
     currentStep++;
     progressWidth.value = Math.max(0, 100 - (currentStep / totalSteps) * 100);
-    
+
     if (currentStep >= totalSteps) {
       clearInterval(progressTimer!);
       progressTimer = null;

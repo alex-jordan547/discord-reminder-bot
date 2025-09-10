@@ -13,7 +13,7 @@ describe('ToastNotification', () => {
     timestamp: new Date().toISOString(),
     priority: 'medium',
     autoHide: true,
-    hideDelay: 3000
+    hideDelay: 3000,
   };
 
   beforeEach(() => {
@@ -30,7 +30,7 @@ describe('ToastNotification', () => {
       // Component should render without throwing
       expect(() => {
         mount(ToastNotification, {
-          props: { notification: mockNotification }
+          props: { notification: mockNotification },
         });
       }).not.toThrow();
     });
@@ -38,10 +38,10 @@ describe('ToastNotification', () => {
     it('should use Vue Teleport for portal rendering', async () => {
       // Create a body element for teleport target
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const wrapper = mount(ToastNotification, {
         props: { notification: mockNotification },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
@@ -53,14 +53,14 @@ describe('ToastNotification', () => {
 
     it('should display notification content', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const wrapper = mount(ToastNotification, {
         props: { notification: mockNotification },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
-      
+
       // Check content in the DOM
       expect(document.body.textContent).toContain(mockNotification.title);
       expect(document.body.textContent).toContain(mockNotification.message);
@@ -68,14 +68,14 @@ describe('ToastNotification', () => {
 
     it('should apply notification type styling', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const wrapper = mount(ToastNotification, {
         props: { notification: mockNotification },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
-      
+
       // Check for type-specific classes in the DOM
       const toastElement = document.querySelector('.toast');
       expect(toastElement?.classList.contains('toast-info')).toBe(true);
@@ -84,10 +84,10 @@ describe('ToastNotification', () => {
     it('should fail - auto-hide functionality not implemented', async () => {
       const onHide = vi.fn();
       const wrapper = mount(ToastNotification, {
-        props: { 
+        props: {
           notification: { ...mockNotification, autoHide: true, hideDelay: 1000 },
-          onHide
-        }
+          onHide,
+        },
       });
 
       vi.advanceTimersByTime(1000);
@@ -98,11 +98,11 @@ describe('ToastNotification', () => {
 
     it('should implement close button functionality', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const onHide = vi.fn();
       const wrapper = mount(ToastNotification, {
         props: { notification: mockNotification, onHide },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
@@ -112,24 +112,22 @@ describe('ToastNotification', () => {
 
       closeButton.click();
       await nextTick();
-      
+
       expect(onHide).toHaveBeenCalledWith(mockNotification.id);
     });
 
     it('should render notification actions', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const action = vi.fn();
       const notificationWithActions: Notification = {
         ...mockNotification,
-        actions: [
-          { id: 'action-1', label: 'Retry', action, style: 'primary' }
-        ]
+        actions: [{ id: 'action-1', label: 'Retry', action, style: 'primary' }],
       };
 
       const wrapper = mount(ToastNotification, {
         props: { notification: notificationWithActions },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
@@ -140,26 +138,26 @@ describe('ToastNotification', () => {
 
       actionButton.click();
       await nextTick();
-      
+
       expect(action).toHaveBeenCalled();
     });
 
     it('should apply priority-based styling', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const criticalNotification: Notification = {
         ...mockNotification,
         priority: 'critical',
-        type: 'error'
+        type: 'error',
       };
 
       const wrapper = mount(ToastNotification, {
         props: { notification: criticalNotification },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
-      
+
       const toastElement = document.querySelector('.toast');
       expect(toastElement?.classList.contains('toast-critical')).toBe(true);
       expect(toastElement?.classList.contains('toast-error')).toBe(true);
@@ -167,14 +165,14 @@ describe('ToastNotification', () => {
 
     it('should implement animation transitions', async () => {
       document.body.innerHTML = '<div id="app"></div>';
-      
+
       const wrapper = mount(ToastNotification, {
         props: { notification: mockNotification },
-        attachTo: document.body
+        attachTo: document.body,
       });
 
       await nextTick();
-      
+
       const toastElement = document.querySelector('.toast');
       expect(toastElement?.classList.contains('toast-enter')).toBe(true);
     });

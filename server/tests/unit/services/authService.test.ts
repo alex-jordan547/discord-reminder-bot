@@ -20,7 +20,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     mockBcrypt = vi.mocked(bcrypt);
     mockJwt = vi.mocked(jwt);
-    
+
     authService = new AuthService({
       jwtSecret: 'test-secret',
       tokenExpiry: '1h',
@@ -40,11 +40,7 @@ describe('AuthService', () => {
       const payload = { userId: 'user123', role: 'admin' };
       const token = await authService.generateToken(payload);
 
-      expect(mockJwt.sign).toHaveBeenCalledWith(
-        payload,
-        'test-secret',
-        { expiresIn: '1h' }
-      );
+      expect(mockJwt.sign).toHaveBeenCalledWith(payload, 'test-secret', { expiresIn: '1h' });
       expect(token).toBe(mockToken);
     });
 
@@ -55,11 +51,7 @@ describe('AuthService', () => {
       const payload = { userId: 'user123' };
       const token = await authService.generateToken(payload, '2h');
 
-      expect(mockJwt.sign).toHaveBeenCalledWith(
-        payload,
-        'test-secret',
-        { expiresIn: '2h' }
-      );
+      expect(mockJwt.sign).toHaveBeenCalledWith(payload, 'test-secret', { expiresIn: '2h' });
       expect(token).toBe(mockToken);
     });
 
@@ -72,7 +64,7 @@ describe('AuthService', () => {
 
       const signCall = mockJwt.sign.mock.calls[0];
       const tokenPayload = signCall[0];
-      
+
       expect(tokenPayload).toHaveProperty('iat');
       expect(tokenPayload.userId).toBe('user123');
     });
@@ -83,7 +75,7 @@ describe('AuthService', () => {
       });
 
       const payload = { userId: 'user123' };
-      
+
       await expect(authService.generateToken(payload)).rejects.toThrow('JWT signing failed');
     });
   });
@@ -106,7 +98,7 @@ describe('AuthService', () => {
       });
 
       const token = 'invalid-jwt-token';
-      
+
       await expect(authService.verifyToken(token)).rejects.toThrow('Invalid token');
     });
 
@@ -118,7 +110,7 @@ describe('AuthService', () => {
       });
 
       const token = 'expired-jwt-token';
-      
+
       await expect(authService.verifyToken(token)).rejects.toThrow('Token expired');
     });
 
@@ -130,7 +122,7 @@ describe('AuthService', () => {
       });
 
       const token = 'malformed-token';
-      
+
       await expect(authService.verifyToken(token)).rejects.toThrow('Malformed token');
     });
   });
@@ -167,14 +159,18 @@ describe('AuthService', () => {
       mockBcrypt.hash.mockRejectedValue(new Error('Hashing failed'));
 
       const password = 'plain-password';
-      
+
       await expect(authService.hashPassword(password)).rejects.toThrow('Hashing failed');
     });
 
     it('should reject empty passwords', async () => {
       await expect(authService.hashPassword('')).rejects.toThrow('Password cannot be empty');
-      await expect(authService.hashPassword(null as any)).rejects.toThrow('Password cannot be empty');
-      await expect(authService.hashPassword(undefined as any)).rejects.toThrow('Password cannot be empty');
+      await expect(authService.hashPassword(null as any)).rejects.toThrow(
+        'Password cannot be empty',
+      );
+      await expect(authService.hashPassword(undefined as any)).rejects.toThrow(
+        'Password cannot be empty',
+      );
     });
   });
 
@@ -184,7 +180,7 @@ describe('AuthService', () => {
 
       const password = 'plain-password';
       const hashedPassword = 'hashed-password';
-      
+
       const isValid = await authService.verifyPassword(password, hashedPassword);
 
       expect(mockBcrypt.compare).toHaveBeenCalledWith(password, hashedPassword);
@@ -196,7 +192,7 @@ describe('AuthService', () => {
 
       const password = 'wrong-password';
       const hashedPassword = 'hashed-password';
-      
+
       const isValid = await authService.verifyPassword(password, hashedPassword);
 
       expect(mockBcrypt.compare).toHaveBeenCalledWith(password, hashedPassword);
@@ -208,13 +204,15 @@ describe('AuthService', () => {
 
       const password = 'plain-password';
       const hashedPassword = 'hashed-password';
-      
-      await expect(authService.verifyPassword(password, hashedPassword)).rejects.toThrow('Comparison failed');
+
+      await expect(authService.verifyPassword(password, hashedPassword)).rejects.toThrow(
+        'Comparison failed',
+      );
     });
 
     it('should reject empty inputs', async () => {
       const hashedPassword = 'hashed-password';
-      
+
       await expect(authService.verifyPassword('', hashedPassword)).rejects.toThrow('Invalid input');
       await expect(authService.verifyPassword('password', '')).rejects.toThrow('Invalid input');
     });
@@ -244,13 +242,7 @@ describe('AuthService', () => {
     });
 
     it('should reject invalid API key formats', async () => {
-      const invalidKeys = [
-        'too-short',
-        'contains-invalid-chars!@#',
-        '',
-        null,
-        undefined,
-      ];
+      const invalidKeys = ['too-short', 'contains-invalid-chars!@#', '', null, undefined];
 
       for (const key of invalidKeys) {
         const isValid = await authService.validateApiKeyFormat(key as any);
@@ -274,7 +266,7 @@ describe('AuthService', () => {
 
       const apiKey = 'plain-api-key';
       const hashedKey = 'hashed-api-key';
-      
+
       const isValid = await authService.verifyApiKey(apiKey, hashedKey);
 
       expect(mockBcrypt.compare).toHaveBeenCalledWith(apiKey, hashedKey);
@@ -365,7 +357,7 @@ describe('AuthService', () => {
       for (let i = 0; i < 5; i++) {
         const sessionId = await authService.createSession(
           { userId: `user${i}` },
-          1000 // 1 second expiry
+          1000, // 1 second expiry
         );
         sessionIds.push(sessionId);
       }
@@ -389,7 +381,7 @@ describe('AuthService', () => {
   describe('Rate Limiting', () => {
     it('should track authentication attempts', async () => {
       const identifier = 'user123';
-      
+
       await authService.recordAuthAttempt(identifier, false);
       const attempts = await authService.getAuthAttempts(identifier);
 
@@ -400,28 +392,28 @@ describe('AuthService', () => {
 
     it('should increment failed attempts', async () => {
       const identifier = 'user123';
-      
+
       await authService.recordAuthAttempt(identifier, false);
       await authService.recordAuthAttempt(identifier, false);
       await authService.recordAuthAttempt(identifier, false);
-      
+
       const attempts = await authService.getAuthAttempts(identifier);
       expect(attempts.count).toBe(3);
     });
 
     it('should reset attempts on successful authentication', async () => {
       const identifier = 'user123';
-      
+
       // Record failed attempts
       await authService.recordAuthAttempt(identifier, false);
       await authService.recordAuthAttempt(identifier, false);
-      
+
       let attempts = await authService.getAuthAttempts(identifier);
       expect(attempts.count).toBe(2);
 
       // Record successful attempt
       await authService.recordAuthAttempt(identifier, true);
-      
+
       attempts = await authService.getAuthAttempts(identifier);
       expect(attempts.count).toBe(0);
       expect(attempts.successful).toBe(true);
@@ -430,12 +422,12 @@ describe('AuthService', () => {
     it('should check if user is rate limited', async () => {
       const identifier = 'user123';
       const maxAttempts = 5;
-      
+
       // Record failed attempts up to limit
       for (let i = 0; i < maxAttempts; i++) {
         await authService.recordAuthAttempt(identifier, false);
       }
-      
+
       const isLimited = await authService.isRateLimited(identifier, maxAttempts);
       expect(isLimited).toBe(true);
     });
@@ -443,34 +435,34 @@ describe('AuthService', () => {
     it('should not rate limit below threshold', async () => {
       const identifier = 'user123';
       const maxAttempts = 5;
-      
+
       // Record failed attempts below limit
       for (let i = 0; i < maxAttempts - 1; i++) {
         await authService.recordAuthAttempt(identifier, false);
       }
-      
+
       const isLimited = await authService.isRateLimited(identifier, maxAttempts);
       expect(isLimited).toBe(false);
     });
 
     it('should implement time-based rate limiting', async () => {
       vi.useFakeTimers();
-      
+
       const identifier = 'user123';
       const maxAttempts = 3;
       const windowMs = 60000; // 1 minute
-      
+
       // Record failed attempts
       for (let i = 0; i < maxAttempts; i++) {
         await authService.recordAuthAttempt(identifier, false);
       }
-      
+
       let isLimited = await authService.isRateLimited(identifier, maxAttempts, windowMs);
       expect(isLimited).toBe(true);
 
       // Fast-forward past window
       vi.advanceTimersByTime(windowMs + 1000);
-      
+
       isLimited = await authService.isRateLimited(identifier, maxAttempts, windowMs);
       expect(isLimited).toBe(false);
 
@@ -481,7 +473,7 @@ describe('AuthService', () => {
   describe('Permission Management', () => {
     it('should check user permissions', async () => {
       const userPermissions = ['read', 'write', 'admin'];
-      
+
       expect(authService.hasPermission(userPermissions, 'read')).toBe(true);
       expect(authService.hasPermission(userPermissions, 'write')).toBe(true);
       expect(authService.hasPermission(userPermissions, 'admin')).toBe(true);
@@ -490,7 +482,7 @@ describe('AuthService', () => {
 
     it('should check multiple permissions', async () => {
       const userPermissions = ['read', 'write'];
-      
+
       expect(authService.hasAllPermissions(userPermissions, ['read'])).toBe(true);
       expect(authService.hasAllPermissions(userPermissions, ['read', 'write'])).toBe(true);
       expect(authService.hasAllPermissions(userPermissions, ['read', 'admin'])).toBe(false);
@@ -498,7 +490,7 @@ describe('AuthService', () => {
 
     it('should check any of multiple permissions', async () => {
       const userPermissions = ['read', 'write'];
-      
+
       expect(authService.hasAnyPermission(userPermissions, ['read'])).toBe(true);
       expect(authService.hasAnyPermission(userPermissions, ['admin'])).toBe(false);
       expect(authService.hasAnyPermission(userPermissions, ['admin', 'read'])).toBe(true);
@@ -511,7 +503,12 @@ describe('AuthService', () => {
         user: ['read'],
       };
 
-      expect(authService.getRolePermissions('admin', roleHierarchy)).toEqual(['read', 'write', 'delete', 'admin']);
+      expect(authService.getRolePermissions('admin', roleHierarchy)).toEqual([
+        'read',
+        'write',
+        'delete',
+        'admin',
+      ]);
       expect(authService.getRolePermissions('user', roleHierarchy)).toEqual(['read']);
       expect(authService.getRolePermissions('invalid', roleHierarchy)).toEqual([]);
     });

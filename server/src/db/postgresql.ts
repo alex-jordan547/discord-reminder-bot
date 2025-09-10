@@ -7,13 +7,13 @@ import { Pool, PoolClient, PoolConfig } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 import { createLogger } from '#/utils/loggingConfig';
-import type { 
-  DatabaseConfig, 
-  DatabaseManager, 
-  HealthCheckResult, 
-  ConnectionStats, 
-  PoolInfo, 
-  CircuitBreakerState 
+import type {
+  DatabaseConfig,
+  DatabaseManager,
+  HealthCheckResult,
+  ConnectionStats,
+  PoolInfo,
+  CircuitBreakerState,
 } from './types';
 
 const logger = createLogger('postgresql');
@@ -28,17 +28,17 @@ export class PostgreSQLManager implements DatabaseManager {
   constructor(config: DatabaseConfig) {
     this.validateConfig(config);
     this.config = { ...config };
-    
+
     this.connectionStats = {
       totalAttempts: 0,
       successfulConnections: 0,
       failedAttempts: 0,
-      consecutiveFailures: 0
+      consecutiveFailures: 0,
     };
 
     this.circuitBreaker = {
       state: 'closed',
-      failureCount: 0
+      failureCount: 0,
     };
   }
 
@@ -99,9 +99,11 @@ export class PostgreSQLManager implements DatabaseManager {
       connectionTimeoutMillis: this.config.connectionTimeout || 30000,
       idleTimeoutMillis: this.config.idleTimeout || 10000,
       maxUses: this.config.maxLifetime ? Math.floor(this.config.maxLifetime / 1000) : undefined,
-      ssl: this.config.ssl ? {
-        rejectUnauthorized: this.config.sslMode !== 'allow'
-      } : false
+      ssl: this.config.ssl
+        ? {
+            rejectUnauthorized: this.config.sslMode !== 'allow',
+          }
+        : false,
     };
 
     this.pool = new Pool(poolConfig);
@@ -112,7 +114,9 @@ export class PostgreSQLManager implements DatabaseManager {
     await client.query('SELECT 1');
     client.release();
 
-    logger.info(`PostgreSQL connected: ${this.config.host}:${this.config.port}/${this.config.database}`);
+    logger.info(
+      `PostgreSQL connected: ${this.config.host}:${this.config.port}/${this.config.database}`,
+    );
   }
 
   async connectWithRetry(): Promise<void> {
@@ -134,14 +138,14 @@ export class PostgreSQLManager implements DatabaseManager {
 
       try {
         await this.connect();
-        
+
         // Success - reset circuit breaker and stats
         this.connectionStats.successfulConnections++;
         this.connectionStats.consecutiveFailures = 0;
         this.connectionStats.lastSuccessfulConnection = new Date();
         this.circuitBreaker.state = 'closed';
         this.circuitBreaker.failureCount = 0;
-        
+
         return;
       } catch (error) {
         lastError = error as Error;
@@ -149,7 +153,7 @@ export class PostgreSQLManager implements DatabaseManager {
         this.connectionStats.consecutiveFailures++;
         this.connectionStats.lastFailedConnection = new Date();
         this.connectionStats.lastError = lastError;
-        
+
         this.circuitBreaker.failureCount++;
         this.circuitBreaker.lastFailureTime = new Date();
 
@@ -184,14 +188,14 @@ export class PostgreSQLManager implements DatabaseManager {
 
   async healthCheck(): Promise<HealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       if (!this.pool || this.pool.ended) {
         return {
           status: 'unhealthy',
           details: 'No active connection pool',
           timestamp: new Date(),
-          responseTime: Date.now() - startTime
+          responseTime: Date.now() - startTime,
         };
       }
 
@@ -203,7 +207,7 @@ export class PostgreSQLManager implements DatabaseManager {
         status: 'healthy',
         details: 'Database is responsive',
         timestamp: new Date(),
-        responseTime: Date.now() - startTime
+        responseTime: Date.now() - startTime,
       };
     } catch (error) {
       return {
@@ -211,7 +215,7 @@ export class PostgreSQLManager implements DatabaseManager {
         details: `Database error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date(),
         responseTime: Date.now() - startTime,
-        error: error as Error
+        error: error as Error,
       };
     }
   }
@@ -231,7 +235,7 @@ export class PostgreSQLManager implements DatabaseManager {
         idleConnections: 0,
         activeConnections: 0,
         maxConnections: 0,
-        waitingClients: 0
+        waitingClients: 0,
       };
     }
 
@@ -240,7 +244,7 @@ export class PostgreSQLManager implements DatabaseManager {
       idleConnections: this.pool.idleCount,
       activeConnections: this.pool.totalCount - this.pool.idleCount,
       maxConnections: this.pool.options.max || 10,
-      waitingClients: this.pool.waitingCount
+      waitingClients: this.pool.waitingCount,
     };
   }
 
@@ -291,9 +295,9 @@ export class PostgreSQLManager implements DatabaseManager {
 
   private static getPostgreSQLConfig(): DatabaseConfig {
     const databaseUrl = process.env.DATABASE_URL;
-    
+
     let config: DatabaseConfig;
-    
+
     if (databaseUrl) {
       config = this.parseConnectionString(databaseUrl);
     } else {
@@ -312,7 +316,7 @@ export class PostgreSQLManager implements DatabaseManager {
         retryAttempts: 3,
         retryDelay: 1000,
         circuitBreakerThreshold: 5,
-        circuitBreakerTimeout: 60000
+        circuitBreakerTimeout: 60000,
       };
     }
 
@@ -324,13 +328,20 @@ export class PostgreSQLManager implements DatabaseManager {
     if (process.env.DATABASE_PASSWORD) config.password = process.env.DATABASE_PASSWORD;
     if (process.env.DATABASE_SSL) config.ssl = process.env.DATABASE_SSL === 'true';
     if (process.env.DATABASE_POOL_SIZE) config.poolSize = parseInt(process.env.DATABASE_POOL_SIZE);
-    if (process.env.DATABASE_CONNECTION_TIMEOUT) config.connectionTimeout = parseInt(process.env.DATABASE_CONNECTION_TIMEOUT);
-    if (process.env.DATABASE_IDLE_TIMEOUT) config.idleTimeout = parseInt(process.env.DATABASE_IDLE_TIMEOUT);
-    if (process.env.DATABASE_MAX_LIFETIME) config.maxLifetime = parseInt(process.env.DATABASE_MAX_LIFETIME);
-    if (process.env.DATABASE_RETRY_ATTEMPTS) config.retryAttempts = parseInt(process.env.DATABASE_RETRY_ATTEMPTS);
-    if (process.env.DATABASE_RETRY_DELAY) config.retryDelay = parseInt(process.env.DATABASE_RETRY_DELAY);
-    if (process.env.DATABASE_CIRCUIT_BREAKER_THRESHOLD) config.circuitBreakerThreshold = parseInt(process.env.DATABASE_CIRCUIT_BREAKER_THRESHOLD);
-    if (process.env.DATABASE_CIRCUIT_BREAKER_TIMEOUT) config.circuitBreakerTimeout = parseInt(process.env.DATABASE_CIRCUIT_BREAKER_TIMEOUT);
+    if (process.env.DATABASE_CONNECTION_TIMEOUT)
+      config.connectionTimeout = parseInt(process.env.DATABASE_CONNECTION_TIMEOUT);
+    if (process.env.DATABASE_IDLE_TIMEOUT)
+      config.idleTimeout = parseInt(process.env.DATABASE_IDLE_TIMEOUT);
+    if (process.env.DATABASE_MAX_LIFETIME)
+      config.maxLifetime = parseInt(process.env.DATABASE_MAX_LIFETIME);
+    if (process.env.DATABASE_RETRY_ATTEMPTS)
+      config.retryAttempts = parseInt(process.env.DATABASE_RETRY_ATTEMPTS);
+    if (process.env.DATABASE_RETRY_DELAY)
+      config.retryDelay = parseInt(process.env.DATABASE_RETRY_DELAY);
+    if (process.env.DATABASE_CIRCUIT_BREAKER_THRESHOLD)
+      config.circuitBreakerThreshold = parseInt(process.env.DATABASE_CIRCUIT_BREAKER_THRESHOLD);
+    if (process.env.DATABASE_CIRCUIT_BREAKER_TIMEOUT)
+      config.circuitBreakerTimeout = parseInt(process.env.DATABASE_CIRCUIT_BREAKER_TIMEOUT);
 
     return config;
   }
@@ -338,7 +349,7 @@ export class PostgreSQLManager implements DatabaseManager {
   private static getSQLiteConfig(): DatabaseConfig {
     return {
       type: 'sqlite',
-      path: process.env.DATABASE_PATH || './data/discord_bot.db'
+      path: process.env.DATABASE_PATH || './data/discord_bot.db',
     };
   }
 
@@ -348,7 +359,7 @@ export class PostgreSQLManager implements DatabaseManager {
   static parseConnectionString(connectionString: string): DatabaseConfig {
     try {
       const url = new URL(connectionString);
-      
+
       const config: DatabaseConfig = {
         type: 'postgresql',
         host: url.hostname,
@@ -360,7 +371,7 @@ export class PostgreSQLManager implements DatabaseManager {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       // Parse query parameters
@@ -372,7 +383,9 @@ export class PostgreSQLManager implements DatabaseManager {
 
       return config;
     } catch (error) {
-      throw new Error(`Invalid connection string: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Invalid connection string: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }

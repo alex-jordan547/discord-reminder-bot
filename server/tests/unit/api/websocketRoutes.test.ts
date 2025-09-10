@@ -26,7 +26,7 @@ describe('WebSocket Routes', () => {
   describe('WebSocket Server Integration', () => {
     it('should accept WebSocket connections on /ws/metrics', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
@@ -54,12 +54,14 @@ describe('WebSocket Routes', () => {
       for (let i = 0; i < 5; i++) {
         const ws = new WebSocket(`${serverAddress}/ws/metrics`);
         connections.push(ws);
-        
-        connectionPromises.push(new Promise((resolve, reject) => {
-          ws.on('open', resolve);
-          ws.on('error', reject);
-          setTimeout(() => reject(new Error('Connection timeout')), 5000);
-        }));
+
+        connectionPromises.push(
+          new Promise((resolve, reject) => {
+            ws.on('open', resolve);
+            ws.on('error', reject);
+            setTimeout(() => reject(new Error('Connection timeout')), 5000);
+          }),
+        );
       }
 
       await Promise.all(connectionPromises);
@@ -76,9 +78,9 @@ describe('WebSocket Routes', () => {
 
       try {
         const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-        
+
         await new Promise((resolve, reject) => {
-          ws.on('close', (code) => {
+          ws.on('close', code => {
             expect(code).toBe(1008); // Policy violation (unauthorized)
             resolve(undefined);
           });
@@ -100,10 +102,10 @@ describe('WebSocket Routes', () => {
       try {
         const ws = new WebSocket(`${serverAddress}/ws/metrics`, {
           headers: {
-            'Authorization': 'Bearer test-token'
-          }
+            Authorization: 'Bearer test-token',
+          },
         });
-        
+
         await new Promise((resolve, reject) => {
           ws.on('open', resolve);
           ws.on('error', reject);
@@ -122,15 +124,15 @@ describe('WebSocket Routes', () => {
   describe('WebSocket Message Handlers', () => {
     it('should broadcast metrics to connected clients', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const messagePromise = new Promise((resolve) => {
-        ws.on('message', (data) => {
+      const messagePromise = new Promise(resolve => {
+        ws.on('message', data => {
           const message = JSON.parse(data.toString());
           expect(message).toHaveProperty('type');
           expect(message).toHaveProperty('data');
@@ -144,13 +146,13 @@ describe('WebSocket Routes', () => {
 
       const message = await messagePromise;
       expect(message).toBeDefined();
-      
+
       ws.close();
     });
 
     it('should handle different message types', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
@@ -158,9 +160,9 @@ describe('WebSocket Routes', () => {
       });
 
       const messages: any[] = [];
-      const messagePromise = new Promise((resolve) => {
+      const messagePromise = new Promise(resolve => {
         let messageCount = 0;
-        ws.on('message', (data) => {
+        ws.on('message', data => {
           const message = JSON.parse(data.toString());
           messages.push(message);
           messageCount++;
@@ -173,25 +175,25 @@ describe('WebSocket Routes', () => {
       ws.send(JSON.stringify({ type: 'ping' }));
 
       await messagePromise;
-      
+
       expect(messages.length).toBeGreaterThanOrEqual(2);
       expect(messages.some(m => m.type === 'subscription_confirmed')).toBe(true);
       expect(messages.some(m => m.type === 'pong')).toBe(true);
-      
+
       ws.close();
     });
 
     it('should handle invalid message formats gracefully', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const errorPromise = new Promise((resolve) => {
-        ws.on('message', (data) => {
+      const errorPromise = new Promise(resolve => {
+        ws.on('message', data => {
           const message = JSON.parse(data.toString());
           if (message.type === 'error') {
             expect(message.error).toContain('Invalid message format');
@@ -215,32 +217,37 @@ describe('WebSocket Routes', () => {
       for (let i = 0; i < 3; i++) {
         const ws = new WebSocket(`${serverAddress}/ws/metrics`);
         clients.push(ws);
-        
-        connectionPromises.push(new Promise((resolve, reject) => {
-          ws.on('open', resolve);
-          ws.on('error', reject);
-          setTimeout(() => reject(new Error('Connection timeout')), 5000);
-        }));
+
+        connectionPromises.push(
+          new Promise((resolve, reject) => {
+            ws.on('open', resolve);
+            ws.on('error', reject);
+            setTimeout(() => reject(new Error('Connection timeout')), 5000);
+          }),
+        );
       }
 
       await Promise.all(connectionPromises);
 
       // Set up message listeners for all clients
-      const messagePromises = clients.map(ws => new Promise((resolve) => {
-        ws.on('message', (data) => {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'metrics_update') {
-            resolve(message);
-          }
-        });
-      }));
+      const messagePromises = clients.map(
+        ws =>
+          new Promise(resolve => {
+            ws.on('message', data => {
+              const message = JSON.parse(data.toString());
+              if (message.type === 'metrics_update') {
+                resolve(message);
+              }
+            });
+          }),
+      );
 
       // Trigger a broadcast (simulate server-side broadcast)
       // In a real scenario, this would be triggered by the monitoring service
       clients[0].send(JSON.stringify({ type: 'trigger_broadcast' }));
 
       const messages = await Promise.all(messagePromises);
-      
+
       expect(messages.length).toBe(3);
       messages.forEach(message => {
         expect(message).toHaveProperty('type', 'metrics_update');
@@ -255,7 +262,7 @@ describe('WebSocket Routes', () => {
     it('should track active connections', async () => {
       const ws1 = new WebSocket(`${serverAddress}/ws/metrics`);
       const ws2 = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await Promise.all([
         new Promise((resolve, reject) => {
           ws1.on('open', resolve);
@@ -266,12 +273,12 @@ describe('WebSocket Routes', () => {
           ws2.on('open', resolve);
           ws2.on('error', reject);
           setTimeout(() => reject(new Error('Connection timeout')), 5000);
-        })
+        }),
       ]);
 
       // Request connection count
-      const countPromise = new Promise((resolve) => {
-        ws1.on('message', (data) => {
+      const countPromise = new Promise(resolve => {
+        ws1.on('message', data => {
           const message = JSON.parse(data.toString());
           if (message.type === 'connection_count') {
             expect(message.count).toBeGreaterThanOrEqual(2);
@@ -289,14 +296,14 @@ describe('WebSocket Routes', () => {
 
     it('should clean up connections on close', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const closePromise = new Promise((resolve) => {
+      const closePromise = new Promise(resolve => {
         ws.on('close', resolve);
       });
 
@@ -309,14 +316,14 @@ describe('WebSocket Routes', () => {
 
     it('should handle connection errors gracefully', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const errorPromise = new Promise((resolve) => {
+      const errorPromise = new Promise(resolve => {
         ws.on('error', resolve);
         ws.on('close', resolve);
       });
@@ -324,7 +331,7 @@ describe('WebSocket Routes', () => {
       // Force an error by sending after close
       ws.close();
       await new Promise(resolve => setTimeout(resolve, 100)); // Wait for close
-      
+
       try {
         ws.send('test');
       } catch (error) {
@@ -339,15 +346,15 @@ describe('WebSocket Routes', () => {
   describe('Rate Limiting', () => {
     it('should implement rate limiting for message sending', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const rateLimitPromise = new Promise((resolve) => {
-        ws.on('message', (data) => {
+      const rateLimitPromise = new Promise(resolve => {
+        ws.on('message', data => {
           const message = JSON.parse(data.toString());
           if (message.type === 'rate_limit_exceeded') {
             expect(message.error).toContain('rate limit');
@@ -367,15 +374,15 @@ describe('WebSocket Routes', () => {
 
     it('should allow normal message flow within rate limits', async () => {
       const ws = new WebSocket(`${serverAddress}/ws/metrics`);
-      
+
       await new Promise((resolve, reject) => {
         ws.on('open', resolve);
         ws.on('error', reject);
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
 
-      const responsePromise = new Promise((resolve) => {
-        ws.on('message', (data) => {
+      const responsePromise = new Promise(resolve => {
+        ws.on('message', data => {
           const message = JSON.parse(data.toString());
           if (message.type === 'pong') {
             resolve(message);
@@ -388,7 +395,7 @@ describe('WebSocket Routes', () => {
 
       const response = await responsePromise;
       expect(response).toHaveProperty('type', 'pong');
-      
+
       ws.close();
     });
   });

@@ -4,7 +4,17 @@
  * Defines all database tables with proper types and relationships
  */
 
-import { pgTable, text, integer, real, unique, index, timestamp, boolean, serial } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  integer,
+  real,
+  unique,
+  index,
+  timestamp,
+  boolean,
+  serial,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Events table - core table for tracking Discord events and reminders
@@ -87,57 +97,61 @@ export const guilds = pgTable(
 );
 
 // Guild configs table - stores per-guild configuration settings
-export const guildConfigs = pgTable('guild_configs', {
-  guildId: text('guild_id')
-    .primaryKey()
-    .references(() => guilds.guildId, { onDelete: 'cascade' }),
-  
-  // Channel configuration
-  reminderChannelId: text('reminder_channel_id'),
-  reminderChannelName: text('reminder_channel_name').notNull().default(''),
-  
-  // Admin configuration  
-  adminRoleIds: text('admin_role_ids').notNull().default('[]'), // JSON array of role IDs
-  adminRoleNames: text('admin_role_names').notNull().default('[]'), // JSON array of role names
-  
-  // Reminder timing configuration
-  defaultIntervalMinutes: integer('default_interval_minutes').notNull().default(60),
-  autoDeleteEnabled: boolean('auto_delete_enabled').notNull().default(false),
-  autoDeleteDelayMinutes: integer('auto_delete_delay_minutes').notNull().default(5),
-  delayBetweenRemindersMs: integer('delay_between_reminders_ms').notNull().default(1000),
-  
-  // Mention and reaction configuration
-  maxMentionsPerReminder: integer('max_mentions_per_reminder').notNull().default(50),
-  useEveryoneAboveLimit: boolean('use_everyone_above_limit').notNull().default(true),
-  defaultReactions: text('default_reactions').notNull().default('["✅","❌","❓"]'), // JSON array
-  
-  // Timezone configuration
-  timezone: text('timezone').notNull().default('UTC'),
-  
-  // Legacy/deprecated fields for backwards compatibility
-  allowedRoles: text('allowed_roles').notNull().default('[]'), // JSON array of role IDs (deprecated)
-  blockedChannels: text('blocked_channels').notNull().default('[]'), // JSON array of channel IDs
-  maxEventsPerGuild: integer('max_events_per_guild').notNull().default(50),
-  enableAutoCleanup: boolean('enable_auto_cleanup').notNull().default(true),
-  cleanupDays: integer('cleanup_days').notNull().default(30),
-  dateFormat: text('date_format').notNull().default('YYYY-MM-DD HH:mm'),
-  
-  // Metadata
-  createdAt: timestamp('created_at')
-    .notNull()
-    .default(sql`now()`),
-  updatedAt: timestamp('updated_at')
-    .notNull()
-    .default(sql`now()`),
-  lastUsedAt: timestamp('last_used_at')
-    .notNull()
-    .default(sql`now()`),
-}, table => ({
-  // Performance indexes for frequent queries
-  guildActiveIdx: index('idx_guild_configs_active').on(table.guildId),
-  reminderChannelIdx: index('idx_guild_configs_reminder_channel').on(table.reminderChannelId),
-  lastUsedIdx: index('idx_guild_configs_last_used').on(table.lastUsedAt),
-}));
+export const guildConfigs = pgTable(
+  'guild_configs',
+  {
+    guildId: text('guild_id')
+      .primaryKey()
+      .references(() => guilds.guildId, { onDelete: 'cascade' }),
+
+    // Channel configuration
+    reminderChannelId: text('reminder_channel_id'),
+    reminderChannelName: text('reminder_channel_name').notNull().default(''),
+
+    // Admin configuration
+    adminRoleIds: text('admin_role_ids').notNull().default('[]'), // JSON array of role IDs
+    adminRoleNames: text('admin_role_names').notNull().default('[]'), // JSON array of role names
+
+    // Reminder timing configuration
+    defaultIntervalMinutes: integer('default_interval_minutes').notNull().default(60),
+    autoDeleteEnabled: boolean('auto_delete_enabled').notNull().default(false),
+    autoDeleteDelayMinutes: integer('auto_delete_delay_minutes').notNull().default(5),
+    delayBetweenRemindersMs: integer('delay_between_reminders_ms').notNull().default(1000),
+
+    // Mention and reaction configuration
+    maxMentionsPerReminder: integer('max_mentions_per_reminder').notNull().default(50),
+    useEveryoneAboveLimit: boolean('use_everyone_above_limit').notNull().default(true),
+    defaultReactions: text('default_reactions').notNull().default('["✅","❌","❓"]'), // JSON array
+
+    // Timezone configuration
+    timezone: text('timezone').notNull().default('UTC'),
+
+    // Legacy/deprecated fields for backwards compatibility
+    allowedRoles: text('allowed_roles').notNull().default('[]'), // JSON array of role IDs (deprecated)
+    blockedChannels: text('blocked_channels').notNull().default('[]'), // JSON array of channel IDs
+    maxEventsPerGuild: integer('max_events_per_guild').notNull().default(50),
+    enableAutoCleanup: boolean('enable_auto_cleanup').notNull().default(true),
+    cleanupDays: integer('cleanup_days').notNull().default(30),
+    dateFormat: text('date_format').notNull().default('YYYY-MM-DD HH:mm'),
+
+    // Metadata
+    createdAt: timestamp('created_at')
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .default(sql`now()`),
+    lastUsedAt: timestamp('last_used_at')
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    // Performance indexes for frequent queries
+    guildActiveIdx: index('idx_guild_configs_active').on(table.guildId),
+    reminderChannelIdx: index('idx_guild_configs_reminder_channel').on(table.reminderChannelId),
+    lastUsedIdx: index('idx_guild_configs_last_used').on(table.lastUsedAt),
+  }),
+);
 
 // Reactions table - tracks user reactions to events
 export const reactions = pgTable(

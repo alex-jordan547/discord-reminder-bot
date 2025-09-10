@@ -26,9 +26,9 @@ export function useLoadingState(options: LoadingStateOptions = {}) {
       // Clear error when starting new loading operation
       error.value = null;
     }
-    
+
     loadingStates.value.set(key, loading);
-    
+
     // Trigger reactivity
     loadingStates.value = new Map(loadingStates.value);
   };
@@ -42,7 +42,7 @@ export function useLoadingState(options: LoadingStateOptions = {}) {
     // Stop all loading states when error occurs
     loadingStates.value.clear();
     loadingStates.value = new Map(loadingStates.value);
-    
+
     // Auto-clear error if configured
     if (options.autoClearError && options.errorTimeout) {
       setTimeout(() => {
@@ -59,7 +59,7 @@ export function useLoadingState(options: LoadingStateOptions = {}) {
 
   const executeAsync = async <T>(
     operation: () => Promise<T>,
-    asyncOptions: AsyncOperationOptions = { preventConcurrent: true }
+    asyncOptions: AsyncOperationOptions = { preventConcurrent: true },
   ): Promise<T> => {
     if (asyncOptions.preventConcurrent && isExecuting.value) {
       throw new Error('Operation already in progress');
@@ -85,7 +85,7 @@ export function useLoadingState(options: LoadingStateOptions = {}) {
     // State
     isLoading,
     error,
-    
+
     // Actions
     setLoading,
     isLoadingKey,

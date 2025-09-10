@@ -27,12 +27,7 @@
                 {{ title }}
               </h2>
             </div>
-            <button
-              v-if="!loading"
-              class="close-button"
-              @click="handleCancel"
-              aria-label="Close"
-            >
+            <button v-if="!loading" class="close-button" @click="handleCancel" aria-label="Close">
               ✕
             </button>
           </div>
@@ -42,11 +37,7 @@
               {{ message }}
             </p>
 
-            <div
-              v-if="fileInfo"
-              data-testid="file-info"
-              class="file-info-section"
-            >
+            <div v-if="fileInfo" data-testid="file-info" class="file-info-section">
               <h4>File Information:</h4>
               <div class="file-details">
                 <div class="file-name">{{ fileInfo.name }}</div>
@@ -87,10 +78,7 @@
               </ul>
             </div>
 
-            <div
-              v-if="requireConfirmation"
-              class="confirmation-input-section"
-            >
+            <div v-if="requireConfirmation" class="confirmation-input-section">
               <label for="confirmation-input" class="confirmation-label">
                 {{ confirmationLabel }}
               </label>
@@ -123,11 +111,7 @@
               :disabled="isConfirmDisabled"
               @click="handleConfirm"
             >
-              <span
-                v-if="loading"
-                data-testid="loading-spinner"
-                class="spinner"
-              ></span>
+              <span v-if="loading" data-testid="loading-spinner" class="spinner"></span>
               {{ confirmButtonText }}
             </button>
           </div>
@@ -211,7 +195,7 @@ const confirmButtonText = computed(() => {
   if (props.loading) {
     return 'Processing...';
   }
-  
+
   const labels = {
     import: 'Import',
     export: 'Export',
@@ -232,11 +216,11 @@ const confirmationPlaceholder = computed(() => {
 
 const isConfirmDisabled = computed(() => {
   if (props.loading) return true;
-  
+
   if (props.requireConfirmation) {
     return confirmationInputValue.value !== props.confirmationText;
   }
-  
+
   return false;
 });
 
@@ -258,27 +242,30 @@ const handleOverlayClick = () => {
 
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 bytes';
-  
+
   const k = 1024;
   const sizes = ['bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
 // Reset confirmation input when dialog becomes visible
-watch(() => props.visible, (newVisible) => {
-  if (newVisible) {
-    confirmationInputValue.value = '';
-    // Focus the confirmation input if required
-    if (props.requireConfirmation) {
-      nextTick(() => {
-        const input = document.getElementById('confirmation-input') as HTMLInputElement;
-        input?.focus();
-      });
+watch(
+  () => props.visible,
+  newVisible => {
+    if (newVisible) {
+      confirmationInputValue.value = '';
+      // Focus the confirmation input if required
+      if (props.requireConfirmation) {
+        nextTick(() => {
+          const input = document.getElementById('confirmation-input') as HTMLInputElement;
+          input?.focus();
+        });
+      }
     }
-  }
-});
+  },
+);
 </script>
 
 <style scoped>
@@ -574,26 +561,26 @@ watch(() => props.visible, (newVisible) => {
   .modal-overlay {
     padding: 0.5rem;
   }
-  
+
   .confirmation-modal {
     max-height: 95vh;
   }
-  
+
   .modal-header,
   .modal-body,
   .modal-footer {
     padding-left: 1rem;
     padding-right: 1rem;
   }
-  
+
   .modal-footer {
     flex-direction: column-reverse;
   }
-  
+
   .btn {
     width: 100%;
   }
-  
+
   .file-meta {
     flex-direction: column;
     gap: 0.25rem;

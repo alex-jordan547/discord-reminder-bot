@@ -3,13 +3,13 @@
     <div class="alerts-header">
       <h1>Alerts & Notifications</h1>
       <p>Monitor and manage system alerts, warnings, and notifications</p>
-      
+
       <div class="alerts-controls">
         <div class="filter-controls">
           <label for="alert-filter">Filter by type:</label>
-          <select 
-            id="alert-filter" 
-            v-model="selectedFilter" 
+          <select
+            id="alert-filter"
+            v-model="selectedFilter"
             data-testid="alert-filter"
             @change="applyFilter"
           >
@@ -20,9 +20,9 @@
             <option value="info">Info</option>
           </select>
         </div>
-        
+
         <div class="action-controls">
-          <button 
+          <button
             class="acknowledge-all-btn"
             data-testid="acknowledge-all"
             @click="acknowledgeAll"
@@ -30,7 +30,7 @@
           >
             ✓ Acknowledge All
           </button>
-          <button 
+          <button
             class="clear-acknowledged-btn"
             data-testid="clear-acknowledged"
             @click="clearAcknowledged"
@@ -38,7 +38,7 @@
           >
             🗑️ Clear Acknowledged
           </button>
-          <button 
+          <button
             class="refresh-btn"
             data-testid="refresh-alerts"
             @click="refreshAlerts"
@@ -58,7 +58,7 @@
           <div class="stat-label">Critical</div>
         </div>
       </div>
-      
+
       <div class="stat-card error">
         <div class="stat-icon">❌</div>
         <div class="stat-content">
@@ -66,7 +66,7 @@
           <div class="stat-label">Errors</div>
         </div>
       </div>
-      
+
       <div class="stat-card warning">
         <div class="stat-icon">⚠️</div>
         <div class="stat-content">
@@ -74,7 +74,7 @@
           <div class="stat-label">Warnings</div>
         </div>
       </div>
-      
+
       <div class="stat-card info">
         <div class="stat-icon">ℹ️</div>
         <div class="stat-content">
@@ -101,16 +101,12 @@
         @acknowledge="handleAlertAcknowledge"
         @dismiss="handleAlertDismiss"
       />
-      
+
       <div v-if="filteredAlerts.length === 0" class="no-alerts" data-testid="no-alerts">
         <div class="no-alerts-icon">🎉</div>
         <h3>No alerts found</h3>
-        <p v-if="selectedFilter">
-          No {{ selectedFilter }} alerts at this time.
-        </p>
-        <p v-else>
-          All systems are running smoothly!
-        </p>
+        <p v-if="selectedFilter">No {{ selectedFilter }} alerts at this time.</p>
+        <p v-else>All systems are running smoothly!</p>
       </div>
     </div>
 
@@ -121,7 +117,7 @@
           <h3>Alert Details</h3>
           <button class="close-btn" @click="closeAlertModal">✕</button>
         </div>
-        
+
         <div class="alert-modal-content">
           <div class="alert-detail-row">
             <strong>Type:</strong>
@@ -129,27 +125,27 @@
               {{ selectedAlert.type.toUpperCase() }}
             </span>
           </div>
-          
+
           <div class="alert-detail-row">
             <strong>Title:</strong>
             <span>{{ selectedAlert.title }}</span>
           </div>
-          
+
           <div class="alert-detail-row">
             <strong>Message:</strong>
             <span>{{ selectedAlert.message }}</span>
           </div>
-          
+
           <div class="alert-detail-row">
             <strong>Source:</strong>
             <span>{{ selectedAlert.source }}</span>
           </div>
-          
+
           <div class="alert-detail-row">
             <strong>Timestamp:</strong>
             <span>{{ formatFullTimestamp(selectedAlert.timestamp) }}</span>
           </div>
-          
+
           <div class="alert-detail-row">
             <strong>Status:</strong>
             <span :class="selectedAlert.acknowledged ? 'acknowledged' : 'unacknowledged'">
@@ -157,21 +153,16 @@
             </span>
           </div>
         </div>
-        
+
         <div class="alert-modal-actions">
-          <button 
+          <button
             v-if="!selectedAlert.acknowledged"
             class="acknowledge-btn"
             @click="acknowledgeAlert(selectedAlert.id)"
           >
             ✓ Acknowledge
           </button>
-          <button 
-            class="dismiss-btn"
-            @click="dismissAlert(selectedAlert.id)"
-          >
-            🗑️ Dismiss
-          </button>
+          <button class="dismiss-btn" @click="dismissAlert(selectedAlert.id)">🗑️ Dismiss</button>
         </div>
       </div>
     </div>
@@ -205,13 +196,13 @@ const alertStats = computed(() => {
     critical: 0,
     error: 0,
     warning: 0,
-    info: 0
+    info: 0,
   };
-  
+
   alerts.value.forEach(alert => {
     stats[alert.type]++;
   });
-  
+
   return stats;
 });
 
@@ -226,38 +217,63 @@ const hasAcknowledgedAlerts = computed(() => {
 // Methods
 function generateMockAlert(): Alert {
   const types: Alert['type'][] = ['critical', 'error', 'warning', 'info'];
-  const sources = ['System Monitor', 'Bot Service', 'Database', 'Network', 'Security', 'Performance'];
+  const sources = [
+    'System Monitor',
+    'Bot Service',
+    'Database',
+    'Network',
+    'Security',
+    'Performance',
+  ];
   const type = types[Math.floor(Math.random() * types.length)];
-  
+
   const alertTemplates = {
     critical: [
-      { title: 'System Critical Error', message: 'CPU usage has exceeded 95% for more than 5 minutes' },
-      { title: 'Bot Disconnected', message: 'Discord bot has lost connection and failed to reconnect' },
+      {
+        title: 'System Critical Error',
+        message: 'CPU usage has exceeded 95% for more than 5 minutes',
+      },
+      {
+        title: 'Bot Disconnected',
+        message: 'Discord bot has lost connection and failed to reconnect',
+      },
       { title: 'Database Connection Lost', message: 'Unable to connect to the primary database' },
-      { title: 'Memory Exhaustion', message: 'System memory usage has reached critical levels (>90%)' }
+      {
+        title: 'Memory Exhaustion',
+        message: 'System memory usage has reached critical levels (>90%)',
+      },
     ],
     error: [
-      { title: 'Command Processing Failed', message: 'Failed to process user command due to internal error' },
+      {
+        title: 'Command Processing Failed',
+        message: 'Failed to process user command due to internal error',
+      },
       { title: 'API Rate Limit Exceeded', message: 'Discord API rate limit has been exceeded' },
       { title: 'Database Query Error', message: 'Database query failed with timeout error' },
-      { title: 'File System Error', message: 'Unable to write to log files - disk may be full' }
+      { title: 'File System Error', message: 'Unable to write to log files - disk may be full' },
     ],
     warning: [
-      { title: 'High Response Time', message: 'Average response time has increased to 2.5 seconds' },
+      {
+        title: 'High Response Time',
+        message: 'Average response time has increased to 2.5 seconds',
+      },
       { title: 'Disk Space Low', message: 'Available disk space is below 20%' },
       { title: 'Memory Usage High', message: 'Memory usage has exceeded 75% threshold' },
-      { title: 'Rate Limit Approaching', message: 'API usage is approaching rate limit threshold' }
+      { title: 'Rate Limit Approaching', message: 'API usage is approaching rate limit threshold' },
     ],
     info: [
       { title: 'New Guild Joined', message: 'Bot has been added to a new Discord server' },
       { title: 'Scheduled Maintenance', message: 'Scheduled maintenance window begins in 2 hours' },
       { title: 'Backup Completed', message: 'Daily database backup completed successfully' },
-      { title: 'System Update Available', message: 'A new system update is available for installation' }
-    ]
+      {
+        title: 'System Update Available',
+        message: 'A new system update is available for installation',
+      },
+    ],
   };
-  
+
   const template = alertTemplates[type][Math.floor(Math.random() * alertTemplates[type].length)];
-  
+
   return {
     id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     type,
@@ -265,17 +281,17 @@ function generateMockAlert(): Alert {
     message: template.message,
     source: sources[Math.floor(Math.random() * sources.length)],
     timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString(), // Random time in last 24h
-    acknowledged: Math.random() > 0.7 // 30% chance of being acknowledged
+    acknowledged: Math.random() > 0.7, // 30% chance of being acknowledged
   };
 }
 
 async function refreshAlerts() {
   loading.value = true;
-  
+
   try {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
-    
+
     // Generate some new alerts occasionally
     if (Math.random() > 0.6) {
       const newAlertsCount = Math.floor(Math.random() * 3) + 1;
@@ -283,15 +299,14 @@ async function refreshAlerts() {
         alerts.value.unshift(generateMockAlert());
       }
     }
-    
+
     // Keep only last 50 alerts
     if (alerts.value.length > 50) {
       alerts.value = alerts.value.slice(0, 50);
     }
-    
+
     // Sort by timestamp (newest first)
     alerts.value.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
   } catch (error) {
     console.error('Failed to refresh alerts:', error);
   } finally {
@@ -324,7 +339,7 @@ function handleAlertAcknowledge(alertId: string) {
 
 function handleAlertDismiss(alertId: string) {
   alerts.value = alerts.value.filter(a => a.id !== alertId);
-  
+
   // Close modal if the dismissed alert was selected
   if (selectedAlert.value?.id === alertId) {
     selectedAlert.value = null;
@@ -355,7 +370,7 @@ function formatFullTimestamp(timestamp: string): string {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    timeZoneName: 'short'
+    timeZoneName: 'short',
   });
 }
 
@@ -378,10 +393,10 @@ onMounted(async () => {
   for (let i = 0; i < 15; i++) {
     alerts.value.push(generateMockAlert());
   }
-  
+
   // Sort by timestamp
   alerts.value.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  
+
   // Start auto-refresh
   startAutoRefresh();
 });
@@ -551,8 +566,12 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .alerts-content {
@@ -735,31 +754,31 @@ onUnmounted(() => {
   .alerts-view {
     padding: 1rem;
   }
-  
+
   .alerts-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .action-controls {
     justify-content: center;
     flex-wrap: wrap;
   }
-  
+
   .alerts-stats {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .alert-modal {
     width: 95%;
     margin: 1rem;
   }
-  
+
   .alert-detail-row {
     flex-direction: column;
     gap: 0.25rem;
   }
-  
+
   .alert-detail-row strong {
     min-width: auto;
   }
@@ -769,11 +788,11 @@ onUnmounted(() => {
   .alerts-header h1 {
     font-size: 1.5rem;
   }
-  
+
   .alerts-stats {
     grid-template-columns: 1fr;
   }
-  
+
   .action-controls {
     flex-direction: column;
   }

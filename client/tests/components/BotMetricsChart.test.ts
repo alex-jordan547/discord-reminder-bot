@@ -207,8 +207,8 @@ describe('BotMetricsChart', () => {
     await nextTick();
 
     expect(wrapper.vm.chartData.datasets[0].backgroundColor).toEqual([
-      'rgba(34, 197, 94, 0.8)',  // Success - green
-      'rgba(239, 68, 68, 0.8)',  // Failed - red
+      'rgba(34, 197, 94, 0.8)', // Success - green
+      'rgba(239, 68, 68, 0.8)', // Failed - red
     ]);
   });
 

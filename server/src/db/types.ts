@@ -6,7 +6,7 @@ export type DatabaseType = 'postgresql' | 'sqlite';
 
 export interface DatabaseConfig {
   type: DatabaseType;
-  
+
   // PostgreSQL specific
   host?: string;
   port?: number;
@@ -15,20 +15,20 @@ export interface DatabaseConfig {
   password?: string;
   ssl?: boolean;
   sslMode?: 'disable' | 'allow' | 'prefer' | 'require' | 'verify-ca' | 'verify-full';
-  
+
   // SQLite specific
   path?: string;
-  
+
   // Connection pooling
   poolSize?: number;
   connectionTimeout?: number;
   idleTimeout?: number;
   maxLifetime?: number;
-  
+
   // Retry configuration
   retryAttempts?: number;
   retryDelay?: number;
-  
+
   // Circuit breaker configuration
   circuitBreakerThreshold?: number;
   circuitBreakerTimeout?: number;

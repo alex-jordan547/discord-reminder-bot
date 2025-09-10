@@ -12,25 +12,25 @@ vi.mock('pg', () => ({
   Pool: vi.fn().mockImplementation(() => ({
     connect: vi.fn().mockResolvedValue({
       query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }),
-      release: vi.fn()
+      release: vi.fn(),
     }),
     end: vi.fn().mockResolvedValue(undefined),
     ended: false,
     totalCount: 10,
     idleCount: 5,
     waitingCount: 0,
-    options: { max: 20 }
-  }))
+    options: { max: 20 },
+  })),
 }));
 
 describe('PostgreSQL Connection Management', () => {
   let postgresManager: PostgreSQLManager;
-  
+
   beforeEach(() => {
     // Reset environment variables
     vi.resetModules();
     vi.clearAllMocks();
-    
+
     // Clean up environment variables
     delete process.env.NODE_ENV;
     delete process.env.DATABASE_TYPE;
@@ -63,11 +63,11 @@ describe('PostgreSQL Connection Management', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       expect(postgresManager).toBeDefined();
       expect(postgresManager.getConfig()).toEqual(config);
     });
@@ -84,12 +84,12 @@ describe('PostgreSQL Connection Management', () => {
         poolSize: 20,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       postgresManager = new PostgreSQLManager(config);
       await postgresManager.connect();
-      
+
       const poolInfo = await postgresManager.getPoolInfo();
       expect(poolInfo.maxConnections).toBe(20);
     });
@@ -107,11 +107,11 @@ describe('PostgreSQL Connection Management', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       expect(postgresManager.getConfig().ssl).toBe(true);
       expect(postgresManager.getConfig().sslMode).toBe('require');
     });
@@ -128,7 +128,7 @@ describe('PostgreSQL Connection Management', () => {
         poolSize: 0,
         connectionTimeout: -1,
         idleTimeout: -1,
-        maxLifetime: -1
+        maxLifetime: -1,
       } as DatabaseConfig;
 
       expect(() => new PostgreSQLManager(invalidConfig)).toThrow('Invalid database configuration');
@@ -142,7 +142,7 @@ describe('PostgreSQL Connection Management', () => {
       process.env.DATABASE_PATH = './dev.db';
 
       const config = PostgreSQLManager.getEnvironmentConfig();
-      
+
       expect(config.type).toBe('sqlite');
       expect(config.path).toBe('./dev.db');
     });
@@ -153,7 +153,7 @@ describe('PostgreSQL Connection Management', () => {
       process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/prod_db';
 
       const config = PostgreSQLManager.getEnvironmentConfig();
-      
+
       expect(config.type).toBe('postgresql');
       expect(config.host).toBe('localhost');
       expect(config.port).toBe(5432);
@@ -164,9 +164,9 @@ describe('PostgreSQL Connection Management', () => {
 
     it('should parse DATABASE_URL correctly', () => {
       const databaseUrl = 'postgresql://testuser:testpass@testhost:5433/testdb?sslmode=require';
-      
+
       const config = PostgreSQLManager.parseConnectionString(databaseUrl);
-      
+
       expect(config.host).toBe('testhost');
       expect(config.port).toBe(5433);
       expect(config.database).toBe('testdb');
@@ -189,7 +189,7 @@ describe('PostgreSQL Connection Management', () => {
       delete process.env.DATABASE_PATH;
 
       const config = PostgreSQLManager.getEnvironmentConfig();
-      
+
       // Should default to SQLite in development
       expect(config.type).toBe('sqlite');
       expect(config.path).toBeDefined();
@@ -211,7 +211,7 @@ describe('PostgreSQL Connection Management', () => {
         DATABASE_PASSWORD: process.env.DATABASE_PASSWORD,
         DATABASE_SSL: process.env.DATABASE_SSL,
         DATABASE_POOL_SIZE: process.env.DATABASE_POOL_SIZE,
-        DATABASE_TYPE: process.env.DATABASE_TYPE
+        DATABASE_TYPE: process.env.DATABASE_TYPE,
       };
 
       // Set override values
@@ -225,7 +225,7 @@ describe('PostgreSQL Connection Management', () => {
       process.env.DATABASE_POOL_SIZE = '25';
 
       const config = PostgreSQLManager.getEnvironmentConfig();
-      
+
       expect(config.host).toBe('override-host');
       expect(config.port).toBe(9999);
       expect(config.database).toBe('override-db');
@@ -258,13 +258,13 @@ describe('PostgreSQL Connection Management', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       const healthResult = await postgresManager.healthCheck();
-      
+
       expect(healthResult).toHaveProperty('status');
       expect(healthResult).toHaveProperty('details');
       expect(healthResult).toHaveProperty('timestamp');
@@ -285,19 +285,19 @@ describe('PostgreSQL Connection Management', () => {
         idleTimeout: 10000,
         maxLifetime: 3600000,
         retryAttempts: 3,
-        retryDelay: 100 // Short delay for testing
+        retryDelay: 100, // Short delay for testing
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       const startTime = Date.now();
-      
+
       try {
         await postgresManager.connectWithRetry();
       } catch (error) {
         const endTime = Date.now();
         const duration = endTime - startTime;
-        
+
         // Should have attempted retries with exponential backoff
         // 100ms + 200ms + 400ms = 700ms minimum
         expect(duration).toBeGreaterThan(600);
@@ -319,16 +319,16 @@ describe('PostgreSQL Connection Management', () => {
         idleTimeout: 10000,
         maxLifetime: 3600000,
         retryAttempts: 2,
-        retryDelay: 50
+        retryDelay: 50,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       try {
         await postgresManager.connectWithRetry();
       } catch (error) {
         const stats = postgresManager.getConnectionStats();
-        
+
         expect(stats.totalAttempts).toBe(3); // Initial + 2 retries
         expect(stats.failedAttempts).toBe(3);
         expect(stats.lastError).toBeDefined();
@@ -349,18 +349,19 @@ describe('PostgreSQL Connection Management', () => {
         idleTimeout: 10000,
         maxLifetime: 3600000,
         retryAttempts: 3,
-        retryDelay: 100
+        retryDelay: 100,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       // Mock successful connection after retry
-      const connectSpy = vi.spyOn(postgresManager, 'connect')
+      const connectSpy = vi
+        .spyOn(postgresManager, 'connect')
         .mockRejectedValueOnce(new Error('Connection failed'))
         .mockResolvedValueOnce(undefined);
 
       await postgresManager.connectWithRetry();
-      
+
       const stats = postgresManager.getConnectionStats();
       expect(stats.successfulConnections).toBe(1);
       expect(stats.consecutiveFailures).toBe(0);
@@ -382,15 +383,16 @@ describe('PostgreSQL Connection Management', () => {
         retryAttempts: 0, // No retries to speed up test
         retryDelay: 50,
         circuitBreakerThreshold: 3,
-        circuitBreakerTimeout: 5000
+        circuitBreakerTimeout: 5000,
       };
 
       postgresManager = new PostgreSQLManager(config);
-      
+
       // Mock the connect method to always fail
-      const connectSpy = vi.spyOn(postgresManager, 'connect')
+      const connectSpy = vi
+        .spyOn(postgresManager, 'connect')
         .mockRejectedValue(new Error('Connection failed'));
-      
+
       // Trigger circuit breaker - need enough failures to reach threshold
       // Each connectWithRetry call will increment failure count
       for (let i = 0; i < 3; i++) {
@@ -400,11 +402,11 @@ describe('PostgreSQL Connection Management', () => {
           // Expected to fail
         }
       }
-      
+
       const circuitState = postgresManager.getCircuitBreakerState();
       expect(circuitState.state).toBe('open');
       expect(circuitState.failureCount).toBeGreaterThanOrEqual(3);
-      
+
       connectSpy.mockRestore();
     });
   });

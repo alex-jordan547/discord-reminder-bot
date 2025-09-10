@@ -43,7 +43,7 @@ describe('NotificationContainer', () => {
 
     it('should limit visible notifications to maximum', async () => {
       const store = useNotificationsStore();
-      
+
       // Add more than max notifications
       for (let i = 0; i < 7; i++) {
         store.addNotification({
@@ -55,9 +55,9 @@ describe('NotificationContainer', () => {
           persistent: false,
         });
       }
-      
+
       await wrapper.vm.$nextTick();
-      
+
       const notifications = wrapper.findAll('.toast-notification');
       expect(notifications.length).toBeLessThanOrEqual(5); // Max 5 visible
     });
@@ -86,7 +86,7 @@ describe('NotificationContainer', () => {
 
     it('should auto-dismiss non-persistent notifications', async () => {
       vi.useFakeTimers();
-      
+
       const store = useNotificationsStore();
       const mockNotification = {
         id: 'test-auto-dismiss',
@@ -105,13 +105,13 @@ describe('NotificationContainer', () => {
       await wrapper.vm.$nextTick();
 
       expect(store.notifications.find(n => n.id === 'test-auto-dismiss')).toBeUndefined();
-      
+
       vi.useRealTimers();
     });
 
     it('should not auto-dismiss persistent notifications', async () => {
       vi.useFakeTimers();
-      
+
       const store = useNotificationsStore();
       const mockNotification = {
         id: 'test-persistent',
@@ -130,7 +130,7 @@ describe('NotificationContainer', () => {
       await wrapper.vm.$nextTick();
 
       expect(store.notifications.find(n => n.id === 'test-persistent')).toBeDefined();
-      
+
       vi.useRealTimers();
     });
   });
@@ -162,7 +162,7 @@ describe('NotificationContainer', () => {
 
     it('should show appropriate icons for notification types', async () => {
       const store = useNotificationsStore();
-      
+
       store.addNotification({
         id: 'test-error-icon',
         type: 'error',
@@ -182,12 +182,14 @@ describe('NotificationContainer', () => {
   describe('Accessibility', () => {
     it('should have proper ARIA attributes', () => {
       expect(wrapper.find('.notification-container').attributes('role')).toBe('region');
-      expect(wrapper.find('.notification-container').attributes('aria-label')).toBe('Notifications');
+      expect(wrapper.find('.notification-container').attributes('aria-label')).toBe(
+        'Notifications',
+      );
     });
 
     it('should support keyboard navigation', async () => {
       const store = useNotificationsStore();
-      
+
       store.addNotification({
         id: 'test-keyboard',
         type: 'info',
@@ -201,7 +203,7 @@ describe('NotificationContainer', () => {
 
       const notification = wrapper.find('.toast-notification');
       expect(notification.attributes('tabindex')).toBe('0');
-      
+
       // Test keyboard dismissal
       await notification.trigger('keydown.escape');
       expect(store.notifications.find(n => n.id === 'test-keyboard')).toBeUndefined();
@@ -209,7 +211,7 @@ describe('NotificationContainer', () => {
 
     it('should announce notifications to screen readers', async () => {
       const store = useNotificationsStore();
-      
+
       store.addNotification({
         id: 'test-announce',
         type: 'info',
@@ -230,7 +232,7 @@ describe('NotificationContainer', () => {
   describe('Animation and Transitions', () => {
     it('should apply enter/leave transitions', async () => {
       const store = useNotificationsStore();
-      
+
       store.addNotification({
         id: 'test-transition',
         type: 'info',
@@ -249,7 +251,7 @@ describe('NotificationContainer', () => {
 
     it('should handle stacking animations', async () => {
       const store = useNotificationsStore();
-      
+
       // Add multiple notifications quickly
       for (let i = 0; i < 3; i++) {
         store.addNotification({
@@ -266,7 +268,7 @@ describe('NotificationContainer', () => {
 
       const notifications = wrapper.findAll('.toast-notification');
       expect(notifications.length).toBe(3);
-      
+
       // Check stacking order
       notifications.forEach((notification, index) => {
         expect(notification.attributes('data-stack-index')).toBe(index.toString());

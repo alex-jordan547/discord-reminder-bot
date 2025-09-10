@@ -20,7 +20,7 @@ const defaultSettings: NotificationSettings = {
     low: true,
     medium: true,
     high: true,
-    critical: true
+    critical: true,
   },
   sound: {
     enabled: true,
@@ -59,8 +59,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
       }
 
       // Filter by category
-      if (notification.category && settings.value.enabled && typeof settings.value.enabled === 'object') {
-        const categoryEnabled = settings.value.enabled[notification.category as keyof typeof settings.value.enabled];
+      if (
+        notification.category &&
+        settings.value.enabled &&
+        typeof settings.value.enabled === 'object'
+      ) {
+        const categoryEnabled =
+          settings.value.enabled[notification.category as keyof typeof settings.value.enabled];
         if (categoryEnabled === false) {
           return false;
         }
@@ -80,7 +85,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
     // Check for deduplication
     const existingIndex = notifications.value.findIndex(
-      n => n.title === notification.title && n.message === notification.message
+      n => n.title === notification.title && n.message === notification.message,
     );
 
     if (existingIndex !== -1) {
@@ -97,23 +102,26 @@ export const useNotificationsStore = defineStore('notifications', () => {
       const aPriority = priorityOrder[a.priority] || 0;
       const bPriority = priorityOrder[b.priority] || 0;
       const priorityDiff = bPriority - aPriority;
-      
+
       if (priorityDiff !== 0) return priorityDiff;
       // If same priority, sort by timestamp (newest first)
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
     // Set up auto-hide timer if enabled
-    const autoHideEnabled = typeof settings.value.autoHide === 'boolean' 
-      ? settings.value.autoHide 
-      : true;
-      
+    const autoHideEnabled =
+      typeof settings.value.autoHide === 'boolean' ? settings.value.autoHide : true;
+
     if (notification.autoHide && autoHideEnabled) {
-      const delay = notification.hideDelay || settings.value.hideDelay || settings.value.display?.duration || 5000;
+      const delay =
+        notification.hideDelay ||
+        settings.value.hideDelay ||
+        settings.value.display?.duration ||
+        5000;
       const timer = window.setTimeout(() => {
         removeNotification(notification.id);
       }, delay);
-      
+
       timers.set(notification.id, timer);
     }
 
@@ -125,7 +133,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     const index = notifications.value.findIndex(n => n.id === id);
     if (index !== -1) {
       notifications.value.splice(index, 1);
-      
+
       // Clear timer if exists
       const timer = timers.get(id);
       if (timer) {
@@ -141,7 +149,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     // Clear all timers
     timers.forEach(timer => clearTimeout(timer));
     timers.clear();
-    
+
     notifications.value = [];
     persistNotifications();
   };
@@ -194,23 +202,26 @@ export const useNotificationsStore = defineStore('notifications', () => {
   restoreFromStorage();
 
   // Watch for settings changes to update timers
-  watch(() => settings.value.autoHide, (newValue) => {
-    if (!newValue) {
-      // Clear all timers if auto-hide is disabled
-      timers.forEach(timer => clearTimeout(timer));
-      timers.clear();
-    }
-  });
+  watch(
+    () => settings.value.autoHide,
+    newValue => {
+      if (!newValue) {
+        // Clear all timers if auto-hide is disabled
+        timers.forEach(timer => clearTimeout(timer));
+        timers.clear();
+      }
+    },
+  );
 
   return {
     // State
     notifications,
     settings,
-    
+
     // Computed
     visibleNotifications,
     filteredNotifications,
-    
+
     // Actions
     addNotification,
     removeNotification,
@@ -227,7 +238,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     resetToDefaults: () => {
       settings.value = { ...defaultSettings };
       persistSettings();
-    }
+    },
   };
 });
 

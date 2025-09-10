@@ -6,10 +6,10 @@ describe('useOfflineQueue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    
+
     // Setup Pinia
     setActivePinia(createPinia());
-    
+
     // Mock navigator.onLine
     Object.defineProperty(navigator, 'onLine', {
       writable: true,
@@ -35,26 +35,26 @@ describe('useOfflineQueue', () => {
 
     it('should listen for online/offline events', () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      
+
       useOfflineQueue();
-      
+
       expect(addEventListenerSpy).toHaveBeenCalledWith('online', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('offline', expect.any(Function));
     });
 
     it('should update status when going offline', () => {
       const { isOnline } = useOfflineQueue();
-      
+
       expect(isOnline.value).toBe(true);
-      
+
       // Simulate going offline
       Object.defineProperty(navigator, 'onLine', {
         writable: true,
         value: false,
       });
-      
+
       window.dispatchEvent(new Event('offline'));
-      
+
       expect(isOnline.value).toBe(false);
     });
 
@@ -64,18 +64,18 @@ describe('useOfflineQueue', () => {
         writable: true,
         value: false,
       });
-      
+
       const { isOnline } = useOfflineQueue();
       expect(isOnline.value).toBe(false);
-      
+
       // Go online
       Object.defineProperty(navigator, 'onLine', {
         writable: true,
         value: true,
       });
-      
+
       window.dispatchEvent(new Event('online'));
-      
+
       expect(isOnline.value).toBe(true);
     });
   });
@@ -88,7 +88,7 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation, queueSize } = useOfflineQueue();
-      
+
       const operation = {
         id: 'test-1',
         type: 'api-call',
@@ -97,13 +97,13 @@ describe('useOfflineQueue', () => {
       };
 
       queueOperation(operation);
-      
+
       expect(queueSize.value).toBe(1);
     });
 
     it('should not queue operations when online', async () => {
       const { queueOperation, queueSize } = useOfflineQueue();
-      
+
       const operation = {
         id: 'test-1',
         type: 'api-call',
@@ -112,16 +112,16 @@ describe('useOfflineQueue', () => {
       };
 
       await queueOperation(operation);
-      
+
       expect(queueSize.value).toBe(0);
     });
 
     it('should execute operation immediately when online', async () => {
       const mockExecutor = vi.fn().mockResolvedValue({ success: true });
       const { queueOperation, setExecutor } = useOfflineQueue();
-      
+
       setExecutor(mockExecutor);
-      
+
       const operation = {
         id: 'test-1',
         type: 'api-call',
@@ -130,7 +130,7 @@ describe('useOfflineQueue', () => {
       };
 
       await queueOperation(operation);
-      
+
       expect(mockExecutor).toHaveBeenCalledWith(operation);
     });
 
@@ -142,7 +142,7 @@ describe('useOfflineQueue', () => {
 
       const { queueOperation } = useOfflineQueue();
       const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-      
+
       const operation = {
         id: 'test-1',
         type: 'api-call',
@@ -151,11 +151,8 @@ describe('useOfflineQueue', () => {
       };
 
       queueOperation(operation);
-      
-      expect(setItemSpy).toHaveBeenCalledWith(
-        'offline-queue',
-        expect.stringContaining('test-1')
-      );
+
+      expect(setItemSpy).toHaveBeenCalledWith('offline-queue', expect.stringContaining('test-1'));
     });
 
     it('should load queue from localStorage on initialization', () => {
@@ -171,7 +168,7 @@ describe('useOfflineQueue', () => {
       vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify(savedQueue));
 
       const { queueSize, getQueue } = useOfflineQueue();
-      
+
       expect(queueSize.value).toBe(1);
       expect(getQueue()).toEqual(savedQueue);
     });
@@ -180,7 +177,7 @@ describe('useOfflineQueue', () => {
   describe('Queue Processing', () => {
     it('should process queue when going online', async () => {
       const mockExecutor = vi.fn().mockResolvedValue({ success: true });
-      
+
       // Start offline
       Object.defineProperty(navigator, 'onLine', {
         writable: true,
@@ -189,7 +186,7 @@ describe('useOfflineQueue', () => {
 
       const { queueOperation, setExecutor } = useOfflineQueue();
       setExecutor(mockExecutor);
-      
+
       // Queue some operations
       await queueOperation({
         id: 'test-1',
@@ -197,7 +194,7 @@ describe('useOfflineQueue', () => {
         data: { endpoint: '/api/test1' },
         timestamp: Date.now(),
       });
-      
+
       await queueOperation({
         id: 'test-2',
         type: 'api-call',
@@ -210,20 +207,20 @@ describe('useOfflineQueue', () => {
         writable: true,
         value: true,
       });
-      
+
       window.dispatchEvent(new Event('online'));
-      
+
       // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       expect(mockExecutor).toHaveBeenCalledTimes(2);
     });
 
     it('should process queue in chronological order', async () => {
       const mockExecutor = vi.fn().mockResolvedValue({ success: true });
       const executionOrder: string[] = [];
-      
-      mockExecutor.mockImplementation((operation) => {
+
+      mockExecutor.mockImplementation(operation => {
         executionOrder.push(operation.id);
         return Promise.resolve({ success: true });
       });
@@ -236,7 +233,7 @@ describe('useOfflineQueue', () => {
 
       const { queueOperation, setExecutor } = useOfflineQueue();
       setExecutor(mockExecutor);
-      
+
       // Queue operations with different timestamps
       await queueOperation({
         id: 'first',
@@ -244,7 +241,7 @@ describe('useOfflineQueue', () => {
         data: { endpoint: '/api/first' },
         timestamp: Date.now() - 1000,
       });
-      
+
       await queueOperation({
         id: 'second',
         type: 'api-call',
@@ -257,15 +254,16 @@ describe('useOfflineQueue', () => {
         writable: true,
         value: true,
       });
-      
+
       window.dispatchEvent(new Event('online'));
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       expect(executionOrder).toEqual(['first', 'second']);
     });
 
     it('should handle failed operations', async () => {
-      const mockExecutor = vi.fn()
+      const mockExecutor = vi
+        .fn()
         .mockResolvedValueOnce({ success: true })
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({ success: true });
@@ -278,7 +276,7 @@ describe('useOfflineQueue', () => {
 
       const { queueOperation, setExecutor, getFailedOperations } = useOfflineQueue();
       setExecutor(mockExecutor);
-      
+
       // Queue operations
       await queueOperation({
         id: 'success-1',
@@ -286,14 +284,14 @@ describe('useOfflineQueue', () => {
         data: { endpoint: '/api/success1' },
         timestamp: Date.now() - 2000,
       });
-      
+
       await queueOperation({
         id: 'fail-1',
         type: 'api-call',
         data: { endpoint: '/api/fail' },
         timestamp: Date.now() - 1000,
       });
-      
+
       await queueOperation({
         id: 'success-2',
         type: 'api-call',
@@ -306,23 +304,24 @@ describe('useOfflineQueue', () => {
         writable: true,
         value: true,
       });
-      
+
       window.dispatchEvent(new Event('online'));
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       expect(mockExecutor).toHaveBeenCalledTimes(3);
       expect(getFailedOperations()).toHaveLength(1);
       expect(getFailedOperations()[0].id).toBe('fail-1');
     });
 
     it('should retry failed operations', async () => {
-      const mockExecutor = vi.fn()
+      const mockExecutor = vi
+        .fn()
         .mockRejectedValueOnce(new Error('First attempt failed'))
         .mockResolvedValueOnce({ success: true });
 
       const { retryFailedOperations, setExecutor } = useOfflineQueue();
       setExecutor(mockExecutor);
-      
+
       // Manually add a failed operation
       const failedOp = {
         id: 'retry-test',
@@ -334,10 +333,8 @@ describe('useOfflineQueue', () => {
       };
 
       await retryFailedOperations([failedOp]);
-      
-      expect(mockExecutor).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'retry-test' })
-      );
+
+      expect(mockExecutor).toHaveBeenCalledWith(expect.objectContaining({ id: 'retry-test' }));
     });
 
     it('should limit retry attempts', async () => {
@@ -345,7 +342,7 @@ describe('useOfflineQueue', () => {
 
       const { retryFailedOperations, setExecutor } = useOfflineQueue();
       setExecutor(mockExecutor);
-      
+
       const failedOp = {
         id: 'max-retry-test',
         type: 'api-call',
@@ -356,7 +353,7 @@ describe('useOfflineQueue', () => {
       };
 
       await retryFailedOperations([failedOp]);
-      
+
       // Should not retry when at max attempts
       expect(mockExecutor).not.toHaveBeenCalled();
     });
@@ -370,18 +367,18 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation, clearQueue, queueSize } = useOfflineQueue();
-      
+
       queueOperation({
         id: 'test-1',
         type: 'api-call',
         data: { endpoint: '/api/test' },
         timestamp: Date.now(),
       });
-      
+
       expect(queueSize.value).toBe(1);
-      
+
       clearQueue();
-      
+
       expect(queueSize.value).toBe(0);
     });
 
@@ -392,25 +389,25 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation, removeFromQueue, queueSize } = useOfflineQueue();
-      
+
       queueOperation({
         id: 'test-1',
         type: 'api-call',
         data: { endpoint: '/api/test1' },
         timestamp: Date.now(),
       });
-      
+
       queueOperation({
         id: 'test-2',
         type: 'api-call',
         data: { endpoint: '/api/test2' },
         timestamp: Date.now(),
       });
-      
+
       expect(queueSize.value).toBe(2);
-      
+
       removeFromQueue('test-1');
-      
+
       expect(queueSize.value).toBe(1);
     });
 
@@ -421,14 +418,14 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation, getQueueStats } = useOfflineQueue();
-      
+
       queueOperation({
         id: 'test-1',
         type: 'api-call',
         data: { endpoint: '/api/test1' },
         timestamp: Date.now() - 5000,
       });
-      
+
       queueOperation({
         id: 'test-2',
         type: 'database-sync',
@@ -437,7 +434,7 @@ describe('useOfflineQueue', () => {
       });
 
       const stats = getQueueStats();
-      
+
       expect(stats.total).toBe(2);
       expect(stats.byType['api-call']).toBe(1);
       expect(stats.byType['database-sync']).toBe(1);
@@ -457,7 +454,7 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation } = useOfflineQueue();
-      
+
       expect(() => {
         queueOperation({
           id: 'test-1',
@@ -472,13 +469,13 @@ describe('useOfflineQueue', () => {
       vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('invalid-json');
 
       const { queueSize } = useOfflineQueue();
-      
+
       expect(queueSize.value).toBe(0);
     });
 
     it('should handle missing executor gracefully', async () => {
       const { queueOperation } = useOfflineQueue();
-      
+
       const operation = {
         id: 'test-1',
         type: 'api-call',
@@ -496,20 +493,20 @@ describe('useOfflineQueue', () => {
   describe('Cleanup', () => {
     it('should remove event listeners on cleanup', () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      
+
       const { cleanup } = useOfflineQueue();
       cleanup();
-      
+
       expect(removeEventListenerSpy).toHaveBeenCalledWith('online', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('offline', expect.any(Function));
     });
 
     it('should clear intervals on cleanup', () => {
       const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
-      
+
       const { cleanup } = useOfflineQueue();
       cleanup();
-      
+
       expect(clearIntervalSpy).toHaveBeenCalled();
     });
   });
@@ -524,7 +521,7 @@ describe('useOfflineQueue', () => {
       };
 
       const { getConfig } = useOfflineQueue(config);
-      
+
       expect(getConfig().maxRetries).toBe(5);
       expect(getConfig().retryDelay).toBe(2000);
       expect(getConfig().maxQueueSize).toBe(50);
@@ -533,7 +530,7 @@ describe('useOfflineQueue', () => {
 
     it('should use default configuration when not provided', () => {
       const { getConfig } = useOfflineQueue();
-      
+
       expect(getConfig().maxRetries).toBe(3);
       expect(getConfig().retryDelay).toBe(1000);
       expect(getConfig().maxQueueSize).toBe(100);
@@ -547,28 +544,28 @@ describe('useOfflineQueue', () => {
       });
 
       const { queueOperation, queueSize } = useOfflineQueue({ maxQueueSize: 2 });
-      
+
       queueOperation({
         id: 'test-1',
         type: 'api-call',
         data: { endpoint: '/api/test1' },
         timestamp: Date.now(),
       });
-      
+
       queueOperation({
         id: 'test-2',
         type: 'api-call',
         data: { endpoint: '/api/test2' },
         timestamp: Date.now(),
       });
-      
+
       queueOperation({
         id: 'test-3',
         type: 'api-call',
         data: { endpoint: '/api/test3' },
         timestamp: Date.now(),
       });
-      
+
       expect(queueSize.value).toBe(2); // Should not exceed maxQueueSize
     });
   });

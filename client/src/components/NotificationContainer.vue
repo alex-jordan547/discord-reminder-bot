@@ -1,10 +1,6 @@
 <template>
   <div class="notification-container">
-    <TransitionGroup
-      name="notification"
-      tag="div"
-      class="notification-list"
-    >
+    <TransitionGroup name="notification" tag="div" class="notification-list">
       <ToastNotification
         v-for="notification in visibleNotifications"
         :key="notification.id"

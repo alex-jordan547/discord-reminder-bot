@@ -31,10 +31,10 @@ vi.mock('vue-chartjs', () => ({
 beforeEach(() => {
   // Clear all mocks before each test
   vi.clearAllMocks();
-  
+
   // Reset DOM
   document.body.innerHTML = '';
-  
+
   // Mock localStorage
   const localStorageMock = {
     getItem: vi.fn(),
@@ -43,7 +43,7 @@ beforeEach(() => {
     clear: vi.fn(),
   };
   vi.stubGlobal('localStorage', localStorageMock);
-  
+
   // Mock sessionStorage
   const sessionStorageMock = {
     getItem: vi.fn(),

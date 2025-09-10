@@ -110,14 +110,18 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions (message_
 db.exec('CREATE INDEX IF NOT EXISTS idx_reactions_user ON reactions (user_id);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_reactions_guild ON reactions (guild_id);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_reactions_reacted_at ON reactions (reacted_at);');
-db.exec('CREATE UNIQUE INDEX IF NOT EXISTS reactions_message_id_user_id_emoji_unique ON reactions (message_id, user_id, emoji);');
+db.exec(
+  'CREATE UNIQUE INDEX IF NOT EXISTS reactions_message_id_user_id_emoji_unique ON reactions (message_id, user_id, emoji);',
+);
 db.exec('CREATE INDEX IF NOT EXISTS idx_reminder_logs_message ON reminder_logs (message_id);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_reminder_logs_guild ON reminder_logs (guild_id);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_reminder_logs_sent_at ON reminder_logs (sent_at);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_reminder_logs_type ON reminder_logs (reminder_type);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_users_guild ON users (guild_id);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen);');
-db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_user_id_guild_id_unique ON users (user_id, guild_id);');
+db.exec(
+  'CREATE UNIQUE INDEX IF NOT EXISTS users_user_id_guild_id_unique ON users (user_id, guild_id);',
+);
 
 db.exec('CREATE INDEX IF NOT EXISTS idx_events_paused ON events (is_paused);');
 db.exec('CREATE INDEX IF NOT EXISTS idx_events_last_reminded_at ON events (last_reminded_at);');

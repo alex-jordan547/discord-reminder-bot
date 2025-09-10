@@ -85,9 +85,11 @@ function validateDashboardConfig(config: any): { valid: boolean; errors: string[
     } else {
       ['memory', 'cpu', 'disk'].forEach(key => {
         if (typeof config.alertThresholds[key] !== 'undefined') {
-          if (typeof config.alertThresholds[key] !== 'number' || 
-              config.alertThresholds[key] < 0 || 
-              config.alertThresholds[key] > 100) {
+          if (
+            typeof config.alertThresholds[key] !== 'number' ||
+            config.alertThresholds[key] < 0 ||
+            config.alertThresholds[key] > 100
+          ) {
             errors.push(`alertThresholds.${key} must be a number between 0 and 100`);
           }
         }
@@ -149,7 +151,7 @@ function generateMetricsHistory(timeRange: string, metrics?: string[]) {
   const data = [];
 
   for (let i = config.count; i >= 0; i--) {
-    const timestamp = new Date(now - (i * config.interval)).toISOString();
+    const timestamp = new Date(now - i * config.interval).toISOString();
     const dataPoint: any = { timestamp };
 
     if (!metrics || metrics.includes('system')) {

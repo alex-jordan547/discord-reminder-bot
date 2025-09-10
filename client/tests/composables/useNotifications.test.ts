@@ -23,7 +23,7 @@ describe('useNotifications', () => {
           title: 'Information',
           message: 'Test info message',
           persistent: false,
-        })
+        }),
       );
     });
 
@@ -40,7 +40,7 @@ describe('useNotifications', () => {
           title: 'Success',
           message: 'Operation completed',
           persistent: false,
-        })
+        }),
       );
     });
 
@@ -57,7 +57,7 @@ describe('useNotifications', () => {
           title: 'Warning',
           message: 'Warning message',
           persistent: false,
-        })
+        }),
       );
     });
 
@@ -74,7 +74,7 @@ describe('useNotifications', () => {
           title: 'Error',
           message: 'Error occurred',
           persistent: true, // Errors should be persistent
-        })
+        }),
       );
     });
 
@@ -103,7 +103,7 @@ describe('useNotifications', () => {
               handler: expect.any(Function),
             }),
           ]),
-        })
+        }),
       );
     });
   });
@@ -142,7 +142,7 @@ describe('useNotifications', () => {
     it('should get notification count', () => {
       const { getCount } = useNotifications();
       const store = useNotificationsStore();
-      
+
       // Mock store state
       store.notifications = [
         { id: '1', type: 'info', title: 'Test', message: 'Test', timestamp: '', persistent: false },
@@ -158,12 +158,36 @@ describe('useNotifications', () => {
     it('should get unacknowledged count', () => {
       const { getUnacknowledgedCount } = useNotifications();
       const store = useNotificationsStore();
-      
+
       // Mock store state
       store.notifications = [
-        { id: '1', type: 'info', title: 'Test', message: 'Test', timestamp: '', persistent: false, acknowledged: false },
-        { id: '2', type: 'error', title: 'Test', message: 'Test', timestamp: '', persistent: true, acknowledged: true },
-        { id: '3', type: 'warning', title: 'Test', message: 'Test', timestamp: '', persistent: false, acknowledged: false },
+        {
+          id: '1',
+          type: 'info',
+          title: 'Test',
+          message: 'Test',
+          timestamp: '',
+          persistent: false,
+          acknowledged: false,
+        },
+        {
+          id: '2',
+          type: 'error',
+          title: 'Test',
+          message: 'Test',
+          timestamp: '',
+          persistent: true,
+          acknowledged: true,
+        },
+        {
+          id: '3',
+          type: 'warning',
+          title: 'Test',
+          message: 'Test',
+          timestamp: '',
+          persistent: false,
+          acknowledged: false,
+        },
       ];
 
       expect(getUnacknowledgedCount()).toBe(2);
@@ -180,7 +204,7 @@ describe('useNotifications', () => {
 
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
-      
+
       // Enable sound
       store.updateSettings({
         sound: { enabled: true, volume: 0.7 },
@@ -200,7 +224,7 @@ describe('useNotifications', () => {
 
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
-      
+
       // Disable sound
       store.updateSettings({
         sound: { enabled: false, volume: 0.7 },
@@ -217,7 +241,7 @@ describe('useNotifications', () => {
 
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
-      
+
       store.updateSettings({
         sound: { enabled: true, volume: 0.8 },
       });
@@ -235,7 +259,7 @@ describe('useNotifications', () => {
 
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
-      
+
       store.updateSettings({
         sound: { enabled: true, volume: 0.5 },
       });
@@ -270,7 +294,7 @@ describe('useNotifications', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Should not be filtered',
-        })
+        }),
       );
     });
 
@@ -293,7 +317,7 @@ describe('useNotifications', () => {
       expect(addSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'Should be allowed',
-        })
+        }),
       );
     });
   });
@@ -305,7 +329,7 @@ describe('useNotifications', () => {
       const addSpy = vi.spyOn(store, 'addNotification');
 
       const message = 'Duplicate message';
-      
+
       showInfo(message);
       showInfo(message); // Should be deduplicated
 
@@ -314,22 +338,22 @@ describe('useNotifications', () => {
 
     it('should allow duplicate notifications after timeout', async () => {
       vi.useFakeTimers();
-      
+
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
       const addSpy = vi.spyOn(store, 'addNotification');
 
       const message = 'Duplicate message';
-      
+
       showInfo(message);
-      
+
       // Fast-forward past deduplication timeout
       vi.advanceTimersByTime(5000);
-      
+
       showInfo(message); // Should be allowed now
 
       expect(addSpy).toHaveBeenCalledTimes(2);
-      
+
       vi.useRealTimers();
     });
 
@@ -339,7 +363,7 @@ describe('useNotifications', () => {
       const addSpy = vi.spyOn(store, 'addNotification');
 
       const message = 'Same message';
-      
+
       showInfo(message);
       showError(message); // Different type, should be allowed
 
@@ -351,7 +375,7 @@ describe('useNotifications', () => {
     it('should handle notification actions', () => {
       const { showNotification } = useNotifications();
       const actionHandler = vi.fn();
-      
+
       showNotification({
         type: 'info',
         title: 'Action Test',
@@ -364,10 +388,10 @@ describe('useNotifications', () => {
 
       const store = useNotificationsStore();
       const notification = store.notifications[0];
-      
+
       expect(notification.actions).toHaveLength(2);
       expect(notification.actions![0].label).toBe('Confirm');
-      
+
       // Execute action
       notification.actions![0].handler();
       expect(actionHandler).toHaveBeenCalled();
@@ -377,19 +401,17 @@ describe('useNotifications', () => {
       const { showNotification } = useNotifications();
       const store = useNotificationsStore();
       const removeSpy = vi.spyOn(store, 'removeNotification');
-      
+
       showNotification({
         type: 'info',
         title: 'Action Test',
         message: 'Test message',
-        actions: [
-          { label: 'Confirm', handler: vi.fn(), dismissAfter: true },
-        ],
+        actions: [{ label: 'Confirm', handler: vi.fn(), dismissAfter: true }],
       });
 
       const notification = store.notifications[0];
       notification.actions![0].handler();
-      
+
       expect(removeSpy).toHaveBeenCalledWith(notification.id);
     });
   });
@@ -398,7 +420,7 @@ describe('useNotifications', () => {
     it('should handle store errors gracefully', () => {
       const { showInfo } = useNotifications();
       const store = useNotificationsStore();
-      
+
       vi.spyOn(store, 'addNotification').mockImplementation(() => {
         throw new Error('Store error');
       });
@@ -411,10 +433,10 @@ describe('useNotifications', () => {
     it('should provide fallback when store is unavailable', () => {
       // Mock console.warn to verify fallback
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+
       // Create composable without store
       const { showInfo } = useNotifications();
-      
+
       // This should not throw and should warn
       expect(() => {
         showInfo('Fallback test');

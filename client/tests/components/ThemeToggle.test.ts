@@ -25,11 +25,11 @@ describe('ThemeToggle', () => {
 
     it('should show current theme icon', () => {
       const store = useThemeStore();
-      
+
       // Test light theme icon
       store.setTheme('light');
       expect(wrapper.find('.theme-icon-light').exists()).toBe(true);
-      
+
       // Test dark theme icon
       store.setTheme('dark');
       expect(wrapper.find('.theme-icon-dark').exists()).toBe(true);
@@ -37,7 +37,7 @@ describe('ThemeToggle', () => {
 
     it('should have proper accessibility attributes', () => {
       const button = wrapper.find('button');
-      
+
       expect(button.attributes('aria-label')).toContain('theme');
       expect(button.attributes('role')).toBe('switch');
       expect(button.attributes('aria-pressed')).toBeDefined();
@@ -46,10 +46,10 @@ describe('ThemeToggle', () => {
     it('should show tooltip with current theme', async () => {
       const store = useThemeStore();
       store.setTheme('light');
-      
+
       const button = wrapper.find('button');
       await button.trigger('mouseenter');
-      
+
       expect(wrapper.find('.tooltip').exists()).toBe(true);
       expect(wrapper.find('.tooltip').text()).toContain('Switch to dark theme');
     });
@@ -59,41 +59,41 @@ describe('ThemeToggle', () => {
     it('should toggle theme when clicked', async () => {
       const store = useThemeStore();
       const toggleSpy = vi.spyOn(store, 'toggleTheme');
-      
+
       const button = wrapper.find('button');
       await button.trigger('click');
-      
+
       expect(toggleSpy).toHaveBeenCalled();
     });
 
     it('should switch from light to dark', async () => {
       const store = useThemeStore();
       store.setTheme('light');
-      
+
       const button = wrapper.find('button');
       await button.trigger('click');
-      
+
       expect(store.currentTheme).toBe('dark');
     });
 
     it('should switch from dark to light', async () => {
       const store = useThemeStore();
       store.setTheme('dark');
-      
+
       const button = wrapper.find('button');
       await button.trigger('click');
-      
+
       expect(store.currentTheme).toBe('light');
     });
 
     it('should update aria-pressed attribute', async () => {
       const store = useThemeStore();
       const button = wrapper.find('button');
-      
+
       store.setTheme('light');
       await wrapper.vm.$nextTick();
       expect(button.attributes('aria-pressed')).toBe('false');
-      
+
       store.setTheme('dark');
       await wrapper.vm.$nextTick();
       expect(button.attributes('aria-pressed')).toBe('true');
@@ -104,20 +104,20 @@ describe('ThemeToggle', () => {
     it('should toggle theme with Enter key', async () => {
       const store = useThemeStore();
       const toggleSpy = vi.spyOn(store, 'toggleTheme');
-      
+
       const button = wrapper.find('button');
       await button.trigger('keydown.enter');
-      
+
       expect(toggleSpy).toHaveBeenCalled();
     });
 
     it('should toggle theme with Space key', async () => {
       const store = useThemeStore();
       const toggleSpy = vi.spyOn(store, 'toggleTheme');
-      
+
       const button = wrapper.find('button');
       await button.trigger('keydown.space');
-      
+
       expect(toggleSpy).toHaveBeenCalled();
     });
 
@@ -129,7 +129,7 @@ describe('ThemeToggle', () => {
     it('should show focus indicator', async () => {
       const button = wrapper.find('button');
       await button.trigger('focus');
-      
+
       expect(button.classes()).toContain('focused');
     });
   });
@@ -143,20 +143,20 @@ describe('ThemeToggle', () => {
     it('should animate icon change', async () => {
       const store = useThemeStore();
       const icon = wrapper.find('.theme-icon');
-      
+
       store.setTheme('light');
       await wrapper.vm.$nextTick();
-      
+
       store.setTheme('dark');
       await wrapper.vm.$nextTick();
-      
+
       expect(icon.classes()).toContain('icon-transition');
     });
 
     it('should have smooth color transitions', () => {
       const button = wrapper.find('button');
       const computedStyle = getComputedStyle(button.element);
-      
+
       expect(computedStyle.transition).toContain('background-color');
       expect(computedStyle.transition).toContain('color');
     });
@@ -166,31 +166,31 @@ describe('ThemeToggle', () => {
     it('should save theme preference to localStorage', async () => {
       const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
       const store = useThemeStore();
-      
+
       store.setTheme('dark');
-      
+
       expect(setItemSpy).toHaveBeenCalledWith('theme-preference', 'dark');
     });
 
     it('should load theme preference from localStorage', () => {
       vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('dark');
-      
+
       const newWrapper = mount(ThemeToggle, {
         global: {
           plugins: [createPinia()],
         },
       });
-      
+
       const store = useThemeStore();
       expect(store.currentTheme).toBe('dark');
     });
 
     it('should apply theme to document root', async () => {
       const store = useThemeStore();
-      
+
       store.setTheme('dark');
       await wrapper.vm.$nextTick();
-      
+
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     });
   });
@@ -214,13 +214,13 @@ describe('ThemeToggle', () => {
 
       const store = useThemeStore();
       store.initializeTheme();
-      
+
       expect(store.systemTheme).toBe('dark');
     });
 
     it('should follow system theme when no preference set', () => {
       vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
-      
+
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation(query => ({
@@ -237,13 +237,13 @@ describe('ThemeToggle', () => {
 
       const store = useThemeStore();
       store.initializeTheme();
-      
+
       expect(store.currentTheme).toBe('light');
     });
 
     it('should listen for system theme changes', () => {
       const mockAddEventListener = vi.fn();
-      
+
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation(() => ({
@@ -260,7 +260,7 @@ describe('ThemeToggle', () => {
 
       const store = useThemeStore();
       store.initializeTheme();
-      
+
       expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
     });
   });
@@ -311,7 +311,7 @@ describe('ThemeToggle', () => {
       });
 
       const store = useThemeStore();
-      
+
       expect(() => {
         store.setTheme('dark');
       }).not.toThrow();
@@ -324,7 +324,7 @@ describe('ThemeToggle', () => {
 
       const store = useThemeStore();
       store.initializeTheme();
-      
+
       expect(store.currentTheme).toBe('light');
     });
 
@@ -333,7 +333,7 @@ describe('ThemeToggle', () => {
 
       const store = useThemeStore();
       store.initializeTheme();
-      
+
       expect(store.currentTheme).toBe('light');
     });
   });

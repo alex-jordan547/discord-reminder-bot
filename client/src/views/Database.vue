@@ -1,62 +1,47 @@
 <template>
   <div class="database-container">
     <h1>Database Management</h1>
-    
+
     <!-- Export Section -->
     <div class="database-export" data-testid="database-export">
       <h2>Export Database</h2>
-      
+
       <div class="export-form">
         <div class="form-group">
           <label for="export-format">Export Format:</label>
-          <select 
-            id="export-format" 
-            v-model="exportFormat"
-            data-testid="export-format-select"
-          >
+          <select id="export-format" v-model="exportFormat" data-testid="export-format-select">
             <option value="sqlite">SQLite (.db)</option>
             <option value="json">JSON (.json)</option>
             <option value="csv">CSV (.csv)</option>
           </select>
         </div>
-        
-        <button 
-          @click="startExport"
-          :disabled="isExporting"
-          data-testid="export-button"
-        >
+
+        <button @click="startExport" :disabled="isExporting" data-testid="export-button">
           {{ isExporting ? 'Exporting...' : 'Export Database' }}
         </button>
-        
-        <button 
-          v-if="isExporting"
-          @click="cancelExport"
-          data-testid="cancel-export"
-        >
-          Cancel
-        </button>
+
+        <button v-if="isExporting" @click="cancelExport" data-testid="cancel-export">Cancel</button>
       </div>
-      
+
       <!-- Export Progress -->
       <div v-if="isExporting" class="export-progress" data-testid="export-progress">
         <div class="progress-bar" data-testid="progress-bar">
-          <div 
-            class="progress-fill" 
-            :style="{ width: exportProgress + '%' }"
-          ></div>
+          <div class="progress-fill" :style="{ width: exportProgress + '%' }"></div>
         </div>
         <div class="progress-text" data-testid="progress-text">
-          {{ exportProgress }}% - Processing {{ currentTable }}... 
-          {{ recordsProcessed }}/{{ totalRecords }} records
+          {{ exportProgress }}% - Processing {{ currentTable }}... {{ recordsProcessed }}/{{
+            totalRecords
+          }}
+          records
         </div>
       </div>
-      
+
       <!-- Export Error -->
       <div v-if="exportError" class="error-message" data-testid="error-message">
         {{ exportError }}
         <button @click="retryExport" data-testid="retry-button">Retry</button>
       </div>
-      
+
       <!-- Export Cancelled -->
       <div v-if="exportCancelled" class="info-message" data-testid="export-cancelled">
         Export cancelled
@@ -66,9 +51,9 @@
     <!-- Import Section -->
     <div class="database-import" data-testid="database-import">
       <h2>Import Database</h2>
-      
+
       <!-- File Upload -->
-      <div 
+      <div
         class="drop-zone"
         :class="{ 'drag-over': isDragOver }"
         @dragenter.prevent="isDragOver = true"
@@ -77,42 +62,38 @@
         @drop.prevent="handleFileDrop"
         data-testid="drop-zone"
       >
-        <input 
+        <input
           type="file"
           ref="fileInput"
           @change="handleFileSelect"
           accept=".db,.json,.csv"
           data-testid="file-input"
           style="display: none"
-        >
-        
+        />
+
         <div class="drop-zone-content">
           <p>Drag and drop a database file here, or</p>
           <button @click="$refs.fileInput.click()">Choose File</button>
         </div>
       </div>
-      
+
       <!-- File Preview -->
       <div v-if="selectedFile" class="file-preview" data-testid="file-preview">
         <h3>Selected File</h3>
         <p><strong>Name:</strong> {{ selectedFile.name }}</p>
         <p><strong>Size:</strong> {{ formatFileSize(selectedFile.size) }}</p>
         <p><strong>Type:</strong> {{ selectedFile.type }}</p>
-        
-        <button 
-          @click="validateFile"
-          :disabled="isValidating"
-          data-testid="validate-button"
-        >
+
+        <button @click="validateFile" :disabled="isValidating" data-testid="validate-button">
           {{ isValidating ? 'Validating...' : 'Validate File' }}
         </button>
       </div>
-      
+
       <!-- File Error -->
       <div v-if="fileError" class="error-message" data-testid="file-error">
         {{ fileError }}
       </div>
-      
+
       <!-- Validation Results -->
       <div v-if="validationResults" class="validation-results" data-testid="validation-results">
         <h3>File Validation Results</h3>
@@ -120,8 +101,8 @@
           <p><strong>✓ Valid database file</strong></p>
           <div class="data-preview" data-testid="data-preview">
             <h4>Tables:</h4>
-            <div 
-              v-for="table in validationResults.preview.tables" 
+            <div
+              v-for="table in validationResults.preview.tables"
               :key="table.name"
               class="table-info"
               data-testid="table-row"
@@ -132,11 +113,8 @@
           </div>
           <p><strong>Total Records:</strong> {{ validationResults.preview.recordCount }}</p>
           <p><strong>Estimated Size:</strong> {{ validationResults.preview.estimatedSize }}</p>
-          
-          <button 
-            @click="showImportConfirmation"
-            data-testid="import-button"
-          >
+
+          <button @click="showImportConfirmation" data-testid="import-button">
             Import Database
           </button>
         </div>
@@ -149,18 +127,18 @@
 
     <!-- Backup Management -->
     <div class="backup-management">
-      <button 
+      <button
         @click="activeTab = 'backups'"
         :class="{ active: activeTab === 'backups' }"
         data-testid="backups-tab"
       >
         Backups
       </button>
-      
+
       <div v-if="activeTab === 'backups'" class="backup-list" data-testid="backup-list">
         <h3>Available Backups</h3>
-        <div 
-          v-for="backup in backups" 
+        <div
+          v-for="backup in backups"
           :key="backup.id"
           class="backup-item"
           data-testid="backup-item"
@@ -171,12 +149,7 @@
             <span>{{ backup.size }}</span>
             <span>{{ backup.type }}</span>
           </div>
-          <button 
-            @click="restoreBackup(backup.id)"
-            data-testid="restore-backup"
-          >
-            Restore
-          </button>
+          <button @click="restoreBackup(backup.id)" data-testid="restore-backup">Restore</button>
         </div>
       </div>
     </div>
@@ -192,18 +165,8 @@
         <h3>Confirm Import</h3>
         <p>This will replace all existing data. Are you sure?</p>
         <div class="dialog-actions">
-          <button 
-            @click="confirmImport"
-            data-testid="confirm-import"
-          >
-            Yes, Import
-          </button>
-          <button 
-            @click="cancelImport"
-            data-testid="cancel-import"
-          >
-            Cancel
-          </button>
+          <button @click="confirmImport" data-testid="confirm-import">Yes, Import</button>
+          <button @click="cancelImport" data-testid="cancel-import">Cancel</button>
         </div>
       </div>
     </div>
@@ -219,13 +182,7 @@
     <!-- Import Error -->
     <div v-if="importError" class="error-message" data-testid="import-error">
       {{ importError }}
-      <button 
-        v-if="canRollback"
-        @click="rollback"
-        data-testid="rollback-button"
-      >
-        Rollback
-      </button>
+      <button v-if="canRollback" @click="rollback" data-testid="rollback-button">Rollback</button>
     </div>
 
     <!-- Rollback Success -->
@@ -251,119 +208,119 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed } from 'vue';
 
 // State
-const exportFormat = ref('sqlite')
-const isExporting = ref(false)
-const exportProgress = ref(0)
-const currentTable = ref('')
-const recordsProcessed = ref(0)
-const totalRecords = ref(0)
-const exportError = ref('')
-const exportCancelled = ref(false)
+const exportFormat = ref('sqlite');
+const isExporting = ref(false);
+const exportProgress = ref(0);
+const currentTable = ref('');
+const recordsProcessed = ref(0);
+const totalRecords = ref(0);
+const exportError = ref('');
+const exportCancelled = ref(false);
 
-const selectedFile = ref<File | null>(null)
-const isDragOver = ref(false)
-const isValidating = ref(false)
-const fileError = ref('')
-const validationResults = ref<any>(null)
+const selectedFile = ref<File | null>(null);
+const isDragOver = ref(false);
+const isValidating = ref(false);
+const fileError = ref('');
+const validationResults = ref<any>(null);
 
-const activeTab = ref('export')
+const activeTab = ref('export');
 const backups = ref([
   {
     id: 'backup_20240101_120000',
     created: '2024-01-01T12:00:00Z',
     size: '5.2 MB',
-    type: 'automatic'
-  }
-])
+    type: 'automatic',
+  },
+]);
 
-const backupInfo = ref<any>(null)
-const showConfirmDialog = ref(false)
-const importSuccess = ref<any>(null)
-const importError = ref('')
-const canRollback = ref(false)
-const rollbackSuccess = ref(false)
-const restoreSuccess = ref<any>(null)
-const chunkProgress = ref<any>(null)
-const timeEstimate = ref('')
+const backupInfo = ref<any>(null);
+const showConfirmDialog = ref(false);
+const importSuccess = ref<any>(null);
+const importError = ref('');
+const canRollback = ref(false);
+const rollbackSuccess = ref(false);
+const restoreSuccess = ref<any>(null);
+const chunkProgress = ref<any>(null);
+const timeEstimate = ref('');
 
 // Methods
 function startExport() {
-  isExporting.value = true
-  exportProgress.value = 0
-  currentTable.value = 'users'
-  recordsProcessed.value = 1000
-  totalRecords.value = 2000
-  exportError.value = ''
-  exportCancelled.value = false
-  
+  isExporting.value = true;
+  exportProgress.value = 0;
+  currentTable.value = 'users';
+  recordsProcessed.value = 1000;
+  totalRecords.value = 2000;
+  exportError.value = '';
+  exportCancelled.value = false;
+
   // Simulate export progress
   const interval = setInterval(() => {
-    exportProgress.value += 10
-    recordsProcessed.value += 200
-    
+    exportProgress.value += 10;
+    recordsProcessed.value += 200;
+
     if (exportProgress.value >= 100) {
-      clearInterval(interval)
-      isExporting.value = false
+      clearInterval(interval);
+      isExporting.value = false;
       // Trigger download
-      const link = document.createElement('a')
-      link.href = 'blob:mock-url'
-      link.download = `export.${exportFormat.value === 'sqlite' ? 'db' : exportFormat.value}`
-      link.click()
+      const link = document.createElement('a');
+      link.href = 'blob:mock-url';
+      link.download = `export.${exportFormat.value === 'sqlite' ? 'db' : exportFormat.value}`;
+      link.click();
     }
-  }, 500)
+  }, 500);
 }
 
 function cancelExport() {
-  isExporting.value = false
-  exportCancelled.value = true
+  isExporting.value = false;
+  exportCancelled.value = true;
 }
 
 function retryExport() {
-  exportError.value = ''
-  startExport()
+  exportError.value = '';
+  startExport();
 }
 
 function handleFileSelect(event: Event) {
-  const target = event.target as HTMLInputElement
+  const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
-    selectFile(target.files[0])
+    selectFile(target.files[0]);
   }
 }
 
 function handleFileDrop(event: DragEvent) {
-  isDragOver.value = false
+  isDragOver.value = false;
   if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
-    selectFile(event.dataTransfer.files[0])
+    selectFile(event.dataTransfer.files[0]);
   }
 }
 
 function selectFile(file: File) {
   // Validate file type
-  const validTypes = ['application/x-sqlite3', 'application/json', 'text/csv']
+  const validTypes = ['application/x-sqlite3', 'application/json', 'text/csv'];
   if (!validTypes.includes(file.type) && !file.name.endsWith('.db')) {
-    fileError.value = 'Invalid file type. Please select a .db, .json, or .csv file.'
-    return
+    fileError.value = 'Invalid file type. Please select a .db, .json, or .csv file.';
+    return;
   }
-  
+
   // Validate file size (100MB limit)
   if (file.size > 100 * 1024 * 1024) {
-    fileError.value = 'File too large. Maximum size is 100MB.'
-    return
+    fileError.value = 'File too large. Maximum size is 100MB.';
+    return;
   }
-  
-  selectedFile.value = file
-  fileError.value = ''
-  validationResults.value = null
+
+  selectedFile.value = file;
+  fileError.value = '';
+  validationResults.value = null;
 }
 
 function validateFile() {
-  if (!selectedFile.value) return
-  
-  isValidating.value = true
-  
+  if (!selectedFile.value) return;
+
+  isValidating.value = true;
+
   // Simulate validation
   setTimeout(() => {
     validationResults.value = {
@@ -371,63 +328,63 @@ function validateFile() {
       preview: {
         tables: [
           { name: 'users', records: 100, columns: ['id', 'username', 'email'] },
-          { name: 'guilds', records: 5, columns: ['id', 'name', 'owner_id'] }
+          { name: 'guilds', records: 5, columns: ['id', 'name', 'owner_id'] },
         ],
         recordCount: 105,
-        estimatedSize: '1.2 MB'
-      }
-    }
-    isValidating.value = false
-  }, 1000)
+        estimatedSize: '1.2 MB',
+      },
+    };
+    isValidating.value = false;
+  }, 1000);
 }
 
 function showImportConfirmation() {
-  showConfirmDialog.value = true
+  showConfirmDialog.value = true;
 }
 
 function confirmImport() {
-  showConfirmDialog.value = false
-  
+  showConfirmDialog.value = false;
+
   // Simulate import
   setTimeout(() => {
     importSuccess.value = {
       recordsImported: 1500,
-      backupCreated: 'backup_20240101_120000.db'
-    }
-  }, 2000)
+      backupCreated: 'backup_20240101_120000.db',
+    };
+  }, 2000);
 }
 
 function cancelImport() {
-  showConfirmDialog.value = false
+  showConfirmDialog.value = false;
 }
 
 function restoreBackup(backupId: string) {
   // Show confirmation first
-  showConfirmDialog.value = true
-  
+  showConfirmDialog.value = true;
+
   setTimeout(() => {
-    showConfirmDialog.value = false
+    showConfirmDialog.value = false;
     restoreSuccess.value = {
-      recordsRestored: 1000
-    }
-  }, 1000)
+      recordsRestored: 1000,
+    };
+  }, 1000);
 }
 
 function rollback() {
-  rollbackSuccess.value = true
-  importError.value = ''
-  canRollback.value = false
+  rollbackSuccess.value = true;
+  importError.value = '';
+  canRollback.value = false;
 }
 
 function formatFileSize(bytes: number): string {
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  if (bytes === 0) return '0 Bytes'
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  if (bytes === 0) return '0 Bytes';
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleString()
+  return new Date(dateString).toLocaleString();
 }
 </script>
 

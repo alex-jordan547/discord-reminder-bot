@@ -37,7 +37,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
   // Actions
   const handleError = (error: any) => {
     let normalizedError: Error;
-    
+
     if (error instanceof Error) {
       normalizedError = error;
     } else if (typeof error === 'object' && error !== null) {
@@ -46,7 +46,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
     } else {
       normalizedError = new Error(String(error));
     }
-    
+
     lastError.value = normalizedError;
 
     // Log error if enabled
@@ -78,7 +78,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
 
   const getUserFriendlyMessage = (error?: Error): string => {
     const targetError = error || lastError.value;
-    
+
     if (!targetError) {
       return 'An unexpected error occurred';
     }
@@ -129,7 +129,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
 
   const retry = async <T>(
     operation: () => Promise<T>,
-    retryOptions: RetryOptions = {}
+    retryOptions: RetryOptions = {},
   ): Promise<T> => {
     const {
       maxAttempts = 3,
@@ -139,22 +139,19 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
     } = retryOptions;
 
     let lastError: Error;
-    
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await operation();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         if (attempt === maxAttempts) {
           throw lastError;
         }
 
         // Calculate delay with exponential backoff
-        const delay = Math.min(
-          baseDelay * Math.pow(backoffMultiplier, attempt - 1),
-          maxDelay
-        );
+        const delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), maxDelay);
 
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -165,7 +162,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
 
   const onError = (callback: (error: Error) => void) => {
     errorListeners.value.push(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const index = errorListeners.value.indexOf(callback);
@@ -186,7 +183,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
   return {
     // State
     lastError,
-    
+
     // Actions
     handleError,
     getUserFriendlyMessage,

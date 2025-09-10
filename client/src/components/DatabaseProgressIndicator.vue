@@ -29,7 +29,7 @@
         data-testid="progress-bar"
         class="progress-bar"
         :class="{
-          'indeterminate': isIndeterminate,
+          indeterminate: isIndeterminate,
           'error-state': hasError,
           'success-state': isComplete,
           'paused-state': isPaused,
@@ -76,22 +76,14 @@
         >
           {{ formatNumber(recordsProcessed) }} / {{ formatNumber(totalRecords) }} records
         </span>
-        <span
-          v-if="processingSpeed"
-          data-testid="processing-speed"
-          class="processing-speed"
-        >
+        <span v-if="processingSpeed" data-testid="processing-speed" class="processing-speed">
           {{ processingSpeed }}
         </span>
       </div>
     </div>
 
     <Transition name="message-fade">
-      <div
-        v-if="hasError && errorMessage"
-        data-testid="error-message"
-        class="error-message"
-      >
+      <div v-if="hasError && errorMessage" data-testid="error-message" class="error-message">
         ❌ {{ errorMessage }}
       </div>
     </Transition>
@@ -194,15 +186,15 @@ const formatTimeRemaining = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}s`;
   }
-  
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = seconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
-  
+
   return `${minutes}m ${remainingSeconds}s`;
 };
 
@@ -417,24 +409,24 @@ const formatNumber = (num: number): string => {
   .database-progress-indicator {
     padding: 1rem;
   }
-  
+
   .progress-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .progress-controls {
     width: 100%;
     justify-content: flex-end;
   }
-  
+
   .progress-info {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
   }
-  
+
   .detail-row {
     flex-direction: column;
     align-items: flex-start;

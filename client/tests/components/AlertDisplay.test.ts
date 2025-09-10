@@ -91,7 +91,9 @@ describe('AlertDisplay', () => {
     await nextTick();
 
     expect(wrapper.find('[data-testid="alert-title"]').text()).toBe('High Memory Usage');
-    expect(wrapper.find('[data-testid="alert-message"]').text()).toBe('Memory usage has exceeded 90%');
+    expect(wrapper.find('[data-testid="alert-message"]').text()).toBe(
+      'Memory usage has exceeded 90%',
+    );
   });
 
   it('should format timestamp correctly', async () => {
@@ -125,7 +127,7 @@ describe('AlertDisplay', () => {
     // Find the acknowledged alert
     const acknowledgedAlert = mockAlerts.find(alert => alert.acknowledged);
     expect(acknowledgedAlert).toBeDefined();
-    
+
     const wrapper = mount(AlertDisplay, {
       props: {
         alerts: [acknowledgedAlert!],

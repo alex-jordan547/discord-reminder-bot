@@ -5,14 +5,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DatabaseExportImportService } from '#/db/exportImport';
-import type { 
-  DatabaseConfig, 
-  ExportOptions, 
-  ImportOptions, 
-  ExportResult, 
+import type {
+  DatabaseConfig,
+  ExportOptions,
+  ImportOptions,
+  ExportResult,
   ImportResult,
   BackupResult,
-  ProgressCallback
+  ProgressCallback,
 } from '#/db/types';
 
 describe('Database Export/Import Service', () => {
@@ -41,7 +41,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ExportOptions = {
@@ -49,7 +49,7 @@ describe('Database Export/Import Service', () => {
         outputPath: './exports/test_export.db',
         includeSchema: true,
         includeData: true,
-        tables: ['events', 'users', 'guilds']
+        tables: ['events', 'users', 'guilds'],
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -75,7 +75,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ExportOptions = {
@@ -84,7 +84,7 @@ describe('Database Export/Import Service', () => {
         includeSchema: true,
         includeData: true,
         tables: ['events', 'users'],
-        prettyPrint: true
+        prettyPrint: true,
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -101,7 +101,7 @@ describe('Database Export/Import Service', () => {
     it('should export database to CSV format', async () => {
       const config: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const options: ExportOptions = {
@@ -111,7 +111,7 @@ describe('Database Export/Import Service', () => {
         includeData: true,
         tables: ['events'],
         delimiter: ',',
-        includeHeaders: true
+        includeHeaders: true,
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -137,7 +137,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ExportOptions = {
@@ -147,7 +147,7 @@ describe('Database Export/Import Service', () => {
         includeData: true,
         tables: ['events'], // Only export events table
         where: 'created_at > ?',
-        whereParams: ['2023-01-01']
+        whereParams: ['2023-01-01'],
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -169,7 +169,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const progressCallback = vi.fn();
@@ -180,7 +180,7 @@ describe('Database Export/Import Service', () => {
         includeSchema: true,
         includeData: true,
         batchSize: 1000,
-        onProgress: progressCallback
+        onProgress: progressCallback,
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -202,14 +202,14 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 1000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ExportOptions = {
         format: 'json',
         outputPath: './exports/failed_export.json',
         includeSchema: true,
-        includeData: true
+        includeData: true,
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -233,7 +233,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -242,7 +242,7 @@ describe('Database Export/Import Service', () => {
         validateData: true,
         sanitizeData: true,
         createBackup: true,
-        skipDuplicates: true
+        skipDuplicates: true,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -268,7 +268,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -277,7 +277,7 @@ describe('Database Export/Import Service', () => {
         validateData: true,
         sanitizeData: true,
         createBackup: false,
-        skipDuplicates: false
+        skipDuplicates: false,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -293,7 +293,7 @@ describe('Database Export/Import Service', () => {
     it('should import CSV database file', async () => {
       const config: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const options: ImportOptions = {
@@ -303,7 +303,7 @@ describe('Database Export/Import Service', () => {
         sanitizeData: true,
         targetTable: 'events',
         delimiter: ',',
-        hasHeaders: true
+        hasHeaders: true,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -326,14 +326,14 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
         filePath: './imports/invalid_file.txt',
         format: 'json',
         validateData: true,
-        sanitizeData: true
+        sanitizeData: true,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -355,7 +355,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -367,8 +367,8 @@ describe('Database Export/Import Service', () => {
           removeHtml: true,
           trimWhitespace: true,
           validateEmails: true,
-          escapeSpecialChars: true
-        }
+          escapeSpecialChars: true,
+        },
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -391,7 +391,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -399,7 +399,7 @@ describe('Database Export/Import Service', () => {
         format: 'json',
         validateData: true,
         sanitizeData: true,
-        strictValidation: true
+        strictValidation: true,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -424,7 +424,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupResult = await exportImportService.createBackupBeforeImport(config);
@@ -448,11 +448,11 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupPath = './backups/test_backup.sql';
-      
+
       const restoreResult = await exportImportService.restoreFromBackup(config, backupPath);
 
       expect(restoreResult.success).toBe(true);
@@ -463,8 +463,11 @@ describe('Database Export/Import Service', () => {
     it('should validate backup integrity', async () => {
       const backupPath = './backups/test_backup.sql';
       const originalChecksum = 'abc123def456';
-      
-      const validationResult = await exportImportService.validateBackupIntegrity(backupPath, originalChecksum);
+
+      const validationResult = await exportImportService.validateBackupIntegrity(
+        backupPath,
+        originalChecksum,
+      );
 
       expect(validationResult.isValid).toBe(true);
       expect(validationResult.currentChecksum).toBeDefined();
@@ -485,7 +488,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 1000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupResult = await exportImportService.createBackupBeforeImport(config);
@@ -509,7 +512,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const progressCallback = vi.fn();
@@ -520,7 +523,7 @@ describe('Database Export/Import Service', () => {
         includeSchema: true,
         includeData: true,
         batchSize: 500,
-        onProgress: progressCallback
+        onProgress: progressCallback,
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -531,8 +534,8 @@ describe('Database Export/Import Service', () => {
           stage: expect.any(String),
           percentage: expect.any(Number),
           recordsProcessed: expect.any(Number),
-          totalRecords: expect.any(Number)
-        })
+          totalRecords: expect.any(Number),
+        }),
       );
       expect(result.batchesProcessed).toBeGreaterThan(1);
     });
@@ -549,7 +552,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const progressCallback = vi.fn();
@@ -560,7 +563,7 @@ describe('Database Export/Import Service', () => {
         validateData: true,
         sanitizeData: true,
         batchSize: 500,
-        onProgress: progressCallback
+        onProgress: progressCallback,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -582,7 +585,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ExportOptions = {
@@ -591,7 +594,7 @@ describe('Database Export/Import Service', () => {
         includeSchema: true,
         includeData: true,
         batchSize: 100, // Small batch size for memory management
-        streamOutput: true // Stream to file instead of loading in memory
+        streamOutput: true, // Stream to file instead of loading in memory
       };
 
       const result = await exportImportService.exportDatabase(config, options);
@@ -613,7 +616,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -622,7 +625,7 @@ describe('Database Export/Import Service', () => {
         validateData: true,
         sanitizeData: true,
         continueOnError: true,
-        maxErrors: 10
+        maxErrors: 10,
       };
 
       const result = await exportImportService.importDatabase(config, options);
@@ -645,7 +648,7 @@ describe('Database Export/Import Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: ImportOptions = {
@@ -653,7 +656,7 @@ describe('Database Export/Import Service', () => {
         format: 'json',
         validateData: true,
         sanitizeData: true,
-        detailedErrorReporting: true
+        detailedErrorReporting: true,
       };
 
       const result = await exportImportService.importDatabase(config, options);

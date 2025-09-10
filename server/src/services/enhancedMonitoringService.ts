@@ -407,7 +407,7 @@ export class EnhancedMonitoringService {
         acknowledged: false,
       };
     }
-    
+
     alert.acknowledged = true;
     alert.acknowledgedAt = new Date().toISOString();
     this.alerts.set(alertId, alert);
@@ -484,9 +484,12 @@ export class EnhancedMonitoringService {
   /**
    * Get aggregated metrics
    */
-  async getAggregatedMetrics(timeRange: string, aggregationType: 'average' | 'min' | 'max'): Promise<any> {
+  async getAggregatedMetrics(
+    timeRange: string,
+    aggregationType: 'average' | 'min' | 'max',
+  ): Promise<any> {
     const history = await this.getMetricsHistory(timeRange);
-    
+
     if (history.length === 0) {
       return {
         memory: { percentage: 0 },
@@ -524,7 +527,7 @@ export class EnhancedMonitoringService {
    */
   async cleanupOldMetrics(retentionDays: number): Promise<void> {
     const cutoffTime = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    
+
     this.metricsHistory = this.metricsHistory.filter(metric => {
       const metricTime = new Date(metric.timestamp);
       return metricTime >= cutoffTime;
@@ -536,7 +539,7 @@ export class EnhancedMonitoringService {
    */
   async exportMetrics(timeRange: string, format: 'json' | 'csv'): Promise<any> {
     const data = await this.getMetricsHistory(timeRange);
-    
+
     return {
       format,
       data,
@@ -554,7 +557,7 @@ export class EnhancedMonitoringService {
     try {
       const systemMetrics = await this.getSystemMetrics();
       const databaseMetrics = await this.getDatabaseMetrics();
-      
+
       const combinedMetrics = {
         timestamp: systemMetrics.timestamp,
         system: systemMetrics,
@@ -562,7 +565,7 @@ export class EnhancedMonitoringService {
       };
 
       await this.storeMetrics(combinedMetrics);
-      
+
       // Check for alerts
       await this.checkAlerts(systemMetrics);
     } catch (error) {
@@ -576,12 +579,12 @@ export class EnhancedMonitoringService {
     if (suppressionEnd && Date.now() < suppressionEnd) {
       return true;
     }
-    
+
     // Clean up expired suppressions
     if (suppressionEnd && Date.now() >= suppressionEnd) {
       this.alertSuppressions.delete(type);
     }
-    
+
     return false;
   }
 
@@ -639,7 +642,7 @@ export class EnhancedMonitoringService {
 
   private generateMockTableStats(): TableStat[] {
     const tables = ['events', 'guilds', 'users', 'reactions'];
-    
+
     return tables.map(name => ({
       name,
       rowCount: Math.floor(Math.random() * 10000) + 100,

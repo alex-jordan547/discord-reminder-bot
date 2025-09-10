@@ -5,13 +5,7 @@
       <p>No alerts at this time</p>
     </div>
 
-    <TransitionGroup
-      v-else
-      name="alert-list"
-      tag="div"
-      class="alert-list"
-      data-testid="alert-list"
-    >
+    <TransitionGroup v-else name="alert-list" tag="div" class="alert-list" data-testid="alert-list">
       <div
         v-for="alert in displayedAlerts"
         :key="alert.id"
@@ -28,19 +22,23 @@
               {{ alert.source }}
             </div>
           </div>
-          
+
           <p class="alert-message" data-testid="alert-message">{{ alert.message }}</p>
-          
+
           <div class="alert-footer">
             <span class="alert-timestamp" data-testid="alert-timestamp">
               {{ formatTimestamp(alert.timestamp) }}
             </span>
-            
+
             <div class="alert-actions">
-              <div v-if="alert.acknowledged" class="acknowledged-badge" data-testid="acknowledged-badge">
+              <div
+                v-if="alert.acknowledged"
+                class="acknowledged-badge"
+                data-testid="acknowledged-badge"
+              >
                 ✓ Acknowledged
               </div>
-              
+
               <button
                 v-else
                 class="acknowledge-btn"
@@ -49,7 +47,7 @@
               >
                 Acknowledge
               </button>
-              
+
               <button
                 v-if="showDismiss"
                 class="dismiss-btn"
@@ -73,13 +71,8 @@
       >
         Show {{ remainingCount }} more alerts
       </button>
-      
-      <button
-        v-else
-        class="show-less-btn"
-        data-testid="show-less-btn"
-        @click="showingAll = false"
-      >
+
+      <button v-else class="show-less-btn" data-testid="show-less-btn" @click="showingAll = false">
         Show less
       </button>
     </div>
@@ -122,17 +115,17 @@ const priorityOrder = { critical: 0, error: 1, warning: 2, info: 3 };
 
 const sortedAlerts = computed(() => {
   let filtered = props.alerts;
-  
+
   // Apply filter if specified
   if (props.filter) {
     filtered = filtered.filter(alert => alert.type === props.filter);
   }
-  
+
   // Sort by priority (critical first) then by timestamp (newest first)
   return filtered.sort((a, b) => {
     const priorityDiff = priorityOrder[a.type] - priorityOrder[b.type];
     if (priorityDiff !== 0) return priorityDiff;
-    
+
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 });
@@ -181,7 +174,7 @@ function setupAutoHide(alertId: string) {
       emit('autoHide', alertId);
       autoHideTimers.value.delete(alertId);
     }, props.autoHideDuration);
-    
+
     autoHideTimers.value.set(alertId, timer);
   }
 }
@@ -414,27 +407,27 @@ onUnmounted(() => {
     background: #374151;
     color: #f9fafb;
   }
-  
+
   .alert-critical {
     background: #450a0a;
   }
-  
+
   .alert-error {
     background: #431407;
   }
-  
+
   .alert-warning {
     background: #451a03;
   }
-  
+
   .alert-info {
     background: #1e3a8a;
   }
-  
+
   .alert-message {
     color: #d1d5db;
   }
-  
+
   .alert-timestamp {
     color: #9ca3af;
   }

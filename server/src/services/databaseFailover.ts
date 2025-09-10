@@ -5,37 +5,37 @@
  * when PostgreSQL becomes unavailable, with automatic backup and recovery.
  */
 
-import fs from 'fs/promises'
-import path from 'path'
-import { createLogger } from '#/utils/loggingConfig'
-import { Settings } from '#/config/settings'
+import fs from 'fs/promises';
+import path from 'path';
+import { createLogger } from '#/utils/loggingConfig';
+import { Settings } from '#/config/settings';
 
-const logger = createLogger('db-failover')
+const logger = createLogger('db-failover');
 
 export interface DatabaseConnection {
-  type: 'postgresql' | 'sqlite'
-  status: 'connected' | 'disconnected' | 'error'
-  lastCheck: Date
-  errorCount: number
-  config: any
+  type: 'postgresql' | 'sqlite';
+  status: 'connected' | 'disconnected' | 'error';
+  lastCheck: Date;
+  errorCount: number;
+  config: any;
 }
 
 export interface FailoverConfig {
-  maxRetries: number
-  retryInterval: number
-  healthCheckInterval: number
-  backupBeforeFailover: boolean
-  autoRecovery: boolean
-  notificationEndpoint?: string
+  maxRetries: number;
+  retryInterval: number;
+  healthCheckInterval: number;
+  backupBeforeFailover: boolean;
+  autoRecovery: boolean;
+  notificationEndpoint?: string;
 }
 
 export interface BackupInfo {
-  id: string
-  timestamp: Date
-  sourceType: 'postgresql' | 'sqlite'
-  filePath: string
-  size: number
-  checksum: string
+  id: string;
+  timestamp: Date;
+  sourceType: 'postgresql' | 'sqlite';
+  filePath: string;
+  size: number;
+  checksum: string;
 }
 
 const DEFAULT_CONFIG: FailoverConfig = {
@@ -43,21 +43,21 @@ const DEFAULT_CONFIG: FailoverConfig = {
   retryInterval: 5000,
   healthCheckInterval: 30000,
   backupBeforeFailover: true,
-  autoRecovery: true
-}
+  autoRecovery: true,
+};
 
 export class DatabaseFailoverService {
-  private connections: Map<string, DatabaseConnection> = new Map()
-  private activeConnection: DatabaseConnection | null = null
-  private config: FailoverConfig
-  private healthCheckInterval: NodeJS.Timeout | null = null
-  private backups: BackupInfo[] = []
-  private isFailingOver = false
+  private connections: Map<string, DatabaseConnection> = new Map();
+  private activeConnection: DatabaseConnection | null = null;
+  private config: FailoverConfig;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private backups: BackupInfo[] = [];
+  private isFailingOver = false;
 
   constructor(config: Partial<FailoverConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config }
-    this.initializeConnections()
-    this.startHealthCheck()
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.initializeConnections();
+    this.startHealthCheck();
   }
 
   /**
@@ -75,9 +75,9 @@ export class DatabaseFailoverService {
         port: parseInt(process.env.POSTGRES_PORT || '5432'),
         database: process.env.POSTGRES_DB || 'discord_bot',
         user: process.env.POSTGRES_USER || 'postgres',
-        password: process.env.POSTGRES_PASSWORD
-      }
-    })
+        password: process.env.POSTGRES_PASSWORD,
+      },
+    });
 
     // SQLite connection
     this.connections.set('sqlite', {
@@ -86,9 +86,9 @@ export class DatabaseFailoverService {
       lastCheck: new Date(),
       errorCount: 0,
       config: {
-        path: path.resolve(process.cwd(), 'data', 'discord_bot.db')
-      }
-    })
+        path: path.resolve(process.cwd(), 'data', 'discord_bot.db'),
+      },
+    });
   }
 
   /**
@@ -98,40 +98,40 @@ export class DatabaseFailoverService {
     try {
       if (connection.type === 'postgresql') {
         // Test PostgreSQL connection
-        const { Client } = await import('pg')
-        const client = new Client(connection.config)
-        
-        await client.connect()
-        await client.query('SELECT 1')
-        await client.end()
-        
-        return true
+        const { Client } = await import('pg');
+        const client = new Client(connection.config);
+
+        await client.connect();
+        await client.query('SELECT 1');
+        await client.end();
+
+        return true;
       } else {
         // Test SQLite connection
-        const sqlite3 = await import('sqlite3')
-        const { Database } = sqlite3
-        
+        const sqlite3 = await import('sqlite3');
+        const { Database } = sqlite3;
+
         return new Promise((resolve, reject) => {
-          const db = new Database(connection.config.path, (err) => {
+          const db = new Database(connection.config.path, err => {
             if (err) {
-              reject(err)
-              return
+              reject(err);
+              return;
             }
-            
-            db.get('SELECT 1', (selectErr) => {
-              db.close()
+
+            db.get('SELECT 1', selectErr => {
+              db.close();
               if (selectErr) {
-                reject(selectErr)
+                reject(selectErr);
               } else {
-                resolve(true)
+                resolve(true);
               }
-            })
-          })
-        })
+            });
+          });
+        });
       }
     } catch (error) {
-      logger.error(`Connection test failed for ${connection.type}:`, error)
-      return false
+      logger.error(`Connection test failed for ${connection.type}:`, error);
+      return false;
     }
   }
 
@@ -139,30 +139,32 @@ export class DatabaseFailoverService {
    * Update connection status
    */
   private async updateConnectionStatus(connectionId: string) {
-    const connection = this.connections.get(connectionId)
-    if (!connection) return
+    const connection = this.connections.get(connectionId);
+    if (!connection) return;
 
-    const isHealthy = await this.testConnection(connection)
-    const previousStatus = connection.status
+    const isHealthy = await this.testConnection(connection);
+    const previousStatus = connection.status;
 
     if (isHealthy) {
-      connection.status = 'connected'
-      connection.errorCount = 0
+      connection.status = 'connected';
+      connection.errorCount = 0;
     } else {
-      connection.status = 'error'
-      connection.errorCount++
+      connection.status = 'error';
+      connection.errorCount++;
     }
 
-    connection.lastCheck = new Date()
+    connection.lastCheck = new Date();
 
     // Log status changes
     if (previousStatus !== connection.status) {
-      logger.info(`Database ${connectionId} status changed: ${previousStatus} → ${connection.status}`)
-      
+      logger.info(
+        `Database ${connectionId} status changed: ${previousStatus} → ${connection.status}`,
+      );
+
       if (connection.status === 'error') {
-        await this.handleConnectionFailure(connectionId)
+        await this.handleConnectionFailure(connectionId);
       } else if (connection.status === 'connected' && previousStatus === 'error') {
-        await this.handleConnectionRecovery(connectionId)
+        await this.handleConnectionRecovery(connectionId);
       }
     }
   }
@@ -171,17 +173,18 @@ export class DatabaseFailoverService {
    * Handle connection failure
    */
   private async handleConnectionFailure(connectionId: string) {
-    const connection = this.connections.get(connectionId)
-    if (!connection) return
+    const connection = this.connections.get(connectionId);
+    if (!connection) return;
 
-    logger.warn(`Database connection ${connectionId} failed (attempts: ${connection.errorCount})`)
+    logger.warn(`Database connection ${connectionId} failed (attempts: ${connection.errorCount})`);
 
     // If this is the active connection and we've exceeded max retries, initiate failover
-    if (this.activeConnection?.type === connectionId && 
-        connection.errorCount >= this.config.maxRetries &&
-        !this.isFailingOver) {
-      
-      await this.initiateFailover()
+    if (
+      this.activeConnection?.type === connectionId &&
+      connection.errorCount >= this.config.maxRetries &&
+      !this.isFailingOver
+    ) {
+      await this.initiateFailover();
     }
 
     // Send notification if configured
@@ -190,8 +193,8 @@ export class DatabaseFailoverService {
         type: 'connection_failure',
         database: connectionId,
         errorCount: connection.errorCount,
-        timestamp: new Date().toISOString()
-      })
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 
@@ -199,14 +202,16 @@ export class DatabaseFailoverService {
    * Handle connection recovery
    */
   private async handleConnectionRecovery(connectionId: string) {
-    logger.info(`Database connection ${connectionId} recovered`)
+    logger.info(`Database connection ${connectionId} recovered`);
 
     // If auto-recovery is enabled and this is the preferred connection, switch back
-    if (this.config.autoRecovery && connectionId === 'postgresql' && 
-        this.activeConnection?.type === 'sqlite') {
-      
-      logger.info('Auto-recovery: switching back to PostgreSQL')
-      await this.switchToConnection('postgresql')
+    if (
+      this.config.autoRecovery &&
+      connectionId === 'postgresql' &&
+      this.activeConnection?.type === 'sqlite'
+    ) {
+      logger.info('Auto-recovery: switching back to PostgreSQL');
+      await this.switchToConnection('postgresql');
     }
 
     // Send notification
@@ -214,8 +219,8 @@ export class DatabaseFailoverService {
       await this.sendNotification({
         type: 'connection_recovery',
         database: connectionId,
-        timestamp: new Date().toISOString()
-      })
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 
@@ -224,53 +229,51 @@ export class DatabaseFailoverService {
    */
   private async createBackup(sourceConnection: DatabaseConnection): Promise<BackupInfo | null> {
     try {
-      const backupId = `backup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const timestamp = new Date()
-      const backupDir = path.resolve(process.cwd(), 'backups')
-      
+      const backupId = `backup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const timestamp = new Date();
+      const backupDir = path.resolve(process.cwd(), 'backups');
+
       // Ensure backup directory exists
-      await fs.mkdir(backupDir, { recursive: true })
-      
-      const backupPath = path.join(backupDir, `${backupId}.sql`)
-      
+      await fs.mkdir(backupDir, { recursive: true });
+
+      const backupPath = path.join(backupDir, `${backupId}.sql`);
+
       if (sourceConnection.type === 'postgresql') {
         // PostgreSQL backup using pg_dump
-        const { execSync } = await import('child_process')
-        const config = sourceConnection.config
-        
-        const command = `pg_dump -h ${config.host} -p ${config.port} -U ${config.user} -d ${config.database} --no-password > ${backupPath}`
-        
+        const { execSync } = await import('child_process');
+        const config = sourceConnection.config;
+
+        const command = `pg_dump -h ${config.host} -p ${config.port} -U ${config.user} -d ${config.database} --no-password > ${backupPath}`;
+
         // Set password via environment variable
-        const env = { ...process.env, PGPASSWORD: config.password }
-        execSync(command, { env })
-        
+        const env = { ...process.env, PGPASSWORD: config.password };
+        execSync(command, { env });
       } else {
         // SQLite backup - copy the file
-        await fs.copyFile(sourceConnection.config.path, backupPath)
+        await fs.copyFile(sourceConnection.config.path, backupPath);
       }
-      
+
       // Calculate file size and checksum
-      const stats = await fs.stat(backupPath)
-      const fileContent = await fs.readFile(backupPath)
-      const checksum = require('crypto').createHash('md5').update(fileContent).digest('hex')
-      
+      const stats = await fs.stat(backupPath);
+      const fileContent = await fs.readFile(backupPath);
+      const checksum = require('crypto').createHash('md5').update(fileContent).digest('hex');
+
       const backupInfo: BackupInfo = {
         id: backupId,
         timestamp,
         sourceType: sourceConnection.type,
         filePath: backupPath,
         size: stats.size,
-        checksum
-      }
-      
-      this.backups.push(backupInfo)
-      logger.info(`Backup created: ${backupId} (${this.formatFileSize(stats.size)})`)
-      
-      return backupInfo
-      
+        checksum,
+      };
+
+      this.backups.push(backupInfo);
+      logger.info(`Backup created: ${backupId} (${this.formatFileSize(stats.size)})`);
+
+      return backupInfo;
     } catch (error) {
-      logger.error('Failed to create backup:', error)
-      return null
+      logger.error('Failed to create backup:', error);
+      return null;
     }
   }
 
@@ -279,33 +282,33 @@ export class DatabaseFailoverService {
    */
   private async initiateFailover() {
     if (this.isFailingOver) {
-      logger.warn('Failover already in progress, skipping')
-      return
+      logger.warn('Failover already in progress, skipping');
+      return;
     }
 
-    this.isFailingOver = true
-    logger.info('Initiating database failover...')
+    this.isFailingOver = true;
+    logger.info('Initiating database failover...');
 
     try {
       // Create backup if configured
       if (this.config.backupBeforeFailover && this.activeConnection) {
-        logger.info('Creating backup before failover...')
-        const backup = await this.createBackup(this.activeConnection)
+        logger.info('Creating backup before failover...');
+        const backup = await this.createBackup(this.activeConnection);
         if (backup) {
-          logger.info(`Backup completed: ${backup.id}`)
+          logger.info(`Backup completed: ${backup.id}`);
         } else {
-          logger.warn('Backup failed, continuing with failover')
+          logger.warn('Backup failed, continuing with failover');
         }
       }
 
       // Switch to fallback connection (SQLite)
-      const sqliteConnection = this.connections.get('sqlite')
+      const sqliteConnection = this.connections.get('sqlite');
       if (sqliteConnection && sqliteConnection.status === 'connected') {
-        await this.switchToConnection('sqlite')
-        logger.info('Failover completed successfully')
+        await this.switchToConnection('sqlite');
+        logger.info('Failover completed successfully');
       } else {
-        logger.error('Failover failed: SQLite connection not available')
-        throw new Error('No fallback connection available')
+        logger.error('Failover failed: SQLite connection not available');
+        throw new Error('No fallback connection available');
       }
 
       // Send notification
@@ -314,22 +317,21 @@ export class DatabaseFailoverService {
           type: 'failover_completed',
           from: this.activeConnection?.type,
           to: 'sqlite',
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        });
       }
-
     } catch (error) {
-      logger.error('Failover failed:', error)
-      
+      logger.error('Failover failed:', error);
+
       if (this.config.notificationEndpoint) {
         await this.sendNotification({
           type: 'failover_failed',
           error: error.message,
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        });
       }
     } finally {
-      this.isFailingOver = false
+      this.isFailingOver = false;
     }
   }
 
@@ -337,19 +339,19 @@ export class DatabaseFailoverService {
    * Switch to specified connection
    */
   private async switchToConnection(connectionType: 'postgresql' | 'sqlite') {
-    const connection = this.connections.get(connectionType)
+    const connection = this.connections.get(connectionType);
     if (!connection || connection.status !== 'connected') {
-      throw new Error(`Cannot switch to ${connectionType}: connection not available`)
+      throw new Error(`Cannot switch to ${connectionType}: connection not available`);
     }
 
-    this.activeConnection = connection
-    logger.info(`Switched to ${connectionType} database`)
+    this.activeConnection = connection;
+    logger.info(`Switched to ${connectionType} database`);
 
     // Update application settings to use the new connection
     if (connectionType === 'sqlite') {
-      process.env.DB_TYPE = 'sqlite'
+      process.env.DB_TYPE = 'sqlite';
     } else {
-      process.env.DB_TYPE = 'postgresql'
+      process.env.DB_TYPE = 'postgresql';
     }
   }
 
@@ -358,24 +360,24 @@ export class DatabaseFailoverService {
    */
   private async sendNotification(data: any) {
     try {
-      if (!this.config.notificationEndpoint) return
+      if (!this.config.notificationEndpoint) return;
 
       const response = await fetch(this.config.notificationEndpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           service: 'database-failover',
-          ...data
-        })
-      })
+          ...data,
+        }),
+      });
 
       if (!response.ok) {
-        throw new Error(`Notification failed: ${response.status}`)
+        throw new Error(`Notification failed: ${response.status}`);
       }
     } catch (error) {
-      logger.error('Failed to send notification:', error)
+      logger.error('Failed to send notification:', error);
     }
   }
 
@@ -383,15 +385,15 @@ export class DatabaseFailoverService {
    * Start health check monitoring
    */
   private startHealthCheck() {
-    if (this.healthCheckInterval) return
+    if (this.healthCheckInterval) return;
 
     this.healthCheckInterval = setInterval(async () => {
       for (const connectionId of this.connections.keys()) {
-        await this.updateConnectionStatus(connectionId)
+        await this.updateConnectionStatus(connectionId);
       }
-    }, this.config.healthCheckInterval)
+    }, this.config.healthCheckInterval);
 
-    logger.info(`Health check started (interval: ${this.config.healthCheckInterval}ms)`)
+    logger.info(`Health check started (interval: ${this.config.healthCheckInterval}ms)`);
   }
 
   /**
@@ -399,9 +401,9 @@ export class DatabaseFailoverService {
    */
   public stopHealthCheck() {
     if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval)
-      this.healthCheckInterval = null
-      logger.info('Health check stopped')
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+      logger.info('Health check stopped');
     }
   }
 
@@ -416,23 +418,23 @@ export class DatabaseFailoverService {
         type: conn.type,
         status: conn.status,
         errorCount: conn.errorCount,
-        lastCheck: conn.lastCheck.toISOString()
+        lastCheck: conn.lastCheck.toISOString(),
       })),
       backups: this.backups.length,
       isFailingOver: this.isFailingOver,
       config: {
         maxRetries: this.config.maxRetries,
         autoRecovery: this.config.autoRecovery,
-        healthCheckInterval: this.config.healthCheckInterval
-      }
-    }
+        healthCheckInterval: this.config.healthCheckInterval,
+      },
+    };
   }
 
   /**
    * Get backup information
    */
   public getBackups(): BackupInfo[] {
-    return [...this.backups]
+    return [...this.backups];
   }
 
   /**
@@ -440,44 +442,44 @@ export class DatabaseFailoverService {
    */
   public async triggerFailover(): Promise<void> {
     if (this.isFailingOver) {
-      throw new Error('Failover already in progress')
+      throw new Error('Failover already in progress');
     }
 
-    logger.info('Manual failover triggered')
-    await this.initiateFailover()
+    logger.info('Manual failover triggered');
+    await this.initiateFailover();
   }
 
   /**
    * Manually trigger recovery to PostgreSQL
    */
   public async triggerRecovery(): Promise<void> {
-    const pgConnection = this.connections.get('postgresql')
+    const pgConnection = this.connections.get('postgresql');
     if (!pgConnection || pgConnection.status !== 'connected') {
-      throw new Error('PostgreSQL connection not available')
+      throw new Error('PostgreSQL connection not available');
     }
 
-    logger.info('Manual recovery to PostgreSQL triggered')
-    await this.switchToConnection('postgresql')
+    logger.info('Manual recovery to PostgreSQL triggered');
+    await this.switchToConnection('postgresql');
   }
 
   /**
    * Format file size for display
    */
   private formatFileSize(bytes: number): string {
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    if (bytes === 0) return '0 B'
-    const i = Math.floor(Math.log(bytes) / Math.log(1024))
-    return `${Math.round(bytes / Math.pow(1024, i) * 100) / 100} ${sizes[i]}`
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 B';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${sizes[i]}`;
   }
 
   /**
    * Cleanup and shutdown
    */
   public async shutdown() {
-    logger.info('Shutting down database failover service')
-    this.stopHealthCheck()
+    logger.info('Shutting down database failover service');
+    this.stopHealthCheck();
   }
 }
 
 // Singleton instance
-export const databaseFailover = new DatabaseFailoverService()
+export const databaseFailover = new DatabaseFailoverService();

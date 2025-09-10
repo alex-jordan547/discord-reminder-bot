@@ -1,14 +1,10 @@
 <template>
   <div class="dashboard-container responsive">
     <!-- Mobile overlay -->
-    <div 
-      v-if="isMobileMenuOpen" 
-      class="dashboard-overlay"
-      @click="closeMobileMenu"
-    ></div>
+    <div v-if="isMobileMenuOpen" class="dashboard-overlay" @click="closeMobileMenu"></div>
 
     <!-- Mobile menu toggle -->
-    <button 
+    <button
       class="mobile-menu-toggle"
       @click="toggleMobileMenu"
       :aria-label="isMobileMenuOpen ? 'Close menu' : 'Open menu'"
@@ -19,26 +15,23 @@
     </button>
 
     <!-- Sidebar Navigation -->
-    <nav 
-      class="dashboard-sidebar"
-      :class="{ 'mobile-open': isMobileMenuOpen }"
-    >
+    <nav class="dashboard-sidebar" :class="{ 'mobile-open': isMobileMenuOpen }">
       <div class="sidebar-header">
         <h2>Dashboard</h2>
         <ThemeToggle />
       </div>
-      
+
       <ul class="nav-list">
-        <li 
-          v-for="item in navigationItems" 
+        <li
+          v-for="item in navigationItems"
           :key="item.name"
           class="nav-item"
-          :class="{ 
+          :class="{
             active: $route.name === item.name,
-            'touch-active': touchActiveItem === item.name 
+            'touch-active': touchActiveItem === item.name,
           }"
         >
-          <router-link 
+          <router-link
             :to="{ name: item.name }"
             :data-testid="`nav-${item.name}`"
             class="nav-link"
@@ -300,7 +293,7 @@ onUnmounted(() => {
   .nav-item.active .nav-link {
     border-right-width: 4px;
   }
-  
+
   .dashboard-sidebar {
     border-right-width: 2px;
   }

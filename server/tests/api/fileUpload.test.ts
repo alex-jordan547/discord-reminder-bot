@@ -22,7 +22,7 @@ describe('File Upload Security', () => {
     server = Fastify();
     fileUploadService = new FileUploadService();
     auditLogger = new AuditLogger();
-    
+
     // Create test upload directory
     if (!fs.existsSync(testUploadDir)) {
       fs.mkdirSync(testUploadDir, { recursive: true });
@@ -31,7 +31,7 @@ describe('File Upload Security', () => {
 
   afterEach(async () => {
     await server.close();
-    
+
     // Clean up test upload directory
     if (fs.existsSync(testUploadDir)) {
       fs.rmSync(testUploadDir, { recursive: true, force: true });
@@ -53,15 +53,15 @@ describe('File Upload Security', () => {
         payload: executableContent,
         headers: {
           'content-type': 'application/octet-stream',
-          'x-filename': 'malicious.exe'
-        }
+          'x-filename': 'malicious.exe',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Bad Request',
-        message: 'File type not allowed: .exe'
+        message: 'File type not allowed: .exe',
       });
     });
 
@@ -79,20 +79,20 @@ describe('File Upload Security', () => {
         payload: csvContent,
         headers: {
           'content-type': 'text/csv',
-          'x-filename': 'data.csv'
-        }
+          'x-filename': 'data.csv',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({
-        success: true
+        success: true,
       });
     });
 
     it('should validate file content matches extension', async () => {
       // Arrange - PNG file with wrong extension
-      const pngContent = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]); // PNG signature
+      const pngContent = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG signature
       server.post('/upload', { preHandler: fileUploadMiddleware }, async () => {
         return { success: true };
       });
@@ -104,15 +104,15 @@ describe('File Upload Security', () => {
         payload: pngContent,
         headers: {
           'content-type': 'application/json',
-          'x-filename': 'data.json'
-        }
+          'x-filename': 'data.json',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(400);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Bad Request',
-        message: 'File content does not match extension'
+        message: 'File content does not match extension',
       });
     });
 
@@ -148,12 +148,16 @@ describe('File Upload Security', () => {
     it('should reject files exceeding maximum size', async () => {
       // Arrange
       const largeContent = Buffer.alloc(11 * 1024 * 1024); // 11MB
-      server.post('/upload', { 
-        preHandler: fileUploadMiddleware,
-        bodyLimit: 10 * 1024 * 1024 // 10MB limit
-      }, async () => {
-        return { success: true };
-      });
+      server.post(
+        '/upload',
+        {
+          preHandler: fileUploadMiddleware,
+          bodyLimit: 10 * 1024 * 1024, // 10MB limit
+        },
+        async () => {
+          return { success: true };
+        },
+      );
 
       // Act
       const response = await server.inject({
@@ -162,15 +166,15 @@ describe('File Upload Security', () => {
         payload: largeContent,
         headers: {
           'content-type': 'application/octet-stream',
-          'x-filename': 'large.bin'
-        }
+          'x-filename': 'large.bin',
+        },
       });
 
       // Assert
       expect(response.statusCode).toBe(413);
       expect(JSON.parse(response.payload)).toEqual({
         error: 'Payload Too Large',
-        message: 'File size exceeds maximum limit of 10MB'
+        message: 'File size exceeds maximum limit of 10MB',
       });
     });
 
@@ -200,7 +204,9 @@ describe('File Upload Security', () => {
   describe('Virus Scanning', () => {
     it('should detect malicious patterns in uploaded files', async () => {
       // Arrange
-      const maliciousContent = Buffer.from('X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*');
+      const maliciousContent = Buffer.from(
+        'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
+      );
       const result = await fileUploadService.scanForMalware(maliciousContent, 'test.txt');
 
       // Act & Assert
@@ -225,10 +231,11 @@ describe('File Upload Security', () => {
         isSafe: false,
         threats: ['Generic.Trojan'],
         quarantined: true,
-        quarantinePath: '/quarantine/file-12345.bin'
+        quarantinePath: '/quarantine/file-12345.bin',
       };
 
-      const scanSpy = vi.spyOn(fileUploadService, 'scanForMalware')
+      const scanSpy = vi
+        .spyOn(fileUploadService, 'scanForMalware')
         .mockResolvedValue(mockQuarantineResult);
 
       // Act
@@ -243,7 +250,8 @@ describe('File Upload Security', () => {
     it('should handle virus scanner unavailability gracefully', async () => {
       // Arrange
       const content = Buffer.from('test content');
-      const scanSpy = vi.spyOn(fileUploadService, 'scanForMalware')
+      const scanSpy = vi
+        .spyOn(fileUploadService, 'scanForMalware')
         .mockRejectedValue(new Error('Scanner service unavailable'));
 
       // Act
@@ -287,7 +295,7 @@ describe('File Upload Security', () => {
     it('should set restrictive file permissions', async () => {
       // Arrange
       const content = Buffer.from('sensitive data');
-      
+
       // Act
       const result = await fileUploadService.securelyStoreFile(content, 'sensitive.json', 'admin');
       const stats = fs.statSync(result.fullPath);
@@ -301,10 +309,11 @@ describe('File Upload Security', () => {
       // Arrange
       const mockOldFiles = [
         '/uploads/2023/01/01/old-file-1.csv',
-        '/uploads/2023/01/01/old-file-2.json'
+        '/uploads/2023/01/01/old-file-2.json',
       ];
 
-      const cleanupSpy = vi.spyOn(fileUploadService, 'cleanupOldFiles')
+      const cleanupSpy = vi
+        .spyOn(fileUploadService, 'cleanupOldFiles')
         .mockResolvedValue(mockOldFiles.length);
 
       // Act
@@ -341,7 +350,7 @@ describe('File Upload Security', () => {
       // Act
       await fileUploadService.processUpload(content, 'test.csv', 'admin', {
         userAgent: 'Test-Agent',
-        ipAddress: '192.168.1.1'
+        ipAddress: '192.168.1.1',
       });
 
       // Assert
@@ -355,8 +364,8 @@ describe('File Upload Security', () => {
         timestamp: expect.any(Date),
         metadata: {
           userAgent: 'Test-Agent',
-          ipAddress: '192.168.1.1'
-        }
+          ipAddress: '192.168.1.1',
+        },
       });
     });
 
@@ -376,8 +385,8 @@ describe('File Upload Security', () => {
         details: {
           filename: 'malicious.exe',
           reason: 'File type not allowed',
-          fileType: 'exe'
-        }
+          fileType: 'exe',
+        },
       });
     });
 
@@ -397,8 +406,8 @@ describe('File Upload Security', () => {
         details: {
           filename: 'virus.txt',
           threats: expect.any(Array),
-          quarantined: expect.any(Boolean)
-        }
+          quarantined: expect.any(Boolean),
+        },
       });
     });
 
@@ -409,7 +418,7 @@ describe('File Upload Security', () => {
       // Act
       await fileUploadService.logFileAccess('secure-file.csv', 'admin', 'download', {
         userAgent: 'Test-Browser',
-        ipAddress: '192.168.1.1'
+        ipAddress: '192.168.1.1',
       });
 
       // Assert
@@ -420,8 +429,8 @@ describe('File Upload Security', () => {
         timestamp: expect.any(Date),
         metadata: {
           userAgent: 'Test-Browser',
-          ipAddress: '192.168.1.1'
-        }
+          ipAddress: '192.168.1.1',
+        },
       });
     });
 
@@ -433,19 +442,18 @@ describe('File Upload Security', () => {
           operation: 'upload',
           filename: 'data.csv',
           userId: 'admin',
-          success: true
+          success: true,
         },
         {
           timestamp: new Date(),
           operation: 'download',
           filename: 'data.csv',
           userId: 'user1',
-          success: true
-        }
+          success: true,
+        },
       ];
 
-      const trailSpy = vi.spyOn(auditLogger, 'getAuditTrail')
-        .mockResolvedValue(mockAuditTrail);
+      const trailSpy = vi.spyOn(auditLogger, 'getAuditTrail').mockResolvedValue(mockAuditTrail);
 
       // Act
       const trail = await auditLogger.getAuditTrail('data.csv');

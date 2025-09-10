@@ -19,9 +19,9 @@ export function useNotifications() {
     const fullNotification: Notification = {
       ...notification,
       id: generateId(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     store.addNotification(fullNotification);
     return fullNotification.id;
   };
@@ -47,7 +47,7 @@ export function useNotifications() {
       priority: 'medium',
       autoHide: true,
       hideDelay: 5000,
-      ...options
+      ...options,
     });
   };
 
@@ -59,7 +59,7 @@ export function useNotifications() {
       priority: 'medium',
       autoHide: true,
       hideDelay: 4000,
-      ...options
+      ...options,
     });
   };
 
@@ -71,7 +71,7 @@ export function useNotifications() {
       priority: 'high',
       autoHide: true,
       hideDelay: 6000,
-      ...options
+      ...options,
     });
   };
 
@@ -83,7 +83,7 @@ export function useNotifications() {
       priority: 'critical',
       autoHide: false, // Errors should be manually dismissed
       persistent: true,
-      ...options
+      ...options,
     });
   };
 
@@ -109,6 +109,6 @@ export function useNotifications() {
     showInfo,
     showSuccess,
     showWarning,
-    showError
+    showError,
   };
 }

@@ -1,357 +1,400 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Database Management Test</title>
     <style>
-        :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8fafc;
-            --bg-tertiary: #f1f5f9;
-            --bg-quaternary: #e2e8f0;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-color: #e2e8f0;
-            --accent-color: #3b82f6;
-            --accent-color-hover: #2563eb;
-            --accent-color-alpha: rgba(59, 130, 246, 0.1);
-            --error-color: #ef4444;
-            --error-bg: #fef2f2;
-            --error-border: #fecaca;
-            --success-color: #10b981;
-            --success-bg: #f0fdf4;
-            --success-border: #bbf7d0;
-            --warning-color: #f59e0b;
-            --warning-bg: #fffbeb;
-            --warning-border: #fed7aa;
-        }
+      :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --bg-quaternary: #e2e8f0;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --accent-color: #3b82f6;
+        --accent-color-hover: #2563eb;
+        --accent-color-alpha: rgba(59, 130, 246, 0.1);
+        --error-color: #ef4444;
+        --error-bg: #fef2f2;
+        --error-border: #fecaca;
+        --success-color: #10b981;
+        --success-bg: #f0fdf4;
+        --success-border: #bbf7d0;
+        --warning-color: #f59e0b;
+        --warning-bg: #fffbeb;
+        --warning-border: #fed7aa;
+      }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-        }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.6;
+      }
 
-        .database-view {
-            padding: 1.5rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+      .database-view {
+        padding: 1.5rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
 
-        .database-header {
-            margin-bottom: 2rem;
-            text-align: center;
-        }
+      .database-header {
+        margin-bottom: 2rem;
+        text-align: center;
+      }
 
-        .database-header h1 {
-            margin: 0 0 0.5rem 0;
-            color: var(--text-primary);
-            font-size: 2rem;
-            font-weight: 700;
-        }
+      .database-header h1 {
+        margin: 0 0 0.5rem 0;
+        color: var(--text-primary);
+        font-size: 2rem;
+        font-weight: 700;
+      }
 
-        .database-header p {
-            margin: 0;
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
+      .database-header p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+      }
 
+      .database-sections {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+
+      .database-section {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 2rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .database-section h2 {
+        margin: 0 0 0.5rem 0;
+        color: var(--text-primary);
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+
+      .database-section p {
+        margin: 0 0 1.5rem 0;
+        color: var(--text-secondary);
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      /* Export Interface Styles */
+      .export-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .form-label {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+
+      .form-select {
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+
+      .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .btn-primary {
+        background: var(--accent-color);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-color-hover);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      /* Import Interface Styles */
+      .drop-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 3rem 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: var(--bg-primary);
+      }
+
+      .drop-zone:hover {
+        border-color: var(--accent-color);
+        background: var(--accent-color-alpha);
+      }
+
+      .upload-instructions {
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+      }
+
+      .supported-formats {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
+
+      .error-message {
+        color: var(--error-color);
+        font-size: 0.9rem;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: var(--error-bg);
+        border-radius: 4px;
+        border: 1px solid var(--error-border);
+      }
+
+      @media (max-width: 768px) {
         .database-sections {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
+          grid-template-columns: 1fr;
         }
-
-        .database-section {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 2rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .database-section h2 {
-            margin: 0 0 0.5rem 0;
-            color: var(--text-primary);
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .database-section p {
-            margin: 0 0 1.5rem 0;
-            color: var(--text-secondary);
-            font-size: 1rem;
-            line-height: 1.5;
-        }
-
-        /* Export Interface Styles */
-        .export-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .form-label {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .form-select {
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-            background: var(--accent-color);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-color-hover);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        /* Import Interface Styles */
-        .drop-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 3rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--bg-primary);
-        }
-
-        .drop-zone:hover {
-            border-color: var(--accent-color);
-            background: var(--accent-color-alpha);
-        }
-
-        .upload-instructions {
-            font-size: 1.1rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .supported-formats {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .error-message {
-            color: var(--error-color);
-            font-size: 0.9rem;
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background: var(--error-bg);
-            border-radius: 4px;
-            border: 1px solid var(--error-border);
-        }
-
-        @media (max-width: 768px) {
-            .database-sections {
-                grid-template-columns: 1fr;
-            }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="database-view">
-        <div class="database-header">
-            <h1>Database Management</h1>
-            <p>Export, import, and manage your database with a comprehensive interface.</p>
-        </div>
+      <div class="database-header">
+        <h1>Database Management</h1>
+        <p>Export, import, and manage your database with a comprehensive interface.</p>
+      </div>
 
-        <div class="database-sections">
-            <!-- Export Section -->
-            <section class="database-section">
-                <h2>Export Database</h2>
-                <p>Export your current database to various formats for backup or migration purposes.</p>
-                
-                <div class="export-form">
-                    <div class="form-group">
-                        <label for="export-format" class="form-label">Export Format:</label>
-                        <select id="export-format" data-testid="export-format-select" class="form-select">
-                            <option value="">Select format...</option>
-                            <option value="sqlite">SQLite</option>
-                            <option value="json">JSON</option>
-                            <option value="csv">CSV</option>
-                        </select>
-                        <div id="format-error" data-testid="format-error" class="error-message" style="display: none;">
-                            Please select an export format
-                        </div>
-                    </div>
+      <div class="database-sections">
+        <!-- Export Section -->
+        <section class="database-section">
+          <h2>Export Database</h2>
+          <p>Export your current database to various formats for backup or migration purposes.</p>
 
-                    <div class="form-actions">
-                        <button type="button" data-testid="export-button" class="btn btn-primary" onclick="handleExport()">
-                            Export Database
-                        </button>
-                    </div>
-                </div>
-            </section>
+          <div class="export-form">
+            <div class="form-group">
+              <label for="export-format" class="form-label">Export Format:</label>
+              <select id="export-format" data-testid="export-format-select" class="form-select">
+                <option value="">Select format...</option>
+                <option value="sqlite">SQLite</option>
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+              </select>
+              <div
+                id="format-error"
+                data-testid="format-error"
+                class="error-message"
+                style="display: none"
+              >
+                Please select an export format
+              </div>
+            </div>
 
-            <!-- Import Section -->
-            <section class="database-section">
-                <h2>Import Database</h2>
-                <p>Import data from external files to replace or merge with your current database.</p>
-                
-                <div data-testid="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
-                    <div class="upload-icon">📁</div>
-                    <div data-testid="upload-instructions" class="upload-instructions">
-                        <strong>Drag and drop</strong> your database file here, or <strong>click to browse</strong>
-                    </div>
-                    <div data-testid="supported-formats" class="supported-formats">
-                        Supported formats: SQLite (.db, .sqlite), JSON (.json), CSV (.csv)
-                    </div>
-                </div>
+            <div class="form-actions">
+              <button
+                type="button"
+                data-testid="export-button"
+                class="btn btn-primary"
+                onclick="handleExport()"
+              >
+                Export Database
+              </button>
+            </div>
+          </div>
+        </section>
 
-                <input type="file" id="file-input" accept=".db,.sqlite,.json,.csv" style="display: none;" onchange="handleFileSelect(event)">
-                
-                <div id="file-error" data-testid="file-error" class="error-message" style="display: none;">
-                    Invalid file type. Please select a SQLite, JSON, or CSV file.
-                </div>
+        <!-- Import Section -->
+        <section class="database-section">
+          <h2>Import Database</h2>
+          <p>Import data from external files to replace or merge with your current database.</p>
 
-                <div id="selected-file-info" data-testid="selected-file-info" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-primary); border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div class="file-details">
-                        <div class="file-name" id="file-name"></div>
-                        <div class="file-size" id="file-size"></div>
-                    </div>
-                    <button data-testid="import-button" class="btn btn-primary" style="margin-top: 1rem;" onclick="handleImport()">
-                        Import Database
-                    </button>
-                </div>
-            </section>
-        </div>
+          <div
+            data-testid="drop-zone"
+            class="drop-zone"
+            onclick="document.getElementById('file-input').click()"
+          >
+            <div class="upload-icon">📁</div>
+            <div data-testid="upload-instructions" class="upload-instructions">
+              <strong>Drag and drop</strong> your database file here, or
+              <strong>click to browse</strong>
+            </div>
+            <div data-testid="supported-formats" class="supported-formats">
+              Supported formats: SQLite (.db, .sqlite), JSON (.json), CSV (.csv)
+            </div>
+          </div>
+
+          <input
+            type="file"
+            id="file-input"
+            accept=".db,.sqlite,.json,.csv"
+            style="display: none"
+            onchange="handleFileSelect(event)"
+          />
+
+          <div id="file-error" data-testid="file-error" class="error-message" style="display: none">
+            Invalid file type. Please select a SQLite, JSON, or CSV file.
+          </div>
+
+          <div
+            id="selected-file-info"
+            data-testid="selected-file-info"
+            style="
+              display: none;
+              margin-top: 1rem;
+              padding: 1rem;
+              background: var(--bg-primary);
+              border-radius: 6px;
+              border: 1px solid var(--border-color);
+            "
+          >
+            <div class="file-details">
+              <div class="file-name" id="file-name"></div>
+              <div class="file-size" id="file-size"></div>
+            </div>
+            <button
+              data-testid="import-button"
+              class="btn btn-primary"
+              style="margin-top: 1rem"
+              onclick="handleImport()"
+            >
+              Import Database
+            </button>
+          </div>
+        </section>
+      </div>
     </div>
 
     <script>
-        function handleExport() {
-            const formatSelect = document.getElementById('export-format');
-            const formatError = document.getElementById('format-error');
-            
-            if (!formatSelect.value) {
-                formatError.style.display = 'block';
-                return;
-            }
-            
-            formatError.style.display = 'none';
-            
-            // Simulate database export and trigger file download
-            const format = formatSelect.value;
-            
-            // Generate a safe, human-readable filename
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            
-            const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-            const extension = format === 'sqlite' ? 'db' : format;
-            const filename = `discord_bot_database_export_${timestamp}.${extension}`;
-            
-            let content, mimeType;
-            
-            switch (format) {
-                case 'sqlite':
-                    // Simulate SQLite binary data
-                    content = new Uint8Array([
-                        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
-                        // Add more realistic SQLite header bytes
-                        0x10, 0x00, 0x01, 0x01, 0x00, 0x40, 0x20, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
-                    ]);
-                    mimeType = 'application/x-sqlite3';
-                    break;
-                case 'json':
-                    content = JSON.stringify({
-                        metadata: {
-                            exportDate: new Date().toISOString(),
-                            format: 'json',
-                            version: '1.0'
-                        },
-                        tables: {
-                            users: [
-                                { id: 1, name: 'John Doe', email: 'john@example.com' },
-                                { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
-                            ],
-                            settings: [
-                                { key: 'theme', value: 'dark' },
-                                { key: 'language', value: 'en' }
-                            ]
-                        }
-                    }, null, 2);
-                    mimeType = 'application/json';
-                    break;
-                case 'csv':
-                    content = `id,name,email,created_at
+      function handleExport() {
+        const formatSelect = document.getElementById('export-format');
+        const formatError = document.getElementById('format-error');
+
+        if (!formatSelect.value) {
+          formatError.style.display = 'block';
+          return;
+        }
+
+        formatError.style.display = 'none';
+
+        // Simulate database export and trigger file download
+        const format = formatSelect.value;
+
+        // Generate a safe, human-readable filename
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+        const extension = format === 'sqlite' ? 'db' : format;
+        const filename = `discord_bot_database_export_${timestamp}.${extension}`;
+
+        let content, mimeType;
+
+        switch (format) {
+          case 'sqlite':
+            // Simulate SQLite binary data
+            content = new Uint8Array([
+              0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20,
+              0x33, 0x00,
+              // Add more realistic SQLite header bytes
+              0x10, 0x00, 0x01, 0x01, 0x00, 0x40, 0x20, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+              0x00, 0x02,
+            ]);
+            mimeType = 'application/x-sqlite3';
+            break;
+          case 'json':
+            content = JSON.stringify(
+              {
+                metadata: {
+                  exportDate: new Date().toISOString(),
+                  format: 'json',
+                  version: '1.0',
+                },
+                tables: {
+                  users: [
+                    { id: 1, name: 'John Doe', email: 'john@example.com' },
+                    { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
+                  ],
+                  settings: [
+                    { key: 'theme', value: 'dark' },
+                    { key: 'language', value: 'en' },
+                  ],
+                },
+              },
+              null,
+              2,
+            );
+            mimeType = 'application/json';
+            break;
+          case 'csv':
+            content = `id,name,email,created_at
 1,"John Doe","john@example.com","2024-01-15 10:30:00"
 2,"Jane Smith","jane@example.com","2024-01-16 14:45:00"
 3,"Bob Johnson","bob@example.com","2024-01-17 09:15:00"`;
-                    mimeType = 'text/csv';
-                    break;
-            }
-            
-            // Create and trigger download
-            const blob = new Blob([content], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            // Show success message
-            showSuccessMessage(`Database exported successfully as ${filename}`);
+            mimeType = 'text/csv';
+            break;
         }
-        
-        function showSuccessMessage(message) {
-            // Remove any existing success message
-            const existingMessage = document.querySelector('.success-message');
-            if (existingMessage) {
-                existingMessage.remove();
-            }
-            
-            // Create success message element
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.style.cssText = `
+
+        // Create and trigger download
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Show success message
+        showSuccessMessage(`Database exported successfully as ${filename}`);
+      }
+
+      function showSuccessMessage(message) {
+        // Remove any existing success message
+        const existingMessage = document.querySelector('.success-message');
+        if (existingMessage) {
+          existingMessage.remove();
+        }
+
+        // Create success message element
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
@@ -365,13 +408,13 @@
                 font-weight: 600;
                 animation: slideIn 0.3s ease-out;
             `;
-            successDiv.textContent = message;
-            
-            // Add animation keyframes
-            if (!document.querySelector('#success-animation-styles')) {
-                const style = document.createElement('style');
-                style.id = 'success-animation-styles';
-                style.textContent = `
+        successDiv.textContent = message;
+
+        // Add animation keyframes
+        if (!document.querySelector('#success-animation-styles')) {
+          const style = document.createElement('style');
+          style.id = 'success-animation-styles';
+          style.textContent = `
                     @keyframes slideIn {
                         from {
                             transform: translateX(100%);
@@ -383,57 +426,57 @@
                         }
                     }
                 `;
-                document.head.appendChild(style);
-            }
-            
-            document.body.appendChild(successDiv);
-            
-            // Auto-remove after 3 seconds
-            setTimeout(() => {
-                if (successDiv.parentNode) {
-                    successDiv.remove();
-                }
-            }, 3000);
+          document.head.appendChild(style);
         }
 
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            const fileError = document.getElementById('file-error');
-            const selectedFileInfo = document.getElementById('selected-file-info');
-            
-            if (!file) return;
-            
-            // Validate file type
-            const validExtensions = ['.db', '.sqlite', '.json', '.csv'];
-            const fileName = file.name.toLowerCase();
-            const isValidType = validExtensions.some(ext => fileName.endsWith(ext));
-            
-            if (!isValidType) {
-                fileError.style.display = 'block';
-                selectedFileInfo.style.display = 'none';
-                return;
-            }
-            
-            fileError.style.display = 'none';
-            selectedFileInfo.style.display = 'block';
-            
-            document.getElementById('file-name').textContent = file.name;
-            document.getElementById('file-size').textContent = formatFileSize(file.size);
+        document.body.appendChild(successDiv);
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+          if (successDiv.parentNode) {
+            successDiv.remove();
+          }
+        }, 3000);
+      }
+
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const fileError = document.getElementById('file-error');
+        const selectedFileInfo = document.getElementById('selected-file-info');
+
+        if (!file) return;
+
+        // Validate file type
+        const validExtensions = ['.db', '.sqlite', '.json', '.csv'];
+        const fileName = file.name.toLowerCase();
+        const isValidType = validExtensions.some(ext => fileName.endsWith(ext));
+
+        if (!isValidType) {
+          fileError.style.display = 'block';
+          selectedFileInfo.style.display = 'none';
+          return;
         }
 
-        function handleImport() {
-            alert('Importing database...');
-        }
+        fileError.style.display = 'none';
+        selectedFileInfo.style.display = 'block';
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 bytes';
-            
-            const k = 1024;
-            const sizes = ['bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('file-size').textContent = formatFileSize(file.size);
+      }
+
+      function handleImport() {
+        alert('Importing database...');
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 bytes';
+
+        const k = 1024;
+        const sizes = ['bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
     </script>
-</body>
+  </body>
 </html>

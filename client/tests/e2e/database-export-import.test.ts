@@ -30,7 +30,7 @@ const mockDownloadLink = {
 
 Object.defineProperty(document, 'createElement', {
   writable: true,
-  value: vi.fn((tagName) => {
+  value: vi.fn(tagName => {
     if (tagName === 'a') {
       return mockDownloadLink;
     }
@@ -45,12 +45,10 @@ describe('Database Export/Import E2E', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: '/database', name: 'database', component: DatabaseView },
-      ],
+      routes: [{ path: '/database', name: 'database', component: DatabaseView }],
     });
 
     pinia = createPinia();
@@ -102,7 +100,7 @@ describe('Database Export/Import E2E', () => {
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify({ format: 'sqlite' }),
-        })
+        }),
       );
 
       // Verify download was triggered
@@ -129,7 +127,7 @@ describe('Database Export/Import E2E', () => {
           '/api/database/export',
           expect.objectContaining({
             body: JSON.stringify({ format }),
-          })
+          }),
         );
 
         // Verify correct file extension
@@ -199,7 +197,7 @@ describe('Database Export/Import E2E', () => {
       // Find and click cancel button
       const cancelButton = wrapper.find('[data-testid="cancel-export"]');
       expect(cancelButton.exists()).toBe(true);
-      
+
       await cancelButton.trigger('click');
 
       // Verify export was cancelled
@@ -216,7 +214,7 @@ describe('Database Export/Import E2E', () => {
 
       // Mock file selection
       const fileInput = wrapper.find('[data-testid="file-input"]');
-      
+
       // Simulate file selection
       Object.defineProperty(fileInput.element, 'files', {
         value: [mockFile],
@@ -310,7 +308,7 @@ describe('Database Export/Import E2E', () => {
     it('should validate file format and content', async () => {
       // Test invalid file type
       const invalidFile = new File(['invalid'], 'test.txt', { type: 'text/plain' });
-      
+
       const fileInput = wrapper.find('[data-testid="file-input"]');
       Object.defineProperty(fileInput.element, 'files', {
         value: [invalidFile],
@@ -326,10 +324,10 @@ describe('Database Export/Import E2E', () => {
       expect(errorMessage.text()).toContain('Invalid file type');
 
       // Test file size limit
-      const largeFile = new File(['x'.repeat(100 * 1024 * 1024)], 'large.db', { 
-        type: 'application/x-sqlite3' 
+      const largeFile = new File(['x'.repeat(100 * 1024 * 1024)], 'large.db', {
+        type: 'application/x-sqlite3',
       });
-      
+
       Object.defineProperty(fileInput.element, 'files', {
         value: [largeFile],
         writable: false,
@@ -435,7 +433,7 @@ describe('Database Export/Import E2E', () => {
         '/api/database/import',
         expect.objectContaining({
           method: 'POST',
-        })
+        }),
       );
     });
 
@@ -516,7 +514,7 @@ describe('Database Export/Import E2E', () => {
         '/api/database/backup',
         expect.objectContaining({
           method: 'POST',
-        })
+        }),
       );
 
       // Verify backup info display
@@ -615,8 +613,8 @@ describe('Database Export/Import E2E', () => {
 
   describe('Performance and Large Files', () => {
     it('should handle large file uploads with progress tracking', async () => {
-      const largeFile = new File(['x'.repeat(50 * 1024 * 1024)], 'large.db', { 
-        type: 'application/x-sqlite3' 
+      const largeFile = new File(['x'.repeat(50 * 1024 * 1024)], 'large.db', {
+        type: 'application/x-sqlite3',
       });
 
       const fileInput = wrapper.find('[data-testid="file-input"]');
@@ -645,7 +643,7 @@ describe('Database Export/Import E2E', () => {
       // Verify progress tracking setup
       expect(mockXHR.upload.addEventListener).toHaveBeenCalledWith(
         'progress',
-        expect.any(Function)
+        expect.any(Function),
       );
     });
 
@@ -694,7 +692,7 @@ describe('Database Export/Import E2E', () => {
 
     it('should provide estimated time remaining', async () => {
       const startTime = Date.now();
-      
+
       // Mock progress with timing
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,

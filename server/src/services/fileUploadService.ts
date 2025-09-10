@@ -62,23 +62,16 @@ export class FileUploadService {
   private readonly maxFileAge = 30 * 24 * 60 * 60 * 1000; // 30 days
 
   // Allowed file types for database import/export
-  private readonly allowedTypes = new Set([
-    'csv',
-    'json',
-    'db',
-    'sqlite',
-    'sql',
-    'xlsx'
-  ]);
+  private readonly allowedTypes = new Set(['csv', 'json', 'db', 'sqlite', 'sql', 'xlsx']);
 
   // File type size limits (in bytes)
   private readonly sizeLimits: Record<string, number> = {
-    'csv': 50 * 1024 * 1024,    // 50MB
-    'json': 10 * 1024 * 1024,   // 10MB
-    'db': 100 * 1024 * 1024,    // 100MB
-    'sqlite': 100 * 1024 * 1024, // 100MB
-    'sql': 25 * 1024 * 1024,    // 25MB
-    'xlsx': 25 * 1024 * 1024    // 25MB
+    csv: 50 * 1024 * 1024, // 50MB
+    json: 10 * 1024 * 1024, // 10MB
+    db: 100 * 1024 * 1024, // 100MB
+    sqlite: 100 * 1024 * 1024, // 100MB
+    sql: 25 * 1024 * 1024, // 25MB
+    xlsx: 25 * 1024 * 1024, // 25MB
   };
 
   // Known malicious signatures (simplified for demo)
@@ -103,17 +96,17 @@ export class FileUploadService {
     fileBuffer: Buffer,
     filename: string,
     userId: string,
-    metadata?: UploadMetadata
+    metadata?: UploadMetadata,
   ): Promise<FileUploadResult> {
     const startTime = Date.now();
-    
+
     try {
       logger.info('Processing file upload', {
         filename,
         userId,
         size: fileBuffer.length,
         userAgent: metadata?.userAgent,
-        ip: metadata?.ipAddress
+        ip: metadata?.ipAddress,
       });
 
       // Step 1: Validate file type
@@ -126,13 +119,13 @@ export class FileUploadService {
           details: {
             filename,
             reason: typeValidation.reason,
-            fileType: this.getFileExtension(filename)
-          }
+            fileType: this.getFileExtension(filename),
+          },
         });
 
         return {
           success: false,
-          error: typeValidation.reason
+          error: typeValidation.reason,
         };
       }
 
@@ -147,13 +140,13 @@ export class FileUploadService {
           details: {
             filename,
             size: sizeValidation.size,
-            limit: sizeValidation.limit
-          }
+            limit: sizeValidation.limit,
+          },
         });
 
         return {
           success: false,
-          error: `File size exceeds maximum limit of ${this.formatFileSize(sizeValidation.limit)}`
+          error: `File size exceeds maximum limit of ${this.formatFileSize(sizeValidation.limit)}`,
         };
       }
 
@@ -167,13 +160,13 @@ export class FileUploadService {
           details: {
             filename,
             expectedType: extension,
-            reason: 'Content does not match file extension'
-          }
+            reason: 'Content does not match file extension',
+          },
         });
 
         return {
           success: false,
-          error: 'File content does not match extension'
+          error: 'File content does not match extension',
         };
       }
 
@@ -187,14 +180,14 @@ export class FileUploadService {
           details: {
             filename,
             threats: scanResult.threats,
-            quarantined: scanResult.quarantined
-          }
+            quarantined: scanResult.quarantined,
+          },
         });
 
         return {
           success: false,
           error: `Malware detected: ${scanResult.threats.join(', ')}`,
-          quarantined: scanResult.quarantined
+          quarantined: scanResult.quarantined,
         };
       }
 
@@ -210,12 +203,12 @@ export class FileUploadService {
           success: false,
           error: storageResult.error,
           timestamp: new Date(),
-          metadata
+          metadata,
         });
 
         return {
           success: false,
-          error: storageResult.error
+          error: storageResult.error,
         };
       }
 
@@ -236,8 +229,8 @@ export class FileUploadService {
           ...metadata,
           originalFilename: filename,
           storedPath: storageResult.path,
-          checksum: storageResult.checksum
-        }
+          checksum: storageResult.checksum,
+        },
       });
 
       logger.info('File upload completed successfully', {
@@ -245,7 +238,7 @@ export class FileUploadService {
         originalFilename: filename,
         storedFilename: storageResult.filename,
         userId,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
       });
 
       return {
@@ -253,15 +246,14 @@ export class FileUploadService {
         fileId,
         filename: storageResult.filename,
         path: storageResult.path,
-        checksum: storageResult.checksum
+        checksum: storageResult.checksum,
       };
-
     } catch (error) {
       logger.error('File upload processing error', {
         filename,
         userId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
 
       await auditLogger.logFileOperation({
@@ -273,12 +265,12 @@ export class FileUploadService {
         success: false,
         error: error.message,
         timestamp: new Date(),
-        metadata
+        metadata,
       });
 
       return {
         success: false,
-        error: 'Upload processing failed'
+        error: 'Upload processing failed',
       };
     }
   }
@@ -288,12 +280,12 @@ export class FileUploadService {
    */
   async validateFileType(filename: string): Promise<FileValidationResult> {
     const extension = this.getFileExtension(filename);
-    
+
     if (!this.allowedTypes.has(extension)) {
       return {
         isValid: false,
         reason: `File type not allowed: .${extension}`,
-        details: { allowedTypes: Array.from(this.allowedTypes) }
+        details: { allowedTypes: Array.from(this.allowedTypes) },
       };
     }
 
@@ -308,7 +300,7 @@ export class FileUploadService {
     return {
       isValid: size <= maxSize,
       size,
-      limit: maxSize
+      limit: maxSize,
     };
   }
 
@@ -317,7 +309,7 @@ export class FileUploadService {
    */
   async validateFileContent(fileBuffer: Buffer, extension: string): Promise<boolean> {
     const content = fileBuffer.toString('utf8', 0, Math.min(fileBuffer.length, 1024));
-    
+
     try {
       switch (extension) {
         case 'json':
@@ -328,11 +320,11 @@ export class FileUploadService {
           // Basic CSV validation - check for consistent delimiters
           const lines = content.split('\n').filter(line => line.trim());
           if (lines.length === 0) return false;
-          
+
           const firstLineCommas = (lines[0].match(/,/g) || []).length;
-          return lines.slice(1).every(line => 
-            Math.abs((line.match(/,/g) || []).length - firstLineCommas) <= 1
-          );
+          return lines
+            .slice(1)
+            .every(line => Math.abs((line.match(/,/g) || []).length - firstLineCommas) <= 1);
 
         case 'db':
         case 'sqlite':
@@ -349,7 +341,7 @@ export class FileUploadService {
         case 'xlsx':
           // Check for Excel file signature (ZIP-based)
           const excelSignature = fileBuffer.subarray(0, 4);
-          return excelSignature.equals(Buffer.from([0x50, 0x4B, 0x03, 0x04])); // ZIP signature
+          return excelSignature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])); // ZIP signature
 
         default:
           return false;
@@ -357,7 +349,7 @@ export class FileUploadService {
     } catch (error) {
       logger.warn('File content validation error', {
         extension,
-        error: error.message
+        error: error.message,
       });
       return false;
     }
@@ -386,11 +378,7 @@ export class FileUploadService {
       }
 
       // Check for suspicious file names
-      const suspiciousNames = [
-        /\.(exe|bat|cmd|scr|pif|com)$/i,
-        /autorun\.inf/i,
-        /desktop\.ini/i
-      ];
+      const suspiciousNames = [/\.(exe|bat|cmd|scr|pif|com)$/i, /autorun\.inf/i, /desktop\.ini/i];
 
       for (const pattern of suspiciousNames) {
         if (pattern.test(filename)) {
@@ -402,32 +390,31 @@ export class FileUploadService {
       if (threats.length > 0) {
         // Quarantine the file
         const quarantinePath = await this.quarantineFile(fileBuffer, filename);
-        
+
         logger.warn('Malware detected in file', {
           filename,
           threats,
-          quarantinePath
+          quarantinePath,
         });
 
         return {
           isSafe: false,
           threats,
           quarantined: true,
-          quarantinePath
+          quarantinePath,
         };
       }
 
       return {
         isSafe: true,
-        threats: []
+        threats: [],
       };
-
     } catch (error) {
       logger.error('Malware scanning error', {
         filename,
-        error: error.message
+        error: error.message,
       });
-      
+
       // Fail securely - reject file if scanning fails
       throw new Error('Virus scanning failed - file rejected for security');
     }
@@ -439,7 +426,7 @@ export class FileUploadService {
   async securelyStoreFile(
     fileBuffer: Buffer,
     originalFilename: string,
-    userId: string
+    userId: string,
   ): Promise<SecureStorageResult> {
     try {
       const extension = this.getFileExtension(originalFilename);
@@ -462,7 +449,7 @@ export class FileUploadService {
         secureFilename,
         path: relativePath,
         checksum,
-        userId
+        userId,
       });
 
       return {
@@ -470,14 +457,13 @@ export class FileUploadService {
         filename: secureFilename,
         path: relativePath,
         fullPath,
-        checksum
+        checksum,
       };
-
     } catch (error) {
       logger.error('Secure file storage error', {
         originalFilename,
         userId,
-        error: error.message
+        error: error.message,
       });
 
       return {
@@ -486,7 +472,7 @@ export class FileUploadService {
         path: '',
         fullPath: '',
         checksum: '',
-        error: 'File storage failed'
+        error: 'File storage failed',
       };
     }
   }
@@ -567,10 +553,10 @@ export class FileUploadService {
         if (!fs.existsSync(dirPath)) return;
 
         const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
-        
+
         for (const entry of entries) {
           const fullPath = path.join(dirPath, entry.name);
-          
+
           if (entry.isDirectory()) {
             await cleanDirectory(fullPath);
             // Remove empty directories
@@ -583,20 +569,22 @@ export class FileUploadService {
             if (now - stats.mtime.getTime() > maxAge) {
               await fs.promises.unlink(fullPath);
               cleanedCount++;
-              logger.debug('Cleaned up old file', { file: fullPath, age: now - stats.mtime.getTime() });
+              logger.debug('Cleaned up old file', {
+                file: fullPath,
+                age: now - stats.mtime.getTime(),
+              });
             }
           }
         }
       };
 
       await cleanDirectory(this.uploadDir);
-      
+
       if (cleanedCount > 0) {
         logger.info('File cleanup completed', { cleanedCount, maxAgeInDays });
       }
 
       return cleanedCount;
-
     } catch (error) {
       logger.error('File cleanup error', { error: error.message });
       return 0;
@@ -610,14 +598,14 @@ export class FileUploadService {
     filename: string,
     userId: string,
     operation: 'download' | 'view' | 'delete',
-    metadata?: UploadMetadata
+    metadata?: UploadMetadata,
   ): Promise<void> {
     await auditLogger.logFileOperation({
       operation,
       filename,
       userId,
       timestamp: new Date(),
-      metadata
+      metadata,
     });
   }
 
@@ -626,7 +614,7 @@ export class FileUploadService {
    */
   private ensureDirectoriesExist(): void {
     const dirs = [this.uploadDir, this.quarantineDir];
-    
+
     for (const dir of dirs) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true, mode: 0o750 });
@@ -640,6 +628,9 @@ export class FileUploadService {
 export const fileUploadService = new FileUploadService();
 
 // Schedule cleanup every 24 hours
-setInterval(() => {
-  fileUploadService.cleanupOldFiles();
-}, 24 * 60 * 60 * 1000);
+setInterval(
+  () => {
+    fileUploadService.cleanupOldFiles();
+  },
+  24 * 60 * 60 * 1000,
+);

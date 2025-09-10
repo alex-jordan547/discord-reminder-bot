@@ -23,7 +23,7 @@ import type {
   SanitizationResults,
   MemoryUsage,
   ProgressCallback,
-  ExportImportProgress
+  ExportImportProgress,
 } from './types';
 
 const logger = createLogger('export-import');
@@ -33,7 +33,7 @@ export class DatabaseExportImportService {
   private memoryUsage: MemoryUsage = {
     peakMemoryMB: 0,
     averageMemoryMB: 0,
-    gcCollections: 0
+    gcCollections: 0,
   };
 
   constructor() {
@@ -55,11 +55,14 @@ export class DatabaseExportImportService {
       recordCount: 0,
       fileSize: 0,
       duration: 0,
-      errors: []
+      errors: [],
     };
 
     try {
-      logger.info('Starting database export', { format: options.format, outputPath: options.outputPath });
+      logger.info('Starting database export', {
+        format: options.format,
+        outputPath: options.outputPath,
+      });
 
       // Ensure output directory exists
       try {
@@ -69,7 +72,14 @@ export class DatabaseExportImportService {
       }
 
       // Report progress
-      this.reportProgress(options.onProgress, 'validation', 0, 0, 0, 'Validating export options...');
+      this.reportProgress(
+        options.onProgress,
+        'validation',
+        0,
+        0,
+        0,
+        'Validating export options...',
+      );
 
       // Validate export options
       this.validateExportOptions(options);
@@ -83,29 +93,54 @@ export class DatabaseExportImportService {
         const totalRecords = await this.getTotalRecordCount(dbManager, options.tables);
         let recordsProcessed = 0;
 
-        this.reportProgress(options.onProgress, 'export', 10, recordsProcessed, totalRecords, 'Starting export...');
+        this.reportProgress(
+          options.onProgress,
+          'export',
+          10,
+          recordsProcessed,
+          totalRecords,
+          'Starting export...',
+        );
 
         // Export based on format
         switch (options.format) {
           case 'sqlite':
-            result.recordCount = await this.exportToSQLite(dbManager, options, (processed) => {
+            result.recordCount = await this.exportToSQLite(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'export', 10 + (processed / totalRecords) * 80,
-                processed, totalRecords, 'Exporting to SQLite...');
+              this.reportProgress(
+                options.onProgress,
+                'export',
+                10 + (processed / totalRecords) * 80,
+                processed,
+                totalRecords,
+                'Exporting to SQLite...',
+              );
             });
             break;
           case 'json':
-            result.recordCount = await this.exportToJSON(dbManager, options, (processed) => {
+            result.recordCount = await this.exportToJSON(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'export', 10 + (processed / totalRecords) * 80,
-                processed, totalRecords, 'Exporting to JSON...');
+              this.reportProgress(
+                options.onProgress,
+                'export',
+                10 + (processed / totalRecords) * 80,
+                processed,
+                totalRecords,
+                'Exporting to JSON...',
+              );
             });
             break;
           case 'csv':
-            result.recordCount = await this.exportToCSV(dbManager, options, (processed) => {
+            result.recordCount = await this.exportToCSV(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'export', 10 + (processed / totalRecords) * 80,
-                processed, totalRecords, 'Exporting to CSV...');
+              this.reportProgress(
+                options.onProgress,
+                'export',
+                10 + (processed / totalRecords) * 80,
+                processed,
+                totalRecords,
+                'Exporting to CSV...',
+              );
             });
             break;
           default:
@@ -140,19 +175,24 @@ export class DatabaseExportImportService {
 
         result.success = true;
         logger.info('Database export completed successfully', { recordCount: result.recordCount });
-
       } finally {
         await dbManager.close();
       }
 
-      this.reportProgress(options.onProgress, 'complete', 100, result.recordCount, result.recordCount, 'Export complete');
-
+      this.reportProgress(
+        options.onProgress,
+        'complete',
+        100,
+        result.recordCount,
+        result.recordCount,
+        'Export complete',
+      );
     } catch (error) {
       result.success = false;
       const exportError: ExportError = {
         message: error instanceof Error ? error.message : 'Unknown error',
         error: error as Error,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       result.errors.push(exportError);
       logger.error('Database export failed', { error: exportError.message });
@@ -177,11 +217,14 @@ export class DatabaseExportImportService {
       recordsImported: 0,
       recordsSkipped: 0,
       duration: 0,
-      errors: []
+      errors: [],
     };
 
     try {
-      logger.info('Starting database import', { format: options.format, filePath: options.filePath });
+      logger.info('Starting database import', {
+        format: options.format,
+        filePath: options.filePath,
+      });
 
       // Report progress
       this.reportProgress(options.onProgress, 'validation', 0, 0, 0, 'Validating import file...');
@@ -208,33 +251,58 @@ export class DatabaseExportImportService {
         const totalRecords = await this.getFileRecordCount(options.filePath, options.format);
         let recordsProcessed = 0;
 
-        this.reportProgress(options.onProgress, 'import', 15, recordsProcessed, totalRecords, 'Starting import...');
+        this.reportProgress(
+          options.onProgress,
+          'import',
+          15,
+          recordsProcessed,
+          totalRecords,
+          'Starting import...',
+        );
 
         // Import based on format
         switch (options.format) {
           case 'sqlite':
-            const sqliteResult = await this.importFromSQLite(dbManager, options, (processed) => {
+            const sqliteResult = await this.importFromSQLite(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'import', 15 + (processed / totalRecords) * 70,
-                processed, totalRecords, 'Importing from SQLite...');
+              this.reportProgress(
+                options.onProgress,
+                'import',
+                15 + (processed / totalRecords) * 70,
+                processed,
+                totalRecords,
+                'Importing from SQLite...',
+              );
             });
             result.recordsImported = sqliteResult.recordsImported;
             result.recordsSkipped = sqliteResult.recordsSkipped;
             break;
           case 'json':
-            const jsonResult = await this.importFromJSON(dbManager, options, (processed) => {
+            const jsonResult = await this.importFromJSON(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'import', 15 + (processed / totalRecords) * 70,
-                processed, totalRecords, 'Importing from JSON...');
+              this.reportProgress(
+                options.onProgress,
+                'import',
+                15 + (processed / totalRecords) * 70,
+                processed,
+                totalRecords,
+                'Importing from JSON...',
+              );
             });
             result.recordsImported = jsonResult.recordsImported;
             result.recordsSkipped = jsonResult.recordsSkipped;
             break;
           case 'csv':
-            const csvResult = await this.importFromCSV(dbManager, options, (processed) => {
+            const csvResult = await this.importFromCSV(dbManager, options, processed => {
               recordsProcessed = processed;
-              this.reportProgress(options.onProgress, 'import', 15 + (processed / totalRecords) * 70,
-                processed, totalRecords, 'Importing from CSV...');
+              this.reportProgress(
+                options.onProgress,
+                'import',
+                15 + (processed / totalRecords) * 70,
+                processed,
+                totalRecords,
+                'Importing from CSV...',
+              );
             });
             result.recordsImported = csvResult.recordsImported;
             result.recordsSkipped = csvResult.recordsSkipped;
@@ -248,7 +316,14 @@ export class DatabaseExportImportService {
 
         // Perform validation if requested
         if (options.validateData) {
-          this.reportProgress(options.onProgress, 'validation', 90, recordsProcessed, totalRecords, 'Validating imported data...');
+          this.reportProgress(
+            options.onProgress,
+            'validation',
+            90,
+            recordsProcessed,
+            totalRecords,
+            'Validating imported data...',
+          );
           try {
             result.validationResults = await this.validateImportedData(dbManager, options);
           } catch (validationError: any) {
@@ -265,7 +340,14 @@ export class DatabaseExportImportService {
 
         // Perform sanitization if requested
         if (options.sanitizeData) {
-          this.reportProgress(options.onProgress, 'sanitization', 95, recordsProcessed, totalRecords, 'Sanitizing data...');
+          this.reportProgress(
+            options.onProgress,
+            'sanitization',
+            95,
+            recordsProcessed,
+            totalRecords,
+            'Sanitizing data...',
+          );
           result.sanitizationResults = await this.sanitizeImportedData(dbManager, options);
         }
 
@@ -280,14 +362,21 @@ export class DatabaseExportImportService {
         }
 
         result.success = true;
-        logger.info('Database import completed successfully', { recordsImported: result.recordsImported });
-
+        logger.info('Database import completed successfully', {
+          recordsImported: result.recordsImported,
+        });
       } finally {
         await dbManager.close();
       }
 
-      this.reportProgress(options.onProgress, 'complete', 100, result.recordsImported, result.recordsImported, 'Import complete');
-
+      this.reportProgress(
+        options.onProgress,
+        'complete',
+        100,
+        result.recordsImported,
+        result.recordsImported,
+        'Import complete',
+      );
     } catch (error) {
       result.success = false;
       const importError: ImportError = {
@@ -297,8 +386,8 @@ export class DatabaseExportImportService {
         context: {
           filePath: options.filePath,
           format: options.format,
-          operation: 'import'
-        }
+          operation: 'import',
+        },
       };
       result.errors.push(importError);
 
@@ -333,7 +422,7 @@ export class DatabaseExportImportService {
         backupPath,
         backupSize: 1024,
         timestamp: new Date(),
-        checksum: 'abc123def456'
+        checksum: 'abc123def456',
       };
     } catch (error) {
       return {
@@ -341,7 +430,7 @@ export class DatabaseExportImportService {
         backupPath,
         backupSize: 0,
         timestamp: new Date(),
-        errors: [error as Error]
+        errors: [error as Error],
       };
     }
   }
@@ -361,18 +450,17 @@ export class DatabaseExportImportService {
         success: true,
         recordsRestored: 100,
         duration: Date.now() - startTime,
-        errors: []
+        errors: [],
       };
 
       logger.info('Restore completed successfully', { backupPath });
       return result;
-
     } catch (error) {
       return {
         success: false,
         recordsRestored: 0,
         duration: Date.now() - startTime,
-        errors: [error as Error]
+        errors: [error as Error],
       };
     }
   }
@@ -380,7 +468,10 @@ export class DatabaseExportImportService {
   /**
    * Validate backup integrity
    */
-  async validateBackupIntegrity(backupPath: string, originalChecksum: string): Promise<BackupIntegrityResult> {
+  async validateBackupIntegrity(
+    backupPath: string,
+    originalChecksum: string,
+  ): Promise<BackupIntegrityResult> {
     try {
       // Mock successful validation for test
       return {
@@ -388,7 +479,7 @@ export class DatabaseExportImportService {
         currentChecksum: originalChecksum,
         originalChecksum,
         fileExists: true,
-        fileSize: 1024
+        fileSize: 1024,
       };
     } catch (error) {
       return {
@@ -397,7 +488,7 @@ export class DatabaseExportImportService {
         originalChecksum,
         fileExists: false,
         fileSize: 0,
-        errors: [error as Error]
+        errors: [error as Error],
       };
     }
   }
@@ -420,28 +511,28 @@ export class DatabaseExportImportService {
         connect: async () => {
           throw new Error('Connection failed');
         },
-        close: async () => { },
+        close: async () => {},
         getDb: async () => {
           throw new Error('Connection failed');
         },
-        healthCheck: async () => ({ status: 'unhealthy' })
+        healthCheck: async () => ({ status: 'unhealthy' }),
       };
     }
 
     return {
-      connect: async () => { },
-      close: async () => { },
+      connect: async () => {},
+      close: async () => {},
       getDb: async () => ({
         select: () => ({
           from: () => ({
-            all: async () => []
-          })
+            all: async () => [],
+          }),
         }),
         insert: () => ({
-          values: async () => { }
-        })
+          values: async () => {},
+        }),
       }),
-      healthCheck: async () => ({ status: 'healthy' })
+      healthCheck: async () => ({ status: 'healthy' }),
     };
   }
 
@@ -469,7 +560,7 @@ export class DatabaseExportImportService {
       'invalid_data.json',
       'large_dataset.json',
       'partial_failure_data.json',
-      'error_data.json'
+      'error_data.json',
     ];
 
     const isValidTestFile = validTestFiles.some(file => filePath.includes(file));
@@ -486,7 +577,7 @@ export class DatabaseExportImportService {
     if (format === 'csv' && ext !== '.csv') {
       throw new Error('Invalid file format: expected CSV file');
     }
-    if (format === 'sqlite' && (ext !== '.db' && ext !== '.sqlite')) {
+    if (format === 'sqlite' && ext !== '.db' && ext !== '.sqlite') {
       throw new Error('Invalid file format: expected SQLite database file');
     }
   }
@@ -511,7 +602,11 @@ export class DatabaseExportImportService {
     return 100;
   }
 
-  private async exportToSQLite(dbManager: any, options: ExportOptions, onProgress: (processed: number) => void): Promise<number> {
+  private async exportToSQLite(
+    dbManager: any,
+    options: ExportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<number> {
     // Mock SQLite export
     const recordCount = 300;
 
@@ -524,7 +619,11 @@ export class DatabaseExportImportService {
     return recordCount;
   }
 
-  private async exportToJSON(dbManager: any, options: ExportOptions, onProgress: (processed: number) => void): Promise<number> {
+  private async exportToJSON(
+    dbManager: any,
+    options: ExportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<number> {
     // Mock JSON export
     let recordCount = 200;
 
@@ -543,7 +642,11 @@ export class DatabaseExportImportService {
     return recordCount;
   }
 
-  private async exportToCSV(dbManager: any, options: ExportOptions, onProgress: (processed: number) => void): Promise<number> {
+  private async exportToCSV(
+    dbManager: any,
+    options: ExportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<number> {
     // Mock CSV export
     const recordCount = 150;
 
@@ -556,7 +659,11 @@ export class DatabaseExportImportService {
     return recordCount;
   }
 
-  private async importFromSQLite(dbManager: any, options: ImportOptions, onProgress: (processed: number) => void): Promise<{ recordsImported: number; recordsSkipped: number }> {
+  private async importFromSQLite(
+    dbManager: any,
+    options: ImportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<{ recordsImported: number; recordsSkipped: number }> {
     const recordsImported = 250;
     const recordsSkipped = 10;
 
@@ -569,7 +676,11 @@ export class DatabaseExportImportService {
     return { recordsImported, recordsSkipped };
   }
 
-  private async importFromJSON(dbManager: any, options: ImportOptions, onProgress: (processed: number) => void): Promise<{ recordsImported: number; recordsSkipped: number }> {
+  private async importFromJSON(
+    dbManager: any,
+    options: ImportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<{ recordsImported: number; recordsSkipped: number }> {
     let recordsImported = 180;
     let recordsSkipped = 5;
 
@@ -595,7 +706,11 @@ export class DatabaseExportImportService {
     return { recordsImported, recordsSkipped };
   }
 
-  private async importFromCSV(dbManager: any, options: ImportOptions, onProgress: (processed: number) => void): Promise<{ recordsImported: number; recordsSkipped: number }> {
+  private async importFromCSV(
+    dbManager: any,
+    options: ImportOptions,
+    onProgress: (processed: number) => void,
+  ): Promise<{ recordsImported: number; recordsSkipped: number }> {
     const recordsImported = 120;
     const recordsSkipped = 3;
 
@@ -608,7 +723,10 @@ export class DatabaseExportImportService {
     return { recordsImported, recordsSkipped };
   }
 
-  private async validateImportedData(dbManager: any, options: ImportOptions): Promise<ImportValidationResults> {
+  private async validateImportedData(
+    dbManager: any,
+    options: ImportOptions,
+  ): Promise<ImportValidationResults> {
     // Mock validation results
     const invalidRecords = options.filePath.includes('invalid_data') ? 20 : 0;
 
@@ -616,7 +734,7 @@ export class DatabaseExportImportService {
       validRecords: 180,
       invalidRecords,
       duplicateRecords: 5,
-      validationErrors: []
+      validationErrors: [],
     };
 
     // For strict validation with invalid data, this should cause import to fail
@@ -630,12 +748,15 @@ export class DatabaseExportImportService {
     return validationResults;
   }
 
-  private async sanitizeImportedData(dbManager: any, options: ImportOptions): Promise<SanitizationResults> {
+  private async sanitizeImportedData(
+    dbManager: any,
+    options: ImportOptions,
+  ): Promise<SanitizationResults> {
     // Mock sanitization results
     return {
       recordsSanitized: 50,
       fieldsModified: 120,
-      sanitizationActions: []
+      sanitizationActions: [],
     };
   }
 
@@ -656,14 +777,14 @@ export class DatabaseExportImportService {
     percentage: number,
     recordsProcessed: number,
     totalRecords: number,
-    message?: string
+    message?: string,
   ): void {
     if (callback) {
       const progress: ExportImportProgress = {
         stage,
         percentage,
         recordsProcessed,
-        totalRecords
+        totalRecords,
       };
       if (message !== undefined) {
         progress.message = message;
@@ -681,7 +802,7 @@ export class DatabaseExportImportService {
     this.memoryUsage = {
       peakMemoryMB: 150,
       averageMemoryMB: 100,
-      gcCollections: 5
+      gcCollections: 5,
     };
   }
 

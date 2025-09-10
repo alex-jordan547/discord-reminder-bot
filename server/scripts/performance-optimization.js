@@ -2,7 +2,7 @@
 
 /**
  * Performance Optimization Script
- * 
+ *
  * Applies database indexes, cache warming, and performance monitoring
  */
 
@@ -30,34 +30,34 @@ const db = drizzle(pool);
 
 async function applyPerformanceIndexes() {
   console.log('🚀 Applying performance indexes...');
-  
+
   const performanceIndexes = [
     // Composite indexes for common query patterns
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_guild_paused_reminded 
      ON events (guild_id, is_paused, last_reminded_at) 
      WHERE is_paused = false`,
-    
+
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reactions_active 
      ON reactions (message_id, is_removed, reacted_at) 
      WHERE is_removed = false`,
-    
+
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reminder_logs_recent 
      ON reminder_logs (guild_id, sent_at DESC, reminder_type) 
      WHERE sent_at > NOW() - INTERVAL '7 days'`,
-    
+
     // Partial indexes for better performance
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_next_reminder 
      ON events (last_reminded_at, interval_minutes) 
      WHERE is_paused = false AND last_reminded_at IS NOT NULL`,
-    
+
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_guilds_active_recent 
      ON guilds (is_active, joined_at DESC) 
      WHERE is_active = true`,
-    
+
     // Full-text search preparation
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_title_search 
      ON events USING gin(to_tsvector('english', title))`,
-    
+
     // Analytics indexes
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reminder_logs_performance 
      ON reminder_logs (execution_time_ms, recipient_count, success_count) 
@@ -81,7 +81,7 @@ async function applyPerformanceIndexes() {
 
 async function optimizeDatabase() {
   console.log('🔧 Optimizing database configuration...');
-  
+
   const optimizations = [
     // Update PostgreSQL configuration for better performance
     `ALTER SYSTEM SET shared_buffers = '256MB'`,
@@ -106,9 +106,9 @@ async function optimizeDatabase() {
 
 async function analyzeTableStatistics() {
   console.log('📊 Analyzing table statistics...');
-  
+
   const tables = ['events', 'guilds', 'guild_configs', 'reactions', 'reminder_logs', 'users'];
-  
+
   for (const table of tables) {
     try {
       await db.execute(sql.raw(`ANALYZE ${table}`));
@@ -121,7 +121,7 @@ async function analyzeTableStatistics() {
 
 async function generatePerformanceReport() {
   console.log('📈 Generating performance report...');
-  
+
   try {
     // Table sizes and index usage
     const tableStats = await db.execute(sql`
@@ -182,10 +182,12 @@ async function generatePerformanceReport() {
 
     console.log('\n📊 PERFORMANCE REPORT');
     console.log('===================');
-    
+
     console.log('\n📋 Table Statistics:');
     tableStats.rows.forEach(row => {
-      console.log(`  ${row.tablename}: ${row.size} (${row.live_tuples} rows, ${row.index_usage_percent}% index usage)`);
+      console.log(
+        `  ${row.tablename}: ${row.size} (${row.live_tuples} rows, ${row.index_usage_percent}% index usage)`,
+      );
     });
 
     console.log('\n🔍 Top Indexes by Usage:');
@@ -203,9 +205,8 @@ async function generatePerformanceReport() {
     return {
       tableStats: tableStats.rows,
       indexStats: indexStats.rows,
-      slowQueries
+      slowQueries,
     };
-
   } catch (error) {
     console.error('❌ Error generating performance report:', error.message);
     return null;
@@ -214,9 +215,9 @@ async function generatePerformanceReport() {
 
 async function vacuumAndReindex() {
   console.log('🧹 Running VACUUM and REINDEX...');
-  
+
   const tables = ['events', 'guilds', 'guild_configs', 'reactions', 'reminder_logs', 'users'];
-  
+
   for (const table of tables) {
     try {
       await db.execute(sql.raw(`VACUUM ANALYZE ${table}`));
@@ -239,29 +240,28 @@ async function main() {
     // Apply optimizations
     await applyPerformanceIndexes();
     console.log('');
-    
+
     await optimizeDatabase();
     console.log('');
-    
+
     await analyzeTableStatistics();
     console.log('');
-    
+
     await vacuumAndReindex();
     console.log('');
-    
+
     const report = await generatePerformanceReport();
-    
+
     console.log('\n🎉 Performance optimization completed!');
     console.log('\nNext steps:');
     console.log('1. Monitor query performance with the new indexes');
     console.log('2. Run this script periodically for maintenance');
     console.log('3. Check the performance report for potential improvements');
-    
+
     if (process.env.NODE_ENV === 'production') {
       console.log('4. Consider enabling pg_stat_statements for query analysis');
       console.log('5. Set up automated VACUUM scheduling');
     }
-
   } catch (error) {
     console.error('💥 Performance optimization failed:', error.message);
     process.exit(1);

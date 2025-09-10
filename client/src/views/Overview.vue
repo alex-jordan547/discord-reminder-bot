@@ -1,26 +1,18 @@
 <template>
   <div class="overview-container responsive" role="main" aria-label="Dashboard Overview">
     <h1>Overview</h1>
-    
+
     <!-- Status Cards -->
     <div class="status-cards mobile-stack">
-      <div 
-        class="status-card" 
-        :class="getStatusClass('system')"
-        data-testid="system-status-card"
-      >
+      <div class="status-card" :class="getStatusClass('system')" data-testid="system-status-card">
         <h3>System Status</h3>
         <div v-if="metrics">
           <p>Memory: {{ metrics.system.memory.percentage }}%</p>
           <p>CPU: {{ metrics.system.cpu.percentage }}%</p>
         </div>
       </div>
-      
-      <div 
-        class="status-card"
-        :class="getStatusClass('bot')"
-        data-testid="bot-status-card"
-      >
+
+      <div class="status-card" :class="getStatusClass('bot')" data-testid="bot-status-card">
         <h3>Bot Status</h3>
         <div v-if="metrics">
           <p>{{ metrics.bot.connected ? 'Connected' : 'Disconnected' }}</p>
@@ -28,19 +20,21 @@
           <p>Users: {{ metrics.bot.users }}</p>
         </div>
       </div>
-      
-      <div 
+
+      <div
         class="status-card"
         :class="getStatusClass('database')"
         data-testid="database-status-card"
       >
         <h3>Database</h3>
         <div v-if="metrics">
-          <p>{{ metrics.database.connectionStatus === 'connected' ? 'Connected' : 'Disconnected' }}</p>
+          <p>
+            {{ metrics.database.connectionStatus === 'connected' ? 'Connected' : 'Disconnected' }}
+          </p>
           <p>Queries: {{ metrics.database.queryCount }}</p>
         </div>
       </div>
-      
+
       <div class="status-card" data-testid="uptime-card">
         <h3>Uptime</h3>
         <div v-if="metrics">
@@ -70,23 +64,21 @@
           <span>{{ metrics.bot.users }}</span>
         </div>
       </div>
-      
+
       <div class="mini-chart responsive-chart">
         <!-- Mini chart placeholder -->
         <div class="chart-placeholder">Chart</div>
       </div>
-      
-      <router-link to="/metrics" data-testid="view-metrics-details">
-        View Details
-      </router-link>
+
+      <router-link to="/metrics" data-testid="view-metrics-details"> View Details </router-link>
     </div>
 
     <!-- Recent Activity -->
     <div class="recent-activity">
       <h2>Recent Activity</h2>
       <div v-if="recentActivities.length > 0">
-        <div 
-          v-for="activity in recentActivities.slice(0, 10)" 
+        <div
+          v-for="activity in recentActivities.slice(0, 10)"
           :key="activity.id"
           class="activity-item"
         >
@@ -114,7 +106,7 @@
             <span v-if="infoAlerts.length > 0">{{ infoAlerts.length }} Info</span>
           </div>
         </div>
-        
+
         <div v-if="criticalAlerts.length > 0" class="critical-alerts alert-critical">
           <h3>Critical Alerts</h3>
           <div v-for="alert in criticalAlerts.slice(0, 3)" :key="alert.id">
@@ -125,24 +117,17 @@
       <div v-else class="empty-state">
         <p>No active alerts</p>
       </div>
-      
-      <router-link to="/alerts" data-testid="view-all-alerts">
-        View All Alerts
-      </router-link>
+
+      <router-link to="/alerts" data-testid="view-all-alerts"> View All Alerts </router-link>
     </div>
 
     <!-- Connection Status -->
-    <div 
-      class="connection-status"
-      :class="connectionStatusClass"
-    >
+    <div class="connection-status" :class="connectionStatusClass">
       <span>{{ connectionStatusText }}</span>
     </div>
 
     <!-- Loading States -->
-    <div v-if="!metrics" class="loading-skeleton">
-      Loading...
-    </div>
+    <div v-if="!metrics" class="loading-skeleton">Loading...</div>
 
     <!-- Error State -->
     <div v-if="error" class="error-state">
@@ -153,85 +138,83 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useDashboardStore } from '@/stores/dashboard'
+import { computed } from 'vue';
+import { useDashboardStore } from '@/stores/dashboard';
 
-const store = useDashboardStore()
+const store = useDashboardStore();
 
 // Computed properties
-const metrics = computed(() => store.metrics)
-const alerts = computed(() => store.alerts)
-const recentActivities = computed(() => store.recentActivities)
-const error = computed(() => store.error)
+const metrics = computed(() => store.metrics);
+const alerts = computed(() => store.alerts);
+const recentActivities = computed(() => store.recentActivities);
+const error = computed(() => store.error);
 
-const criticalAlerts = computed(() => 
-  alerts.value.filter(alert => alert.type === 'critical')
-)
+const criticalAlerts = computed(() => alerts.value.filter(alert => alert.type === 'critical'));
 
-const warningAlerts = computed(() => 
-  alerts.value.filter(alert => alert.type === 'warning')
-)
+const warningAlerts = computed(() => alerts.value.filter(alert => alert.type === 'warning'));
 
-const infoAlerts = computed(() => 
-  alerts.value.filter(alert => alert.type === 'info')
-)
+const infoAlerts = computed(() => alerts.value.filter(alert => alert.type === 'info'));
 
 const connectionStatusClass = computed(() => {
-  const status = store.connectionStatus.status
+  const status = store.connectionStatus.status;
   return {
-    'connected': status === 'connected',
-    'disconnected': status === 'disconnected',
-    'reconnecting': status === 'reconnecting'
-  }
-})
+    connected: status === 'connected',
+    disconnected: status === 'disconnected',
+    reconnecting: status === 'reconnecting',
+  };
+});
 
 const connectionStatusText = computed(() => {
-  const status = store.connectionStatus.status
+  const status = store.connectionStatus.status;
   switch (status) {
-    case 'connected': return 'Connected'
-    case 'disconnected': return 'Disconnected'
-    case 'reconnecting': return 'Reconnecting'
-    default: return 'Unknown'
+    case 'connected':
+      return 'Connected';
+    case 'disconnected':
+      return 'Disconnected';
+    case 'reconnecting':
+      return 'Reconnecting';
+    default:
+      return 'Unknown';
   }
-})
+});
 
 // Methods
 function getStatusClass(type: string) {
-  if (!metrics.value) return 'status-unknown'
-  
+  if (!metrics.value) return 'status-unknown';
+
   switch (type) {
     case 'system':
-      const memoryPercent = metrics.value.system.memory.percentage
-      if (memoryPercent > 90) return 'status-critical'
-      if (memoryPercent > 80) return 'status-warning'
-      return 'status-healthy'
-    
+      const memoryPercent = metrics.value.system.memory.percentage;
+      if (memoryPercent > 90) return 'status-critical';
+      if (memoryPercent > 80) return 'status-warning';
+      return 'status-healthy';
+
     case 'bot':
-      return metrics.value.bot.connected ? 'status-healthy' : 'status-critical'
-    
+      return metrics.value.bot.connected ? 'status-healthy' : 'status-critical';
+
     case 'database':
-      return metrics.value.database.connectionStatus === 'connected' 
-        ? 'status-healthy' 
-        : 'status-critical'
-    
+      return metrics.value.database.connectionStatus === 'connected'
+        ? 'status-healthy'
+        : 'status-critical';
+
     default:
-      return 'status-unknown'
+      return 'status-unknown';
   }
 }
 
 function formatUptime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${minutes}m`
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
 }
 
 function formatTimestamp(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString()
+  return new Date(timestamp).toLocaleTimeString();
 }
 
 function retry() {
   // Clear error and retry
-  store.$patch({ error: null })
+  store.$patch({ error: null });
   // Trigger data refresh
 }
 </script>
@@ -419,7 +402,7 @@ function retry() {
   .mobile-stack {
     grid-template-columns: 1fr;
   }
-  
+
   .responsive-chart {
     height: 150px;
   }

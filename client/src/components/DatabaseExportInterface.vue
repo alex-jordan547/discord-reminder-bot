@@ -15,11 +15,7 @@
           <option value="json">JSON</option>
           <option value="csv">CSV</option>
         </select>
-        <div
-          v-if="formatError"
-          data-testid="format-error"
-          class="error-message"
-        >
+        <div v-if="formatError" data-testid="format-error" class="error-message">
           {{ formatError }}
         </div>
       </div>
@@ -31,11 +27,7 @@
           class="btn btn-primary"
           :disabled="isExporting"
         >
-          <span
-            v-if="isExporting"
-            data-testid="export-spinner"
-            class="spinner"
-          ></span>
+          <span v-if="isExporting" data-testid="export-spinner" class="spinner"></span>
           {{ isExporting ? 'Exporting...' : 'Export Database' }}
         </button>
       </div>
@@ -93,12 +85,12 @@ const handleExport = () => {
 // Reset form after successful export
 watch(
   () => props.lastExportResult,
-  (result) => {
+  result => {
     if (result?.success) {
       // Keep the selected format for convenience
       formatError.value = '';
     }
-  }
+  },
 );
 </script>
 
@@ -218,11 +210,11 @@ watch(
   .database-export-interface {
     padding: 1rem;
   }
-  
+
   .form-actions {
     justify-content: stretch;
   }
-  
+
   .btn {
     width: 100%;
     justify-content: center;

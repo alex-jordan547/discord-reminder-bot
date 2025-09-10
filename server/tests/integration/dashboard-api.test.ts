@@ -71,7 +71,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('token');
       expect(result).toHaveProperty('user');
@@ -89,7 +89,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(401);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
     });
@@ -104,7 +104,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('userId', 'test-user');
       expect(result).toHaveProperty('role', 'admin');
@@ -114,7 +114,7 @@ describe('Dashboard API Integration', () => {
       // Create short-lived token
       const shortToken = await authService.generateToken(
         { userId: 'test-user', role: 'admin' },
-        '1ms'
+        '1ms',
       );
 
       // Wait for token to expire
@@ -129,7 +129,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('token');
       expect(result.token).not.toBe(shortToken);
@@ -147,7 +147,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const config = JSON.parse(response.payload);
       expect(config).toHaveProperty('refreshInterval');
       expect(config).toHaveProperty('theme');
@@ -178,7 +178,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result.success).toBe(true);
       expect(result.config.refreshInterval).toBe(30000);
@@ -203,7 +203,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('validation');
@@ -221,24 +221,24 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const metrics = JSON.parse(response.payload);
       expect(metrics).toHaveProperty('timestamp');
       expect(metrics).toHaveProperty('system');
       expect(metrics).toHaveProperty('bot');
       expect(metrics).toHaveProperty('database');
-      
+
       // System metrics
       expect(metrics.system).toHaveProperty('memory');
       expect(metrics.system).toHaveProperty('cpu');
       expect(metrics.system).toHaveProperty('disk');
       expect(metrics.system.memory).toHaveProperty('percentage');
-      
+
       // Bot metrics
       expect(metrics.bot).toHaveProperty('connected');
       expect(metrics.bot).toHaveProperty('guilds');
       expect(metrics.bot).toHaveProperty('users');
-      
+
       // Database metrics
       expect(metrics.database).toHaveProperty('connectionStatus');
       expect(metrics.database).toHaveProperty('queryCount');
@@ -264,11 +264,11 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const history = JSON.parse(response.payload);
       expect(Array.isArray(history)).toBe(true);
       expect(history.length).toBeLessThanOrEqual(5);
-      
+
       if (history.length > 0) {
         expect(history[0]).toHaveProperty('timestamp');
         expect(history[0]).toHaveProperty('system');
@@ -285,7 +285,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('aggregation', 'average');
       expect(result).toHaveProperty('timeRange', '1h');
@@ -302,7 +302,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Invalid time range');
@@ -329,10 +329,10 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const alerts = JSON.parse(response.payload);
       expect(Array.isArray(alerts)).toBe(true);
-      
+
       if (alerts.length > 0) {
         expect(alerts[0]).toHaveProperty('id');
         expect(alerts[0]).toHaveProperty('type');
@@ -366,7 +366,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(typeResponse.statusCode).toBe(200);
-      
+
       const typeAlerts = JSON.parse(typeResponse.payload);
       typeAlerts.forEach((alert: any) => {
         expect(alert.type).toBe('memory');
@@ -382,7 +382,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(severityResponse.statusCode).toBe(200);
-      
+
       const severityAlerts = JSON.parse(severityResponse.payload);
       severityAlerts.forEach((alert: any) => {
         expect(alert.severity).toBe('critical');
@@ -406,7 +406,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result.success).toBe(true);
       expect(result.alert.acknowledged).toBe(true);
@@ -430,7 +430,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result.success).toBe(true);
 
@@ -490,11 +490,11 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('valid');
       expect(result).toHaveProperty('preview');
-      
+
       if (result.valid) {
         expect(result.preview).toHaveProperty('tables');
         expect(result.preview).toHaveProperty('recordCount');
@@ -512,7 +512,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(backupResponse.statusCode).toBe(200);
-      
+
       const backupResult = JSON.parse(backupResponse.payload);
       expect(backupResult.success).toBe(true);
       expect(backupResult).toHaveProperty('backupId');
@@ -538,7 +538,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(importResponse.statusCode).toBe(200);
-      
+
       const importResult = JSON.parse(importResponse.payload);
       expect(importResult.success).toBe(true);
       expect(importResult).toHaveProperty('recordsImported');
@@ -565,10 +565,10 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(listResponse.statusCode).toBe(200);
-      
+
       const backups = JSON.parse(listResponse.payload);
       expect(Array.isArray(backups)).toBe(true);
-      
+
       if (backups.length > 0) {
         expect(backups[0]).toHaveProperty('id');
         expect(backups[0]).toHaveProperty('created');
@@ -600,7 +600,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(restoreResponse.statusCode).toBe(200);
-      
+
       const restoreResult = JSON.parse(restoreResponse.payload);
       expect(restoreResult.success).toBe(true);
       expect(restoreResult).toHaveProperty('recordsRestored');
@@ -618,14 +618,14 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const stats = JSON.parse(response.payload);
       expect(stats).toHaveProperty('uptime');
       expect(stats).toHaveProperty('metricsCollected');
       expect(stats).toHaveProperty('alertsGenerated');
       expect(stats).toHaveProperty('activeConnections');
       expect(stats).toHaveProperty('lastUpdate');
-      
+
       expect(typeof stats.uptime).toBe('number');
       expect(typeof stats.metricsCollected).toBe('number');
       expect(typeof stats.alertsGenerated).toBe('number');
@@ -641,12 +641,12 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      
+
       const health = JSON.parse(response.payload);
       expect(health).toHaveProperty('status');
       expect(health).toHaveProperty('services');
       expect(health).toHaveProperty('timestamp');
-      
+
       expect(health.status).toMatch(/^(healthy|degraded|unhealthy)$/);
       expect(health.services).toHaveProperty('database');
       expect(health.services).toHaveProperty('monitoring');
@@ -662,7 +662,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(401);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
     });
@@ -692,7 +692,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(503);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Service unavailable');
@@ -710,14 +710,14 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(400);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
     });
 
     it('should handle rate limiting', async () => {
       const requests = [];
-      
+
       // Make many rapid requests
       for (let i = 0; i < 100; i++) {
         requests.push(
@@ -727,12 +727,12 @@ describe('Dashboard API Integration', () => {
             headers: {
               authorization: `Bearer ${authToken}`,
             },
-          })
+          }),
         );
       }
 
       const responses = await Promise.all(requests);
-      
+
       // Some requests should be rate limited
       const rateLimitedResponses = responses.filter(r => r.statusCode === 429);
       expect(rateLimitedResponses.length).toBeGreaterThan(0);
@@ -741,7 +741,7 @@ describe('Dashboard API Integration', () => {
     it('should handle database connection failures', async () => {
       // Mock database connection failure
       vi.spyOn(databaseService, 'getConnection').mockRejectedValue(
-        new Error('Database connection failed')
+        new Error('Database connection failed'),
       );
 
       const response = await app.inject({
@@ -755,7 +755,7 @@ describe('Dashboard API Integration', () => {
       });
 
       expect(response.statusCode).toBe(500);
-      
+
       const result = JSON.parse(response.payload);
       expect(result).toHaveProperty('error');
       expect(result.error).toContain('Database');
@@ -778,7 +778,7 @@ describe('Dashboard API Integration', () => {
             headers: {
               authorization: `Bearer ${authToken}`,
             },
-          })
+          }),
         );
       }
 
@@ -801,7 +801,7 @@ describe('Dashboard API Integration', () => {
 
       for (let i = 0; i < iterations; i++) {
         const startTime = Date.now();
-        
+
         const response = await app.inject({
           method: 'GET',
           url: '/api/dashboard/metrics/realtime',
@@ -812,7 +812,7 @@ describe('Dashboard API Integration', () => {
 
         const endTime = Date.now();
         const responseTime = endTime - startTime;
-        
+
         responseTimes.push(responseTime);
         expect(response.statusCode).toBe(200);
       }
@@ -820,7 +820,9 @@ describe('Dashboard API Integration', () => {
       // Calculate performance metrics
       const avgResponseTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
       const maxResponseTime = Math.max(...responseTimes);
-      const p95ResponseTime = responseTimes.sort((a, b) => a - b)[Math.floor(responseTimes.length * 0.95)];
+      const p95ResponseTime = responseTimes.sort((a, b) => a - b)[
+        Math.floor(responseTimes.length * 0.95)
+      ];
 
       // Performance should be acceptable
       expect(avgResponseTime).toBeLessThan(100); // Average < 100ms

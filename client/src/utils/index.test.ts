@@ -112,7 +112,7 @@ describe('Dashboard Utilities', () => {
     it('generates unique IDs', () => {
       const id1 = generateId();
       const id2 = generateId();
-      
+
       expect(id1).not.toBe(id2);
       expect(id1).toHaveLength(9);
       expect(id2).toHaveLength(9);

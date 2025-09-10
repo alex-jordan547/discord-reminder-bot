@@ -26,7 +26,7 @@ describe('NotificationSettings', () => {
     it('should render all notification type toggles', () => {
       const toggles = wrapper.findAll('.notification-toggle');
       expect(toggles.length).toBeGreaterThan(0);
-      
+
       // Check for specific notification types
       expect(wrapper.find('[data-testid="toggle-system"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="toggle-alerts"]').exists()).toBe(true);
@@ -49,7 +49,7 @@ describe('NotificationSettings', () => {
   describe('Settings Management', () => {
     it('should load current settings from store', () => {
       const store = useNotificationsStore();
-      
+
       // Update store settings
       store.updateSettings({
         enabled: {
@@ -99,7 +99,7 @@ describe('NotificationSettings', () => {
           enabled: expect.objectContaining({
             system: false,
           }),
-        })
+        }),
       );
     });
 
@@ -119,7 +119,7 @@ describe('NotificationSettings', () => {
             enabled: true,
             volume: 0.8,
           }),
-        })
+        }),
       );
     });
 
@@ -142,7 +142,7 @@ describe('NotificationSettings', () => {
             maxVisible: 8,
             position: 'bottom-left',
           }),
-        })
+        }),
       );
     });
   });
@@ -150,14 +150,14 @@ describe('NotificationSettings', () => {
   describe('Form Validation', () => {
     it('should validate duration input', async () => {
       const durationInput = wrapper.find('[data-testid="display-duration"]');
-      
+
       // Test invalid values
       await durationInput.setValue(-1000);
       expect(wrapper.find('.validation-error').exists()).toBe(true);
-      
+
       await durationInput.setValue(0);
       expect(wrapper.find('.validation-error').exists()).toBe(true);
-      
+
       // Test valid value
       await durationInput.setValue(3000);
       expect(wrapper.find('.validation-error').exists()).toBe(false);
@@ -165,14 +165,14 @@ describe('NotificationSettings', () => {
 
     it('should validate max notifications input', async () => {
       const maxInput = wrapper.find('[data-testid="max-notifications"]');
-      
+
       // Test invalid values
       await maxInput.setValue(0);
       expect(wrapper.find('.validation-error').exists()).toBe(true);
-      
+
       await maxInput.setValue(11); // Assuming max is 10
       expect(wrapper.find('.validation-error').exists()).toBe(true);
-      
+
       // Test valid value
       await maxInput.setValue(5);
       expect(wrapper.find('.validation-error').exists()).toBe(false);
@@ -180,14 +180,14 @@ describe('NotificationSettings', () => {
 
     it('should validate volume range', async () => {
       const volumeSlider = wrapper.find('[data-testid="sound-volume"]');
-      
+
       // Test boundary values
       await volumeSlider.setValue(0);
       expect(wrapper.find('.validation-error').exists()).toBe(false);
-      
+
       await volumeSlider.setValue(1);
       expect(wrapper.find('.validation-error').exists()).toBe(false);
-      
+
       // Test out of range (should be clamped by input)
       await volumeSlider.setValue(1.5);
       expect((volumeSlider.element as HTMLInputElement).value).toBe('1');
@@ -248,11 +248,11 @@ describe('NotificationSettings', () => {
   describe('Accessibility', () => {
     it('should have proper form labels', () => {
       const toggles = wrapper.findAll('.notification-toggle');
-      
+
       toggles.forEach(toggle => {
         const input = toggle.find('input');
         const label = toggle.find('label');
-        
+
         expect(input.exists()).toBe(true);
         expect(label.exists()).toBe(true);
         expect(label.attributes('for')).toBe(input.attributes('id'));
@@ -284,7 +284,7 @@ describe('NotificationSettings', () => {
     it('should have descriptive help text', () => {
       const helpTexts = wrapper.findAll('.help-text');
       expect(helpTexts.length).toBeGreaterThan(0);
-      
+
       helpTexts.forEach(helpText => {
         expect(helpText.text().length).toBeGreaterThan(0);
       });
@@ -294,14 +294,11 @@ describe('NotificationSettings', () => {
   describe('Persistence', () => {
     it('should save settings to localStorage', async () => {
       const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-      
+
       const systemToggle = wrapper.find('[data-testid="toggle-system"]');
       await systemToggle.setValue(false);
 
-      expect(setItemSpy).toHaveBeenCalledWith(
-        'notification-settings',
-        expect.any(String)
-      );
+      expect(setItemSpy).toHaveBeenCalledWith('notification-settings', expect.any(String));
     });
 
     it('should load settings from localStorage on mount', () => {
@@ -321,7 +318,7 @@ describe('NotificationSettings', () => {
 
       const systemToggle = newWrapper.find('[data-testid="toggle-system"]');
       const soundToggle = newWrapper.find('[data-testid="sound-enabled"]');
-      
+
       expect((systemToggle.element as HTMLInputElement).checked).toBe(false);
       expect((soundToggle.element as HTMLInputElement).checked).toBe(false);
     });

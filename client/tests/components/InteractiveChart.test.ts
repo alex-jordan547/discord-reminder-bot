@@ -146,7 +146,7 @@ describe('InteractiveChart', () => {
 
     expect(wrapper.find('[data-testid="time-range-selector"]').exists()).toBe(true);
     expect(wrapper.findAll('[data-testid="time-range-option"]')).toHaveLength(4);
-    
+
     const options = wrapper.findAll('[data-testid="time-range-option"]');
     expect(options[0].text()).toBe('1h');
     expect(options[1].text()).toBe('6h');
@@ -195,14 +195,14 @@ describe('InteractiveChart', () => {
 
     const resetButton = wrapper.find('[data-testid="reset-zoom"]');
     expect(resetButton.exists()).toBe(true);
-    
+
     // Test that the resetZoom function exists
     expect(typeof wrapper.vm.resetZoom).toBe('function');
-    
+
     // Test that clicking the button doesn't throw an error
     await resetButton.trigger('click');
     await nextTick();
-    
+
     // The test passes if no error is thrown
     expect(true).toBe(true);
   });

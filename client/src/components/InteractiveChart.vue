@@ -12,13 +12,9 @@
           {{ range }}
         </button>
       </div>
-      
+
       <div class="zoom-controls" data-testid="zoom-controls">
-        <button
-          class="reset-zoom-btn"
-          data-testid="reset-zoom"
-          @click="resetZoom"
-        >
+        <button class="reset-zoom-btn" data-testid="reset-zoom" @click="resetZoom">
           Reset Zoom
         </button>
       </div>
@@ -68,7 +64,7 @@ ChartJS.register(
   Tooltip,
   Legend,
   Filler,
-  zoomPlugin
+  zoomPlugin,
 );
 
 interface Props {
@@ -102,11 +98,11 @@ function resetZoom() {
 function extractMetricValue(metrics: MonitoringMetrics, path: string): number {
   const keys = path.split('.');
   let value: any = metrics;
-  
+
   for (const key of keys) {
     value = value?.[key];
   }
-  
+
   return typeof value === 'number' ? value : 0;
 }
 
@@ -129,20 +125,37 @@ function getMetricLabel(metricType: string): string {
     'performance.errorRate': 'Error Rate',
     'performance.availability': 'Availability (%)',
   };
-  
+
   return labelMap[metricType] || metricType;
 }
 
 function getMetricColor(metricType: string): { border: string; background: string } {
   const colorMap: Record<string, { border: string; background: string }> = {
-    'system.cpu.percentage': { border: 'rgba(59, 130, 246, 1)', background: 'rgba(59, 130, 246, 0.1)' },
-    'system.memory.percentage': { border: 'rgba(16, 185, 129, 1)', background: 'rgba(16, 185, 129, 0.1)' },
-    'system.disk.percentage': { border: 'rgba(245, 158, 11, 1)', background: 'rgba(245, 158, 11, 0.1)' },
+    'system.cpu.percentage': {
+      border: 'rgba(59, 130, 246, 1)',
+      background: 'rgba(59, 130, 246, 0.1)',
+    },
+    'system.memory.percentage': {
+      border: 'rgba(16, 185, 129, 1)',
+      background: 'rgba(16, 185, 129, 0.1)',
+    },
+    'system.disk.percentage': {
+      border: 'rgba(245, 158, 11, 1)',
+      background: 'rgba(245, 158, 11, 0.1)',
+    },
     'bot.guilds': { border: 'rgba(168, 85, 247, 1)', background: 'rgba(168, 85, 247, 0.1)' },
-    'performance.responseTime': { border: 'rgba(239, 68, 68, 1)', background: 'rgba(239, 68, 68, 0.1)' },
+    'performance.responseTime': {
+      border: 'rgba(239, 68, 68, 1)',
+      background: 'rgba(239, 68, 68, 0.1)',
+    },
   };
-  
-  return colorMap[metricType] || { border: 'rgba(59, 130, 246, 1)', background: 'rgba(59, 130, 246, 0.1)' };
+
+  return (
+    colorMap[metricType] || {
+      border: 'rgba(59, 130, 246, 1)',
+      background: 'rgba(59, 130, 246, 0.1)',
+    }
+  );
 }
 
 const chartData = computed(() => {
@@ -167,9 +180,7 @@ const chartData = computed(() => {
     return date.toLocaleTimeString('en-US', { hour12: false });
   });
 
-  const data = props.metricsHistory.map(metrics => 
-    extractMetricValue(metrics, props.metricType)
-  );
+  const data = props.metricsHistory.map(metrics => extractMetricValue(metrics, props.metricType));
 
   const colors = getMetricColor(props.metricType);
 
@@ -317,8 +328,12 @@ const chartOptions = computed(() => ({
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Dark mode support */
@@ -329,7 +344,7 @@ const chartOptions = computed(() => ({
     border-color: #4b5563;
     color: #f9fafb;
   }
-  
+
   .time-range-option:hover,
   .reset-zoom-btn:hover {
     background: #4b5563;

@@ -21,7 +21,7 @@ export default defineConfig({
     }),
   ],
 
-  // Configuration pour build et développement  
+  // Configuration pour build et développement
   build: {
     target: 'node18',
     outDir: 'dist',

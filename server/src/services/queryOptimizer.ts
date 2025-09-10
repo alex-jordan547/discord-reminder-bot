@@ -1,6 +1,6 @@
 /**
  * Query Optimization Service
- * 
+ *
  * Implements caching, connection pooling, and query optimization
  * for improved database performance
  */
@@ -33,7 +33,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
     this.config = {
       defaultTTL: parseInt(process.env.CACHE_TTL || '300'), // 5 minutes default
       keyPrefix: 'discord_bot:',
-      enableCompression: process.env.CACHE_COMPRESSION === 'true'
+      enableCompression: process.env.CACHE_COMPRESSION === 'true',
     };
 
     // Initialize Redis cache if available
@@ -41,10 +41,10 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
       this.cache = new Redis(process.env.REDIS_URL, {
         retryDelayOnFailover: 100,
         maxRetriesPerRequest: 3,
-        lazyConnect: true
+        lazyConnect: true,
       });
-      
-      this.cache.on('error', (err) => {
+
+      this.cache.on('error', err => {
         console.warn('Redis cache error:', err.message);
         this.cache = null; // Fallback to no cache
       });
@@ -63,7 +63,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
       connectionTimeoutMillis: 2000, // Return error after 2 seconds if connection could not be established
       statement_timeout: 5000, // Timeout individual queries after 5 seconds
       query_timeout: 5000,
-      application_name: 'discord_reminder_bot'
+      application_name: 'discord_reminder_bot',
     });
 
     this.db = drizzle(this.pool);
@@ -77,7 +77,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => `${key}:${value}`)
       .join('|');
-    
+
     return `${this.config.keyPrefix}${type}:${paramString}`;
   }
 
@@ -87,7 +87,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
   private async getCachedOrQuery<T>(
     cacheKey: string,
     queryFn: () => Promise<T>,
-    ttl?: number
+    ttl?: number,
   ): Promise<T> {
     if (!this.cache) {
       return await queryFn();
@@ -103,13 +103,9 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
     }
 
     const result = await queryFn();
-    
+
     try {
-      await this.cache.setex(
-        cacheKey,
-        ttl || this.config.defaultTTL,
-        JSON.stringify(result)
-      );
+      await this.cache.setex(cacheKey, ttl || this.config.defaultTTL, JSON.stringify(result));
     } catch (error) {
       console.warn('Cache write error:', error);
     }
@@ -122,7 +118,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
    */
   async getActiveEventsByGuild(guildId: string, limit = 50) {
     const cacheKey = this.generateCacheKey('active_events', { guildId, limit });
-    
+
     return this.getCachedOrQuery(
       cacheKey,
       async () => {
@@ -135,19 +131,14 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
             lastRemindedAt: events.lastRemindedAt,
             isPaused: events.isPaused,
             createdAt: events.createdAt,
-            channelId: events.channelId
+            channelId: events.channelId,
           })
           .from(events)
-          .where(
-            and(
-              eq(events.guildId, guildId),
-              eq(events.isPaused, false)
-            )
-          )
+          .where(and(eq(events.guildId, guildId), eq(events.isPaused, false)))
           .orderBy(events.createdAt)
           .limit(limit);
       },
-      120 // 2 minutes cache for active events
+      120, // 2 minutes cache for active events
     );
   }
 
@@ -156,7 +147,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
    */
   async getGuildMetrics(guildId: string) {
     const cacheKey = this.generateCacheKey('guild_metrics', { guildId });
-    
+
     return this.getCachedOrQuery(
       cacheKey,
       async () => {
@@ -175,10 +166,10 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
           LEFT JOIN reminder_logs rl ON e.message_id = rl.message_id
           WHERE e.guild_id = ${guildId}
         `);
-        
+
         return result.rows[0] || {};
       },
-      300 // 5 minutes cache for metrics
+      300, // 5 minutes cache for metrics
     );
   }
 
@@ -188,7 +179,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
   async getRecentReminderActivity(guildId: string, hours = 24, limit = 100) {
     const cacheKey = this.generateCacheKey('recent_activity', { guildId, hours, limit });
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-    
+
     return this.getCachedOrQuery(
       cacheKey,
       async () => {
@@ -201,33 +192,30 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
             errorCount: reminderLogs.errorCount,
             executionTimeMs: reminderLogs.executionTimeMs,
             sentAt: reminderLogs.sentAt,
-            eventTitle: events.title
+            eventTitle: events.title,
           })
           .from(reminderLogs)
           .innerJoin(events, eq(reminderLogs.messageId, events.messageId))
-          .where(
-            and(
-              eq(reminderLogs.guildId, guildId),
-              gte(reminderLogs.sentAt, since)
-            )
-          )
+          .where(and(eq(reminderLogs.guildId, guildId), gte(reminderLogs.sentAt, since)))
           .orderBy(reminderLogs.sentAt)
           .limit(limit);
       },
-      60 // 1 minute cache for recent activity
+      60, // 1 minute cache for recent activity
     );
   }
 
   /**
    * Batch update reactions for better performance
    */
-  async batchUpdateReactions(updates: Array<{
-    messageId: string;
-    userId: string;
-    emoji: string;
-    isRemoved: boolean;
-    removedAt?: Date;
-  }>) {
+  async batchUpdateReactions(
+    updates: Array<{
+      messageId: string;
+      userId: string;
+      emoji: string;
+      isRemoved: boolean;
+      removedAt?: Date;
+    }>,
+  ) {
     if (updates.length === 0) return;
 
     // Invalidate cache for affected messages
@@ -241,7 +229,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
       emoji: update.emoji,
       isRemoved: update.isRemoved,
       removedAt: update.removedAt || null,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     }));
 
     // PostgreSQL UPSERT for efficient batch operations
@@ -253,8 +241,11 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
         COALESCE(r.created_at, now()) as created_at,
         e.guild_id
       FROM (VALUES ${sql.join(
-        values.map(v => sql`(${v.messageId}, ${v.userId}, ${v.emoji}, ${v.isRemoved}, ${v.removedAt}, ${v.updatedAt})`),
-        sql`, `
+        values.map(
+          v =>
+            sql`(${v.messageId}, ${v.userId}, ${v.emoji}, ${v.isRemoved}, ${v.removedAt}, ${v.updatedAt})`,
+        ),
+        sql`, `,
       )}) as v(message_id, user_id, emoji, is_removed, removed_at, updated_at)
       JOIN events e ON e.message_id = v.message_id
       LEFT JOIN reactions r ON r.message_id = v.message_id AND r.user_id = v.user_id AND r.emoji = v.emoji
@@ -271,7 +262,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
    */
   async getPerformanceMetrics() {
     const cacheKey = this.generateCacheKey('performance_metrics', {});
-    
+
     return this.getCachedOrQuery(
       cacheKey,
       async () => {
@@ -295,7 +286,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
         const poolMetrics = {
           totalCount: this.pool.totalCount,
           idleCount: this.pool.idleCount,
-          waitingCount: this.pool.waitingCount
+          waitingCount: this.pool.waitingCount,
         };
 
         let cacheMetrics = null;
@@ -304,7 +295,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
             const info = await this.cache.info('memory');
             cacheMetrics = {
               connected: true,
-              memory: info
+              memory: info,
             };
           } catch (error) {
             cacheMetrics = { connected: false, error: error.message };
@@ -315,10 +306,10 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
           database: dbMetrics.rows,
           connectionPool: poolMetrics,
           cache: cacheMetrics,
-          timestamp: new Date()
+          timestamp: new Date(),
         };
       },
-      30 // 30 seconds cache for performance metrics
+      30, // 30 seconds cache for performance metrics
     );
   }
 
@@ -330,7 +321,7 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
 
     try {
       const patterns = types.map(type => `${this.config.keyPrefix}${type}:*`);
-      
+
       for (const pattern of patterns) {
         const keys = await this.cache.keys(pattern);
         if (keys.length > 0) {

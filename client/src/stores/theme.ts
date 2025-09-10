@@ -56,11 +56,11 @@ export const useThemeStore = defineStore('theme', () => {
   return {
     // State
     currentTheme,
-    
+
     // Computed
     isDark,
     isLight,
-    
+
     // Actions
     setTheme,
     toggleTheme,

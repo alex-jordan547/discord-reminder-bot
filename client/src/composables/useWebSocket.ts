@@ -12,7 +12,7 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
 
   const lastMessage = ref<WebSocketMessage | null>(null);
   const isConnected = computed(() => connectionStatus.value.status === 'connected');
-  
+
   let ws: WebSocket | null = null;
   let reconnectTimer: number | null = null;
   let maxReconnectAttempts = 5;
@@ -31,7 +31,7 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
     try {
       const message: WebSocketMessage = JSON.parse(event.data);
       lastMessage.value = message;
-      
+
       // Call specific message type handlers
       const handler = messageHandlers.get(message.type);
       if (handler) {
@@ -52,7 +52,7 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
   const handleClose = (event: CloseEvent) => {
     updateConnectionStatus('disconnected');
     console.log('WebSocket disconnected:', event.code, event.reason);
-    
+
     // Attempt reconnection if not manually closed
     if (event.code !== 1000 && connectionStatus.value.reconnectAttempts < maxReconnectAttempts) {
       scheduleReconnect();
@@ -62,7 +62,7 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
   const handleError = (event: Event) => {
     console.error('WebSocket error:', event);
     updateConnectionStatus('error');
-    
+
     // Attempt reconnection on error if we haven't exceeded max attempts
     if (connectionStatus.value.reconnectAttempts < maxReconnectAttempts) {
       scheduleReconnect();
@@ -91,7 +91,7 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
     try {
       updateConnectionStatus('connecting');
       ws = new WebSocket(url);
-      
+
       ws.onopen = handleOpen;
       ws.onmessage = handleMessage;
       ws.onclose = handleClose;
@@ -112,12 +112,13 @@ export function useWebSocket(url: string = 'ws://localhost:3000/ws') {
       ws.close(1000, 'Manual disconnect');
       ws = null;
     }
-    
+
     updateConnectionStatus('disconnected');
   };
 
   const send = (message: WebSocketMessage) => {
-    if (ws && ws.readyState === 1) { // 1 = OPEN
+    if (ws && ws.readyState === 1) {
+      // 1 = OPEN
       ws.send(JSON.stringify(message));
     } else {
       console.warn('WebSocket is not connected. Cannot send message:', message);

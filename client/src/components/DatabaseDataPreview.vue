@@ -88,11 +88,16 @@
             {{ currentTable.name }}
           </h4>
           <div data-testid="pagination-info" class="pagination-info">
-            Showing {{ currentTable.sampleRows.length }} of {{ formatNumber(currentTable.rowCount) }} rows
+            Showing {{ currentTable.sampleRows.length }} of
+            {{ formatNumber(currentTable.rowCount) }} rows
           </div>
         </div>
 
-        <div v-if="currentTable.sampleRows.length === 0" data-testid="empty-table-message" class="empty-table">
+        <div
+          v-if="currentTable.sampleRows.length === 0"
+          data-testid="empty-table-message"
+          class="empty-table"
+        >
           <div class="empty-icon">📭</div>
           <p>No data to preview in this table</p>
         </div>
@@ -216,14 +221,14 @@ const formatCellValue = (value: any): string => {
   if (isNullValue(value)) {
     return 'NULL';
   }
-  
+
   const stringValue = String(value);
   const maxLength = 50;
-  
+
   if (stringValue.length > maxLength) {
     return stringValue.substring(0, maxLength) + '...';
   }
-  
+
   return stringValue;
 };
 
@@ -231,21 +236,21 @@ const getCellTooltip = (value: any): string => {
   if (isNullValue(value)) {
     return 'NULL value';
   }
-  
+
   return String(value);
 };
 
 // Set first table as active when preview data changes
 watch(
   () => props.previewData,
-  (newData) => {
+  newData => {
     if (newData && newData.tables.length > 0) {
       activeTable.value = newData.tables[0].name;
     } else {
       activeTable.value = '';
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 
@@ -577,41 +582,41 @@ watch(
   .database-data-preview {
     max-height: 90vh;
   }
-  
+
   .preview-header {
     padding: 1rem;
   }
-  
+
   .preview-content {
     padding: 1rem;
   }
-  
+
   .file-summary {
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
     padding: 0.75rem;
   }
-  
+
   .table-tabs {
     gap: 0.25rem;
   }
-  
+
   .table-tab {
     min-width: 100px;
     padding: 0.5rem 0.75rem;
   }
-  
+
   .table-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
     padding: 1rem;
   }
-  
+
   .data-table {
     font-size: 0.8rem;
   }
-  
+
   .data-cell {
     padding: 0.5rem;
     max-width: 150px;

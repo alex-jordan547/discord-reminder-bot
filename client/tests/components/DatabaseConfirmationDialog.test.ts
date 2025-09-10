@@ -23,7 +23,7 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'This will replace all existing data.',
     });
-    
+
     const modal = wrapper.find('[data-testid="confirmation-modal"]');
     expect(modal.exists()).toBe(false);
   });
@@ -35,10 +35,10 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'This will replace all existing data.',
     });
-    
+
     const modal = wrapper.find('[data-testid="confirmation-modal"]');
     expect(modal.exists()).toBe(true);
-    
+
     const overlay = wrapper.find('[data-testid="modal-overlay"]');
     expect(overlay.exists()).toBe(true);
   });
@@ -50,11 +50,11 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Delete Database',
       message: 'This action cannot be undone. All data will be permanently lost.',
     });
-    
+
     const title = wrapper.find('[data-testid="modal-title"]');
     expect(title.exists()).toBe(true);
     expect(title.text()).toBe('Delete Database');
-    
+
     const message = wrapper.find('[data-testid="modal-message"]');
     expect(message.exists()).toBe(true);
     expect(message.text()).toBe('This action cannot be undone. All data will be permanently lost.');
@@ -67,18 +67,18 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'Import data?',
     });
-    
+
     const importIcon = importWrapper.find('[data-testid="operation-icon"]');
     expect(importIcon.exists()).toBe(true);
     expect(importIcon.text()).toBe('📥');
-    
+
     const deleteWrapper = createWrapper({
       visible: true,
       operation: 'delete',
       title: 'Confirm Delete',
       message: 'Delete data?',
     });
-    
+
     const deleteIcon = deleteWrapper.find('[data-testid="operation-icon"]');
     expect(deleteIcon.text()).toBe('🗑️');
   });
@@ -95,10 +95,10 @@ describe('DatabaseConfirmationDialog', () => {
         'Database will be temporarily unavailable',
       ],
     });
-    
+
     const warningList = wrapper.find('[data-testid="warning-details"]');
     expect(warningList.exists()).toBe(true);
-    
+
     const warningItems = warningList.findAll('li');
     expect(warningItems).toHaveLength(3);
     expect(warningItems[0].text()).toBe('Current data will be backed up');
@@ -115,11 +115,11 @@ describe('DatabaseConfirmationDialog', () => {
       requireConfirmation: true,
       confirmationText: 'DELETE',
     });
-    
+
     const confirmationInput = wrapper.find('[data-testid="confirmation-input"]');
     expect(confirmationInput.exists()).toBe(true);
     expect(confirmationInput.attributes('placeholder')).toBe('Type "DELETE" to confirm');
-    
+
     const confirmButton = wrapper.find('[data-testid="confirm-button"]');
     expect(confirmButton.attributes('disabled')).toBeDefined();
   });
@@ -133,17 +133,17 @@ describe('DatabaseConfirmationDialog', () => {
       requireConfirmation: true,
       confirmationText: 'DELETE',
     });
-    
+
     const confirmationInput = wrapper.find('[data-testid="confirmation-input"]');
     await confirmationInput.setValue('DELETE');
-    
+
     const confirmButton = wrapper.find('[data-testid="confirm-button"]');
     expect(confirmButton.attributes('disabled')).toBeUndefined();
   });
 
   it('should show file information when importing', () => {
     const mockFile = new File(['test'], 'backup.db', { type: 'application/x-sqlite3' });
-    
+
     const wrapper = createWrapper({
       visible: true,
       operation: 'import',
@@ -155,7 +155,7 @@ describe('DatabaseConfirmationDialog', () => {
         type: 'SQLite Database',
       },
     });
-    
+
     const fileInfo = wrapper.find('[data-testid="file-info"]');
     expect(fileInfo.exists()).toBe(true);
     expect(fileInfo.text()).toContain('backup.db');
@@ -174,7 +174,7 @@ describe('DatabaseConfirmationDialog', () => {
         estimatedBackupSize: '2.5 MB',
       },
     });
-    
+
     const backupInfo = wrapper.find('[data-testid="backup-info"]');
     expect(backupInfo.exists()).toBe(true);
     expect(backupInfo.text()).toContain('A backup will be created');
@@ -189,17 +189,17 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'Import data?',
     });
-    
+
     const importConfirmButton = importWrapper.find('[data-testid="confirm-button"]');
     expect(importConfirmButton.text()).toBe('Import');
-    
+
     const deleteWrapper = createWrapper({
       visible: true,
       operation: 'delete',
       title: 'Confirm Delete',
       message: 'Delete data?',
     });
-    
+
     const deleteConfirmButton = deleteWrapper.find('[data-testid="confirm-button"]');
     expect(deleteConfirmButton.text()).toBe('Delete');
   });
@@ -211,10 +211,10 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Export',
       message: 'Export data?',
     });
-    
+
     const confirmButton = wrapper.find('[data-testid="confirm-button"]');
     await confirmButton.trigger('click');
-    
+
     expect(wrapper.emitted('confirm')).toBeTruthy();
   });
 
@@ -225,10 +225,10 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'Import data?',
     });
-    
+
     const cancelButton = wrapper.find('[data-testid="cancel-button"]');
     await cancelButton.trigger('click');
-    
+
     expect(wrapper.emitted('cancel')).toBeTruthy();
   });
 
@@ -240,10 +240,10 @@ describe('DatabaseConfirmationDialog', () => {
       message: 'Import data?',
       closeOnOverlayClick: true,
     });
-    
+
     const overlay = wrapper.find('[data-testid="modal-overlay"]');
     await overlay.trigger('click');
-    
+
     expect(wrapper.emitted('cancel')).toBeTruthy();
   });
 
@@ -255,10 +255,10 @@ describe('DatabaseConfirmationDialog', () => {
       message: 'Delete data?',
       closeOnOverlayClick: false,
     });
-    
+
     const overlay = wrapper.find('[data-testid="modal-overlay"]');
     await overlay.trigger('click');
-    
+
     expect(wrapper.emitted('cancel')).toBeFalsy();
   });
 
@@ -269,10 +269,10 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Import',
       message: 'Import data?',
     });
-    
+
     const overlay = wrapper.find('[data-testid="modal-overlay"]');
     await overlay.trigger('keydown.escape');
-    
+
     expect(wrapper.emitted('cancel')).toBeTruthy();
   });
 
@@ -284,10 +284,10 @@ describe('DatabaseConfirmationDialog', () => {
       message: 'Import data?',
       loading: true,
     });
-    
+
     const confirmButton = wrapper.find('[data-testid="confirm-button"]');
     const cancelButton = wrapper.find('[data-testid="cancel-button"]');
-    
+
     expect(confirmButton.attributes('disabled')).toBeDefined();
     expect(cancelButton.attributes('disabled')).toBeDefined();
   });
@@ -300,7 +300,7 @@ describe('DatabaseConfirmationDialog', () => {
       message: 'Import data?',
       loading: true,
     });
-    
+
     const spinner = wrapper.find('[data-testid="loading-spinner"]');
     expect(spinner.exists()).toBe(true);
   });
@@ -312,10 +312,10 @@ describe('DatabaseConfirmationDialog', () => {
       title: 'Confirm Delete',
       message: 'Delete data?',
     });
-    
+
     const modal = dangerousWrapper.find('[data-testid="confirmation-modal"]');
     expect(modal.classes()).toContain('dangerous-operation');
-    
+
     const confirmButton = dangerousWrapper.find('[data-testid="confirm-button"]');
     expect(confirmButton.classes()).toContain('btn-danger');
   });

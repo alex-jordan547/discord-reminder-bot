@@ -1,10 +1,6 @@
 <template>
   <div class="system-metrics-chart">
-    <Line
-      :data="chartData"
-      :options="chartOptions"
-      data-testid="line-chart"
-    />
+    <Line :data="chartData" :options="chartOptions" data-testid="line-chart" />
   </div>
 </template>
 
@@ -33,7 +29,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 interface Props {
@@ -59,7 +55,7 @@ watch(
     if (props.realTime && oldMetrics) {
       updateDataHistory(newMetrics);
     }
-  }
+  },
 );
 
 function updateDataHistory(metrics: SystemMetrics) {
@@ -96,17 +92,20 @@ function updateDataHistory(metrics: SystemMetrics) {
 
 const chartData = computed(() => {
   if (props.type === 'network') {
-    const labels = props.realTime && labelHistory.value.length > 0 
-      ? labelHistory.value 
-      : [new Date().toLocaleTimeString('en-US', { hour12: false })];
-    
-    const bytesInData = props.realTime && dataHistory.value.length > 0 
-      ? dataHistory.value 
-      : [props.metrics.network.bytesIn];
-    
-    const bytesOutData = props.realTime && dataHistory.value.length > 0 
-      ? dataHistory.value.map(() => props.metrics.network.bytesOut) 
-      : [props.metrics.network.bytesOut];
+    const labels =
+      props.realTime && labelHistory.value.length > 0
+        ? labelHistory.value
+        : [new Date().toLocaleTimeString('en-US', { hour12: false })];
+
+    const bytesInData =
+      props.realTime && dataHistory.value.length > 0
+        ? dataHistory.value
+        : [props.metrics.network.bytesIn];
+
+    const bytesOutData =
+      props.realTime && dataHistory.value.length > 0
+        ? dataHistory.value.map(() => props.metrics.network.bytesOut)
+        : [props.metrics.network.bytesOut];
 
     return {
       labels,
@@ -152,13 +151,12 @@ const chartData = computed(() => {
       currentValue = 0;
   }
 
-  const labels = props.realTime && labelHistory.value.length > 0 
-    ? labelHistory.value 
-    : [new Date().toLocaleTimeString('en-US', { hour12: false })];
-  
-  const data = props.realTime && dataHistory.value.length > 0 
-    ? dataHistory.value 
-    : [currentValue];
+  const labels =
+    props.realTime && labelHistory.value.length > 0
+      ? labelHistory.value
+      : [new Date().toLocaleTimeString('en-US', { hour12: false })];
+
+  const data = props.realTime && dataHistory.value.length > 0 ? dataHistory.value : [currentValue];
 
   return {
     labels,

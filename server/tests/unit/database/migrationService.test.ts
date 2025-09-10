@@ -20,7 +20,7 @@ describe('Database Migration Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock SQLite manager
     mockSQLiteManager = {
       connect: vi.fn().mockResolvedValue(undefined),
@@ -28,11 +28,11 @@ describe('Database Migration Service', () => {
       getDb: vi.fn().mockResolvedValue({
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
-            all: vi.fn().mockResolvedValue([])
-          })
-        })
+            all: vi.fn().mockResolvedValue([]),
+          }),
+        }),
       }),
-      healthCheck: vi.fn().mockResolvedValue({ status: 'healthy' })
+      healthCheck: vi.fn().mockResolvedValue({ status: 'healthy' }),
     };
 
     // Mock PostgreSQL manager
@@ -41,15 +41,15 @@ describe('Database Migration Service', () => {
       close: vi.fn().mockResolvedValue(undefined),
       getDb: vi.fn().mockResolvedValue({
         insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockResolvedValue(undefined)
+          values: vi.fn().mockResolvedValue(undefined),
         }),
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
-            all: vi.fn().mockResolvedValue([])
-          })
-        })
+            all: vi.fn().mockResolvedValue([]),
+          }),
+        }),
       }),
-      healthCheck: vi.fn().mockResolvedValue({ status: 'healthy' })
+      healthCheck: vi.fn().mockResolvedValue({ status: 'healthy' }),
     };
 
     migrationService = new MigrationService();
@@ -65,7 +65,7 @@ describe('Database Migration Service', () => {
     it('should successfully migrate data from SQLite to PostgreSQL', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -79,14 +79,14 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
         batchSize: 1000,
         validateData: true,
         createBackup: true,
-        skipExisting: false
+        skipExisting: false,
       };
 
       const result = await migrationService.migrate(sourceConfig, targetConfig, options);
@@ -104,20 +104,20 @@ describe('Database Migration Service', () => {
       const mockData = Array.from({ length: 5000 }, (_, i) => ({
         id: i + 1,
         name: `Test ${i + 1}`,
-        created_at: new Date()
+        created_at: new Date(),
       }));
 
       mockSQLiteManager.getDb.mockResolvedValue({
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
-            all: vi.fn().mockResolvedValue(mockData)
-          })
-        })
+            all: vi.fn().mockResolvedValue(mockData),
+          }),
+        }),
       });
 
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './large_test.db'
+        path: './large_test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -131,14 +131,14 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
         batchSize: 1000,
         validateData: true,
         createBackup: true,
-        skipExisting: false
+        skipExisting: false,
       };
 
       const result = await migrationService.migrate(sourceConfig, targetConfig, options);
@@ -151,7 +151,7 @@ describe('Database Migration Service', () => {
     it('should validate data integrity during migration', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -165,14 +165,14 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
         batchSize: 1000,
         validateData: true,
         createBackup: true,
-        skipExisting: false
+        skipExisting: false,
       };
 
       const result = await migrationService.migrate(sourceConfig, targetConfig, options);
@@ -186,7 +186,7 @@ describe('Database Migration Service', () => {
     it('should handle migration errors gracefully', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -200,19 +200,19 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
         batchSize: 1000,
         validateData: true,
         createBackup: true,
-        skipExisting: false
+        skipExisting: false,
       };
 
       // Mock the createDatabaseManager to throw an error
       const originalCreateManager = migrationService['createDatabaseManager'];
-      migrationService['createDatabaseManager'] = vi.fn().mockImplementation((config) => {
+      migrationService['createDatabaseManager'] = vi.fn().mockImplementation(config => {
         if (config.type === 'postgresql') {
           return {
             connect: async () => {
@@ -222,7 +222,7 @@ describe('Database Migration Service', () => {
             getDb: async () => {
               throw new Error('Connection failed');
             },
-            healthCheck: async () => ({ status: 'unhealthy' })
+            healthCheck: async () => ({ status: 'unhealthy' }),
           };
         }
         return originalCreateManager.call(migrationService, config);
@@ -233,7 +233,7 @@ describe('Database Migration Service', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].message).toContain('Connection failed');
-      
+
       // Restore original method
       migrationService['createDatabaseManager'] = originalCreateManager;
     });
@@ -243,7 +243,7 @@ describe('Database Migration Service', () => {
     it('should create schema mapping between SQLite and PostgreSQL', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -257,7 +257,7 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const schemaMapping = await migrationService.createSchemaMapping(sourceConfig, targetConfig);
@@ -274,10 +274,14 @@ describe('Database Migration Service', () => {
         name: 'Test',
         is_active: 1, // SQLite boolean as integer
         created_at: 1640995200, // SQLite timestamp as integer
-        metadata: '{"key": "value"}' // SQLite JSON as text
+        metadata: '{"key": "value"}', // SQLite JSON as text
       };
 
-      const transformedData = await migrationService.transformData(sqliteData, 'sqlite', 'postgresql');
+      const transformedData = await migrationService.transformData(
+        sqliteData,
+        'sqlite',
+        'postgresql',
+      );
 
       expect(transformedData.id).toBe(1);
       expect(transformedData.name).toBe('Test');
@@ -290,7 +294,7 @@ describe('Database Migration Service', () => {
       const invalidData = {
         id: 'not_a_number',
         created_at: 'invalid_timestamp',
-        metadata: 'invalid_json{'
+        metadata: 'invalid_json{',
       };
 
       const result = await migrationService.transformData(invalidData, 'sqlite', 'postgresql');
@@ -302,7 +306,7 @@ describe('Database Migration Service', () => {
     it('should preserve data relationships during transformation', async () => {
       const sourceData = [
         { table: 'users', id: 1, name: 'User 1' },
-        { table: 'events', id: 1, user_id: 1, title: 'Event 1' }
+        { table: 'events', id: 1, user_id: 1, title: 'Event 1' },
       ];
 
       const transformedData = await migrationService.transformRelatedData(sourceData);
@@ -326,7 +330,7 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupResult = await migrationService.createBackup(targetConfig);
@@ -349,14 +353,14 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupPath = './backup_test.sql';
-      
+
       // Add a small delay to ensure the test has some duration
       await new Promise(resolve => setTimeout(resolve, 1));
-      
+
       const rollbackResult = await migrationService.rollback(targetConfig, backupPath);
 
       expect(rollbackResult.success).toBe(true);
@@ -376,15 +380,15 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const backupPath = './backup_test.sql';
       const originalChecksum = 'abc123';
-      
+
       const rollbackResult = await migrationService.rollback(targetConfig, backupPath, {
         validateIntegrity: true,
-        originalChecksum
+        originalChecksum,
       });
 
       expect(rollbackResult.success).toBe(true);
@@ -404,11 +408,11 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const invalidBackupPath = './nonexistent_backup.sql';
-      
+
       const rollbackResult = await migrationService.rollback(targetConfig, invalidBackupPath);
 
       expect(rollbackResult.success).toBe(false);
@@ -421,7 +425,7 @@ describe('Database Migration Service', () => {
     it('should track migration progress', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -435,7 +439,7 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
@@ -443,7 +447,7 @@ describe('Database Migration Service', () => {
         validateData: true,
         createBackup: true,
         skipExisting: false,
-        onProgress: vi.fn()
+        onProgress: vi.fn(),
       };
 
       await migrationService.migrate(sourceConfig, targetConfig, options);
@@ -464,7 +468,7 @@ describe('Database Migration Service', () => {
     it('should log migration events', async () => {
       const sourceConfig: DatabaseConfig = {
         type: 'sqlite',
-        path: './test.db'
+        path: './test.db',
       };
 
       const targetConfig: DatabaseConfig = {
@@ -478,14 +482,14 @@ describe('Database Migration Service', () => {
         poolSize: 10,
         connectionTimeout: 30000,
         idleTimeout: 10000,
-        maxLifetime: 3600000
+        maxLifetime: 3600000,
       };
 
       const options: MigrationOptions = {
         batchSize: 1000,
         validateData: true,
         createBackup: true,
-        skipExisting: false
+        skipExisting: false,
       };
 
       await migrationService.migrate(sourceConfig, targetConfig, options);

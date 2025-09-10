@@ -2,23 +2,17 @@
   <div class="notification-settings">
     <div class="settings-header">
       <h3 class="settings-title">Notification Settings</h3>
-      <p class="settings-description">
-        Configure how and when you receive notifications
-      </p>
+      <p class="settings-description">Configure how and when you receive notifications</p>
     </div>
 
     <form @submit.prevent="saveSettings" class="settings-form">
       <!-- General Settings -->
       <div class="settings-section">
         <h4 class="section-title">General</h4>
-        
+
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.enabled"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.enabled" type="checkbox" class="form-checkbox" />
             Enable notifications
           </label>
         </div>
@@ -26,11 +20,7 @@
         <div class="form-group">
           <label class="form-label">
             Auto-hide notifications
-            <input
-              v-model="localSettings.autoHide"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.autoHide" type="checkbox" class="form-checkbox" />
           </label>
         </div>
 
@@ -65,47 +55,31 @@
       <!-- Notification Types -->
       <div class="settings-section">
         <h4 class="section-title">Notification Types</h4>
-        
+
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="showInfo"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="showInfo" type="checkbox" class="form-checkbox" />
             Information notifications
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="showSuccess"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="showSuccess" type="checkbox" class="form-checkbox" />
             Success notifications
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="showWarning"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="showWarning" type="checkbox" class="form-checkbox" />
             Warning notifications
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="showError"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="showError" type="checkbox" class="form-checkbox" />
             Error notifications
           </label>
         </div>
@@ -114,36 +88,24 @@
       <!-- Priority Levels -->
       <div class="settings-section">
         <h4 class="section-title">Priority Levels</h4>
-        
+
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.priority.low"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.priority.low" type="checkbox" class="form-checkbox" />
             Low priority
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.priority.medium"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.priority.medium" type="checkbox" class="form-checkbox" />
             Medium priority
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.priority.high"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.priority.high" type="checkbox" class="form-checkbox" />
             High priority
           </label>
         </div>
@@ -163,25 +125,17 @@
       <!-- Additional Options -->
       <div class="settings-section">
         <h4 class="section-title">Additional Options</h4>
-        
+
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.sound"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.sound" type="checkbox" class="form-checkbox" />
             Play sound for notifications
           </label>
         </div>
 
         <div class="form-group">
           <label class="form-label">
-            <input
-              v-model="localSettings.desktop"
-              type="checkbox"
-              class="form-checkbox"
-            />
+            <input v-model="localSettings.desktop" type="checkbox" class="form-checkbox" />
             Show desktop notifications
           </label>
         </div>
@@ -189,27 +143,13 @@
 
       <!-- Actions -->
       <div class="settings-actions">
-        <button
-          type="submit"
-          class="btn btn-primary"
-          :disabled="!hasChanges"
-        >
-          Save Settings
-        </button>
-        
-        <button
-          type="button"
-          class="btn btn-secondary"
-          @click="resetSettings"
-        >
+        <button type="submit" class="btn btn-primary" :disabled="!hasChanges">Save Settings</button>
+
+        <button type="button" class="btn btn-secondary" @click="resetSettings">
           Reset to Defaults
         </button>
 
-        <button
-          type="button"
-          class="btn btn-danger"
-          @click="clearAllNotifications"
-        >
+        <button type="button" class="btn btn-danger" @click="clearAllNotifications">
           Clear All Notifications
         </button>
       </div>
@@ -238,7 +178,7 @@ const showInfo = computed({
     } else {
       localSettings.value.types = localSettings.value.types.filter(type => type !== 'info');
     }
-  }
+  },
 });
 
 const showSuccess = computed({
@@ -251,7 +191,7 @@ const showSuccess = computed({
     } else {
       localSettings.value.types = localSettings.value.types.filter(type => type !== 'success');
     }
-  }
+  },
 });
 
 const showWarning = computed({
@@ -264,7 +204,7 @@ const showWarning = computed({
     } else {
       localSettings.value.types = localSettings.value.types.filter(type => type !== 'warning');
     }
-  }
+  },
 });
 
 const showError = computed({
@@ -277,7 +217,7 @@ const showError = computed({
     } else {
       localSettings.value.types = localSettings.value.types.filter(type => type !== 'error');
     }
-  }
+  },
 });
 
 // Check if there are unsaved changes
@@ -299,9 +239,13 @@ const clearAllNotifications = () => {
 };
 
 // Watch for external settings changes
-watch(settings, (newSettings) => {
-  localSettings.value = { ...newSettings };
-}, { deep: true });
+watch(
+  settings,
+  newSettings => {
+    localSettings.value = { ...newSettings };
+  },
+  { deep: true },
+);
 
 // Initialize local settings
 onMounted(() => {

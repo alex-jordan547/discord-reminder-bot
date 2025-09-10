@@ -56,7 +56,7 @@ export class AuditLogger {
   private readonly maxLogFiles = 10;
   private readonly logBuffer: AuditLog[] = [];
   private readonly bufferFlushInterval = 5000; // 5 seconds
-  
+
   constructor() {
     this.ensureLogDirectoryExists();
     this.startLogFlusher();
@@ -78,15 +78,15 @@ export class AuditLogger {
         fileSize: operation.fileSize,
         fileType: operation.fileType,
         processingTime: operation.processingTime,
-        error: operation.error
+        error: operation.error,
       },
       metadata: {
         ipAddress: operation.metadata?.ipAddress,
         userAgent: operation.metadata?.userAgent,
         originalFilename: operation.metadata?.originalFilename,
         storedPath: operation.metadata?.storedPath,
-        checksum: operation.metadata?.checksum
-      }
+        checksum: operation.metadata?.checksum,
+      },
     };
 
     await this.writeAuditLog(auditEntry);
@@ -95,7 +95,7 @@ export class AuditLogger {
       operation: operation.operation,
       filename: operation.filename,
       userId: operation.userId,
-      success: operation.success
+      success: operation.success,
     });
   }
 
@@ -114,8 +114,8 @@ export class AuditLogger {
       metadata: {
         ipAddress: event.ipAddress,
         userAgent: event.userAgent,
-        severity: event.severity
-      }
+        severity: event.severity,
+      },
     };
 
     await this.writeAuditLog(auditEntry);
@@ -124,7 +124,7 @@ export class AuditLogger {
       event: event.event,
       severity: event.severity,
       userId: event.userId,
-      details: event.details
+      details: event.details,
     });
   }
 
@@ -136,7 +136,7 @@ export class AuditLogger {
     action: 'login' | 'logout' | 'token_refresh' | 'password_change',
     result: 'success' | 'failure',
     details?: Record<string, any>,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<void> {
     const auditEntry: AuditLog = {
       id: this.generateLogId(),
@@ -146,7 +146,7 @@ export class AuditLogger {
       action,
       result,
       details: details || {},
-      metadata: metadata || {}
+      metadata: metadata || {},
     };
 
     await this.writeAuditLog(auditEntry);
@@ -154,7 +154,7 @@ export class AuditLogger {
     logger.info('Authentication event logged', {
       userId,
       action,
-      result
+      result,
     });
   }
 
@@ -168,7 +168,7 @@ export class AuditLogger {
     result: 'success' | 'failure',
     requiredPermissions?: string[],
     userPermissions?: string[],
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<void> {
     const auditEntry: AuditLog = {
       id: this.generateLogId(),
@@ -181,9 +181,9 @@ export class AuditLogger {
       details: {
         requiredPermissions: requiredPermissions || [],
         userPermissions: userPermissions || [],
-        authorized: result === 'success'
+        authorized: result === 'success',
       },
-      metadata: metadata || {}
+      metadata: metadata || {},
     };
 
     await this.writeAuditLog(auditEntry);
@@ -194,7 +194,7 @@ export class AuditLogger {
         action,
         resource,
         requiredPermissions,
-        userPermissions
+        userPermissions,
       });
     }
   }
@@ -207,11 +207,11 @@ export class AuditLogger {
     userId?: string,
     startDate?: Date,
     endDate?: Date,
-    limit?: number
+    limit?: number,
   ): Promise<AuditLog[]> {
     try {
       const logs = await this.readAuditLogs();
-      
+
       let filtered = logs.filter(log => {
         if (resource && log.resource !== resource) return false;
         if (userId && log.userId !== userId) return false;
@@ -233,7 +233,7 @@ export class AuditLogger {
       logger.error('Failed to retrieve audit trail', {
         resource,
         userId,
-        error: error.message
+        error: error.message,
       });
       return [];
     }
@@ -244,7 +244,7 @@ export class AuditLogger {
    */
   async getAuditStats(
     startDate: Date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
-    endDate: Date = new Date()
+    endDate: Date = new Date(),
   ): Promise<{
     totalEvents: number;
     eventsByType: Record<string, number>;
@@ -255,10 +255,8 @@ export class AuditLogger {
   }> {
     try {
       const logs = await this.readAuditLogs();
-      
-      const filtered = logs.filter(log => 
-        log.timestamp >= startDate && log.timestamp <= endDate
-      );
+
+      const filtered = logs.filter(log => log.timestamp >= startDate && log.timestamp <= endDate);
 
       const stats = {
         totalEvents: filtered.length,
@@ -266,7 +264,7 @@ export class AuditLogger {
         eventsByResult: {} as Record<string, number>,
         topUsers: [] as Array<{ userId: string; eventCount: number }>,
         securityEvents: 0,
-        failedOperations: 0
+        failedOperations: 0,
       };
 
       const userCounts: Record<string, number> = {};
@@ -274,20 +272,20 @@ export class AuditLogger {
       for (const log of filtered) {
         // Count by type
         stats.eventsByType[log.type] = (stats.eventsByType[log.type] || 0) + 1;
-        
+
         // Count by result
         stats.eventsByResult[log.result] = (stats.eventsByResult[log.result] || 0) + 1;
-        
+
         // Count security events
         if (log.type === 'security_event') {
           stats.securityEvents++;
         }
-        
+
         // Count failed operations
         if (log.result === 'failure') {
           stats.failedOperations++;
         }
-        
+
         // Count by user
         if (log.userId) {
           userCounts[log.userId] = (userCounts[log.userId] || 0) + 1;
@@ -303,7 +301,7 @@ export class AuditLogger {
       return stats;
     } catch (error) {
       logger.error('Failed to generate audit statistics', {
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -312,14 +310,10 @@ export class AuditLogger {
   /**
    * Export audit logs for compliance
    */
-  async exportAuditLogs(
-    format: 'json' | 'csv',
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<string> {
+  async exportAuditLogs(format: 'json' | 'csv', startDate?: Date, endDate?: Date): Promise<string> {
     try {
       const logs = await this.getAuditTrail(undefined, undefined, startDate, endDate);
-      
+
       if (format === 'json') {
         return JSON.stringify(logs, null, 2);
       } else if (format === 'csv') {
@@ -332,7 +326,7 @@ export class AuditLogger {
         format,
         startDate,
         endDate,
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -353,7 +347,7 @@ export class AuditLogger {
     } catch (error) {
       logger.error('Failed to write audit log', {
         entry,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -367,19 +361,17 @@ export class AuditLogger {
     try {
       const logFile = this.getCurrentLogFile();
       const logEntries = this.logBuffer.splice(0, this.logBuffer.length);
-      
-      const logLines = logEntries.map(entry => 
-        JSON.stringify(entry) + '\n'
-      ).join('');
+
+      const logLines = logEntries.map(entry => JSON.stringify(entry) + '\n').join('');
 
       await fs.promises.appendFile(logFile, logLines, { encoding: 'utf8' });
-      
+
       // Check if log file needs rotation
       await this.rotateLogFileIfNeeded(logFile);
     } catch (error) {
       logger.error('Failed to flush audit log buffer', {
         bufferSize: this.logBuffer.length,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -395,7 +387,7 @@ export class AuditLogger {
       for (const file of logFiles) {
         const content = await fs.promises.readFile(file, 'utf8');
         const lines = content.split('\n').filter(line => line.trim());
-        
+
         for (const line of lines) {
           try {
             const log = JSON.parse(line);
@@ -410,7 +402,7 @@ export class AuditLogger {
       return logs;
     } catch (error) {
       logger.error('Failed to read audit logs', {
-        error: error.message
+        error: error.message,
       });
       return [];
     }
@@ -435,7 +427,7 @@ export class AuditLogger {
         .filter(file => file.startsWith('audit-') && file.endsWith('.log'))
         .map(file => path.join(this.logDir, file))
         .sort();
-      
+
       return logFiles;
     } catch (error) {
       return [];
@@ -448,21 +440,21 @@ export class AuditLogger {
   private async rotateLogFileIfNeeded(logFile: string): Promise<void> {
     try {
       const stats = await fs.promises.stat(logFile);
-      
+
       if (stats.size >= this.maxLogSize) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const rotatedFile = logFile.replace('.log', `-${timestamp}.log`);
-        
+
         await fs.promises.rename(logFile, rotatedFile);
         logger.info('Audit log file rotated', { original: logFile, rotated: rotatedFile });
-        
+
         // Clean up old log files
         await this.cleanupOldLogFiles();
       }
     } catch (error) {
       logger.error('Failed to rotate log file', {
         logFile,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -473,10 +465,10 @@ export class AuditLogger {
   private async cleanupOldLogFiles(): Promise<void> {
     try {
       const files = await this.getLogFiles();
-      
+
       if (files.length > this.maxLogFiles) {
         const filesToDelete = files.slice(0, files.length - this.maxLogFiles);
-        
+
         for (const file of filesToDelete) {
           await fs.promises.unlink(file);
           logger.info('Old audit log file deleted', { file });
@@ -484,7 +476,7 @@ export class AuditLogger {
       }
     } catch (error) {
       logger.error('Failed to cleanup old log files', {
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -496,8 +488,16 @@ export class AuditLogger {
     if (logs.length === 0) return '';
 
     const headers = [
-      'id', 'type', 'timestamp', 'userId', 'action', 'resource', 'result',
-      'ipAddress', 'userAgent', 'details'
+      'id',
+      'type',
+      'timestamp',
+      'userId',
+      'action',
+      'resource',
+      'result',
+      'ipAddress',
+      'userAgent',
+      'details',
     ];
 
     const csvLines = [headers.join(',')];
@@ -513,7 +513,7 @@ export class AuditLogger {
         log.result,
         log.metadata.ipAddress || '',
         log.metadata.userAgent || '',
-        JSON.stringify(log.details).replace(/"/g, '""')
+        JSON.stringify(log.details).replace(/"/g, '""'),
       ];
 
       csvLines.push(row.map(field => `"${field}"`).join(','));

@@ -48,7 +48,7 @@ function authenticateWebSocket(request: FastifyRequest): boolean {
 // Rate limiting check
 function checkRateLimit(connection: WebSocketConnection): boolean {
   const now = new Date();
-  
+
   // Reset rate limit window if needed
   if (now.getTime() - connection.rateLimitReset.getTime() > RATE_LIMIT_WINDOW) {
     connection.messageCount = 0;
@@ -61,7 +61,7 @@ function checkRateLimit(connection: WebSocketConnection): boolean {
 // Broadcast message to all connected clients
 function broadcastToAll(message: any, excludeConnectionId?: string): void {
   const messageStr = JSON.stringify(message);
-  
+
   connections.forEach((connection, connectionId) => {
     if (connectionId !== excludeConnectionId) {
       try {
@@ -79,74 +79,86 @@ function broadcastToAll(message: any, excludeConnectionId?: string): void {
 function handleWebSocketMessage(connection: WebSocketConnection, message: string): void {
   try {
     const data = JSON.parse(message);
-    
+
     // Update activity timestamp
     connection.lastActivity = new Date();
-    
+
     // Check rate limiting
     if (!checkRateLimit(connection)) {
-      connection.socket.socket.send(JSON.stringify({
-        type: 'rate_limit_exceeded',
-        error: 'Message rate limit exceeded. Please slow down.'
-      }));
+      connection.socket.socket.send(
+        JSON.stringify({
+          type: 'rate_limit_exceeded',
+          error: 'Message rate limit exceeded. Please slow down.',
+        }),
+      );
       return;
     }
-    
+
     connection.messageCount++;
 
     // Handle different message types
     switch (data.type) {
       case 'ping':
-        connection.socket.socket.send(JSON.stringify({
-          type: 'pong',
-          timestamp: new Date().toISOString(),
-          id: data.id
-        }));
+        connection.socket.socket.send(
+          JSON.stringify({
+            type: 'pong',
+            timestamp: new Date().toISOString(),
+            id: data.id,
+          }),
+        );
         break;
 
       case 'subscribe':
         if (data.channel) {
           connection.subscriptions.add(data.channel);
-          connection.socket.socket.send(JSON.stringify({
-            type: 'subscription_confirmed',
-            channel: data.channel,
-            timestamp: new Date().toISOString()
-          }));
+          connection.socket.socket.send(
+            JSON.stringify({
+              type: 'subscription_confirmed',
+              channel: data.channel,
+              timestamp: new Date().toISOString(),
+            }),
+          );
         }
         break;
 
       case 'unsubscribe':
         if (data.channel) {
           connection.subscriptions.delete(data.channel);
-          connection.socket.socket.send(JSON.stringify({
-            type: 'subscription_cancelled',
-            channel: data.channel,
-            timestamp: new Date().toISOString()
-          }));
+          connection.socket.socket.send(
+            JSON.stringify({
+              type: 'subscription_cancelled',
+              channel: data.channel,
+              timestamp: new Date().toISOString(),
+            }),
+          );
         }
         break;
 
       case 'request_metrics':
         // Send current metrics to the requesting client
-        connection.socket.socket.send(JSON.stringify({
-          type: 'metrics_update',
-          data: {
-            timestamp: new Date().toISOString(),
-            system: {
-              memory: process.memoryUsage(),
-              uptime: process.uptime()
+        connection.socket.socket.send(
+          JSON.stringify({
+            type: 'metrics_update',
+            data: {
+              timestamp: new Date().toISOString(),
+              system: {
+                memory: process.memoryUsage(),
+                uptime: process.uptime(),
+              },
+              connections: connections.size,
             },
-            connections: connections.size
-          }
-        }));
+          }),
+        );
         break;
 
       case 'get_connection_count':
-        connection.socket.socket.send(JSON.stringify({
-          type: 'connection_count',
-          count: connections.size,
-          timestamp: new Date().toISOString()
-        }));
+        connection.socket.socket.send(
+          JSON.stringify({
+            type: 'connection_count',
+            count: connections.size,
+            timestamp: new Date().toISOString(),
+          }),
+        );
         break;
 
       case 'trigger_broadcast':
@@ -157,28 +169,32 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
             timestamp: new Date().toISOString(),
             system: {
               memory: process.memoryUsage(),
-              uptime: process.uptime()
+              uptime: process.uptime(),
             },
-            connections: connections.size
-          }
+            connections: connections.size,
+          },
         }); // Don't exclude sender for this test
         break;
 
       default:
-        connection.socket.socket.send(JSON.stringify({
-          type: 'error',
-          error: 'Unknown message type',
-          timestamp: new Date().toISOString()
-        }));
+        connection.socket.socket.send(
+          JSON.stringify({
+            type: 'error',
+            error: 'Unknown message type',
+            timestamp: new Date().toISOString(),
+          }),
+        );
         break;
     }
   } catch (error) {
     logger.error(`Error handling WebSocket message: ${error}`);
-    connection.socket.socket.send(JSON.stringify({
-      type: 'error',
-      error: 'Invalid message format',
-      timestamp: new Date().toISOString()
-    }));
+    connection.socket.socket.send(
+      JSON.stringify({
+        type: 'error',
+        error: 'Invalid message format',
+        timestamp: new Date().toISOString(),
+      }),
+    );
   }
 }
 
@@ -212,56 +228,63 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
 
   // WebSocket route for metrics
   fastify.register(async function (fastify) {
-    fastify.get('/ws/metrics', { 
-      websocket: true,
-      preHandler: async (request, reply) => {
-        // Authenticate connection before upgrade
-        if (!authenticateWebSocket(request)) {
-          logger.warn('Unauthorized WebSocket connection attempt');
-          reply.code(401).send({ error: 'Unauthorized' });
-          return;
-        }
-      }
-    }, (connection, request) => {
+    fastify.get(
+      '/ws/metrics',
+      {
+        websocket: true,
+        preHandler: async (request, reply) => {
+          // Authenticate connection before upgrade
+          if (!authenticateWebSocket(request)) {
+            logger.warn('Unauthorized WebSocket connection attempt');
+            reply.code(401).send({ error: 'Unauthorized' });
+            return;
+          }
+        },
+      },
+      (connection, request) => {
+        const connectionId = generateConnectionId();
+        const wsConnection: WebSocketConnection = {
+          id: connectionId,
+          socket: connection,
+          lastActivity: new Date(),
+          subscriptions: new Set(),
+          messageCount: 0,
+          rateLimitReset: new Date(),
+        };
 
-      const connectionId = generateConnectionId();
-      const wsConnection: WebSocketConnection = {
-        id: connectionId,
-        socket: connection,
-        lastActivity: new Date(),
-        subscriptions: new Set(),
-        messageCount: 0,
-        rateLimitReset: new Date()
-      };
+        // Store connection
+        connections.set(connectionId, wsConnection);
+        logger.info(`WebSocket connection established: ${connectionId}`);
 
-      // Store connection
-      connections.set(connectionId, wsConnection);
-      logger.info(`WebSocket connection established: ${connectionId}`);
+        // Send welcome message
+        connection.socket.send(
+          JSON.stringify({
+            type: 'connected',
+            connectionId,
+            timestamp: new Date().toISOString(),
+          }),
+        );
 
-      // Send welcome message
-      connection.socket.send(JSON.stringify({
-        type: 'connected',
-        connectionId,
-        timestamp: new Date().toISOString()
-      }));
+        // Handle incoming messages
+        connection.socket.on('message', message => {
+          handleWebSocketMessage(wsConnection, message.toString());
+        });
 
-      // Handle incoming messages
-      connection.socket.on('message', (message) => {
-        handleWebSocketMessage(wsConnection, message.toString());
-      });
+        // Handle connection close
+        connection.socket.on('close', (code, reason) => {
+          logger.info(
+            `WebSocket connection closed: ${connectionId}, code: ${code}, reason: ${reason}`,
+          );
+          connections.delete(connectionId);
+        });
 
-      // Handle connection close
-      connection.socket.on('close', (code, reason) => {
-        logger.info(`WebSocket connection closed: ${connectionId}, code: ${code}, reason: ${reason}`);
-        connections.delete(connectionId);
-      });
-
-      // Handle connection errors
-      connection.socket.on('error', (error) => {
-        logger.error(`WebSocket connection error: ${connectionId}, error: ${error}`);
-        connections.delete(connectionId);
-      });
-    });
+        // Handle connection errors
+        connection.socket.on('error', error => {
+          logger.error(`WebSocket connection error: ${connectionId}, error: ${error}`);
+          connections.delete(connectionId);
+        });
+      },
+    );
   });
 
   logger.info('WebSocket routes registered successfully');
@@ -276,6 +299,6 @@ export function broadcastMetrics(metrics: any): void {
   broadcastToAll({
     type: 'metrics_broadcast',
     data: metrics,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 }

@@ -33,7 +33,7 @@ export class SessionManager {
 
   constructor(redisClient?: any) {
     this.redisClient = redisClient;
-    
+
     // Start cleanup interval
     this.startCleanupInterval();
   }
@@ -42,10 +42,10 @@ export class SessionManager {
    * Create a new session
    */
   async createSession(
-    userId: string, 
-    data: Record<string, any>, 
+    userId: string,
+    data: Record<string, any>,
     maxAge: number = this.defaultMaxAge,
-    metadata?: { userAgent?: string; ipAddress?: string }
+    metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<string> {
     try {
       const sessionId = this.generateSessionId();
@@ -59,7 +59,7 @@ export class SessionManager {
         lastActivity: now,
         expiresAt,
         userAgent: metadata?.userAgent,
-        ipAddress: metadata?.ipAddress
+        ipAddress: metadata?.ipAddress,
       };
 
       // Store in Redis if available, otherwise in memory
@@ -67,7 +67,7 @@ export class SessionManager {
         await this.redisClient.setEx(
           `session:${sessionId}`,
           Math.ceil(maxAge / 1000),
-          JSON.stringify(this.serializeSession(sessionData))
+          JSON.stringify(this.serializeSession(sessionData)),
         );
       } else {
         this.sessions.set(sessionId, sessionData);
@@ -78,7 +78,7 @@ export class SessionManager {
         userId,
         expiresAt: expiresAt.toISOString(),
         userAgent: metadata?.userAgent,
-        ipAddress: metadata?.ipAddress
+        ipAddress: metadata?.ipAddress,
       });
 
       return sessionId;
@@ -136,7 +136,7 @@ export class SessionManager {
           await this.redisClient.setEx(
             `session:${sessionId}`,
             ttl,
-            JSON.stringify(this.serializeSession(sessionData))
+            JSON.stringify(this.serializeSession(sessionData)),
           );
         }
       } else {
@@ -170,7 +170,7 @@ export class SessionManager {
           await this.redisClient.setEx(
             `session:${sessionId}`,
             ttl,
-            JSON.stringify(this.serializeSession(sessionData))
+            JSON.stringify(this.serializeSession(sessionData)),
           );
         }
       } else {
@@ -215,13 +215,13 @@ export class SessionManager {
         // In a real Redis implementation, you'd use a pattern scan
         // For now, we'll track user sessions separately
         const userSessionsKey = `user_sessions:${userId}`;
-        const sessionIds = await this.redisClient.sMembers(userSessionsKey) || [];
-        
+        const sessionIds = (await this.redisClient.sMembers(userSessionsKey)) || [];
+
         for (const sessionId of sessionIds) {
           await this.redisClient.del(`session:${sessionId}`);
           destroyedCount++;
         }
-        
+
         await this.redisClient.del(userSessionsKey);
       } else {
         for (const [sessionId, sessionData] of this.sessions.entries()) {
@@ -260,7 +260,7 @@ export class SessionManager {
               lastActivity: sessionData.lastActivity,
               expiresAt: sessionData.expiresAt,
               userAgent: sessionData.userAgent,
-              ipAddress: sessionData.ipAddress
+              ipAddress: sessionData.ipAddress,
             });
           }
         }
@@ -315,36 +315,36 @@ export class SessionManager {
         sessionsByUser: {} as Record<string, number>,
         averageSessionAge: 0,
         oldestSession: null as Date | null,
-        newestSession: null as Date | null
+        newestSession: null as Date | null,
       };
 
       if (!this.redisClient) {
         const sessions = Array.from(this.sessions.values());
         stats.totalSessions = sessions.length;
-        
+
         let totalAge = 0;
-        
+
         for (const session of sessions) {
           if (session.expiresAt > now) {
             stats.activeSessions++;
           } else {
             stats.expiredSessions++;
           }
-          
+
           stats.sessionsByUser[session.userId] = (stats.sessionsByUser[session.userId] || 0) + 1;
-          
+
           const age = now.getTime() - session.createdAt.getTime();
           totalAge += age;
-          
+
           if (!stats.oldestSession || session.createdAt < stats.oldestSession) {
             stats.oldestSession = session.createdAt;
           }
-          
+
           if (!stats.newestSession || session.createdAt > stats.newestSession) {
             stats.newestSession = session.createdAt;
           }
         }
-        
+
         if (sessions.length > 0) {
           stats.averageSessionAge = totalAge / sessions.length;
         }
@@ -372,7 +372,7 @@ export class SessionManager {
       ...session,
       createdAt: session.createdAt.toISOString(),
       lastActivity: session.lastActivity.toISOString(),
-      expiresAt: session.expiresAt.toISOString()
+      expiresAt: session.expiresAt.toISOString(),
     };
   }
 
@@ -384,7 +384,7 @@ export class SessionManager {
       ...data,
       createdAt: new Date(data.createdAt),
       lastActivity: new Date(data.lastActivity),
-      expiresAt: new Date(data.expiresAt)
+      expiresAt: new Date(data.expiresAt),
     };
   }
 
@@ -393,9 +393,12 @@ export class SessionManager {
    */
   private startCleanupInterval(): void {
     // Clean up every 5 minutes
-    setInterval(() => {
-      this.cleanupExpiredSessions();
-    }, 5 * 60 * 1000);
+    setInterval(
+      () => {
+        this.cleanupExpiredSessions();
+      },
+      5 * 60 * 1000,
+    );
   }
 }
 

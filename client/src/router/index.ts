@@ -13,8 +13,8 @@ const routes = [
     component: Overview,
     meta: {
       title: 'Overview',
-      description: 'Dashboard overview with key metrics and status'
-    }
+      description: 'Dashboard overview with key metrics and status',
+    },
   },
   {
     path: '/metrics',
@@ -22,8 +22,8 @@ const routes = [
     component: Metrics,
     meta: {
       title: 'Metrics',
-      description: 'Detailed system and bot metrics visualization'
-    }
+      description: 'Detailed system and bot metrics visualization',
+    },
   },
   {
     path: '/database',
@@ -31,8 +31,8 @@ const routes = [
     component: Database,
     meta: {
       title: 'Database',
-      description: 'Database management and export/import tools'
-    }
+      description: 'Database management and export/import tools',
+    },
   },
   {
     path: '/alerts',
@@ -40,14 +40,14 @@ const routes = [
     component: Alerts,
     meta: {
       title: 'Alerts',
-      description: 'System alerts and notifications'
-    }
+      description: 'System alerts and notifications',
+    },
   },
   {
     // Catch-all route for 404s
     path: '/:pathMatch(.*)*',
-    redirect: '/'
-  }
+    redirect: '/',
+  },
 ];
 
 const router = createRouter({
@@ -59,7 +59,7 @@ const router = createRouter({
     } else {
       return { top: 0 };
     }
-  }
+  },
 });
 
 // Navigation guards
@@ -70,7 +70,7 @@ router.beforeEach((to, from, next) => {
   } else {
     document.title = 'Discord Bot Dashboard';
   }
-  
+
   next();
 });
 

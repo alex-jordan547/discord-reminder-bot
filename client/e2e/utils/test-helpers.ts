@@ -36,7 +36,7 @@ export class DatabaseTestHelpers {
   async uploadFile(fileType: keyof typeof testFiles) {
     const file = testFiles[fileType];
     const fileInput = this.page.locator('input[type="file"]');
-    
+
     await fileInput.setInputFiles({
       name: file.name,
       mimeType: file.mimeType,
@@ -54,15 +54,21 @@ export class DatabaseTestHelpers {
   }
 
   async waitForPreviewData() {
-    await expect(this.page.locator('[data-testid="data-preview-container"]')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator('[data-testid="data-preview-container"]')).toBeVisible({
+      timeout: 10000,
+    });
   }
 
   async waitForProgressCompletion() {
-    await expect(this.page.locator('[data-testid="success-message"]')).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('[data-testid="success-message"]')).toBeVisible({
+      timeout: 15000,
+    });
   }
 
   async waitForProgressError() {
-    await expect(this.page.locator('[data-testid="error-message"]')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator('[data-testid="error-message"]')).toBeVisible({
+      timeout: 10000,
+    });
   }
 
   async cancelProgress() {
@@ -84,7 +90,9 @@ export class DatabaseTestHelpers {
 
   async expectExportFormValidation() {
     await expect(this.page.locator('[data-testid="format-error"]')).toBeVisible();
-    await expect(this.page.locator('[data-testid="format-error"]')).toContainText('Please select an export format');
+    await expect(this.page.locator('[data-testid="format-error"]')).toContainText(
+      'Please select an export format',
+    );
   }
 
   async expectFileValidationError(errorText: string) {
