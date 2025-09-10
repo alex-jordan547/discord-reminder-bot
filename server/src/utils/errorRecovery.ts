@@ -10,7 +10,7 @@
  */
 
 import { createLogger } from '#/utils/loggingConfig';
-import { DiscordAPIError, HTTPError, RateLimitError, WebSocketShardEvents } from 'discord.js';
+import { DiscordAPIError, HTTPError, RateLimitError } from 'discord.js';
 
 const logger = createLogger('error-recovery');
 
@@ -430,117 +430,6 @@ function getCircuitBreaker(name: string): CircuitBreaker {
 
   return circuitBreakers.get(name)!;
 }
-
-/**
- * Enhanced retry decorator with circuit breaker protection
- */
-export function withRetry<T extends any[], R>(
-  configName: string = 'api_call',
-  customConfig?: Partial<RetryConfig>,
-) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>,
-  ) {
-    const originalMethod = descriptor.value!;
-    const baseConfig = RETRY_CONFIGS[configName] || RETRY_CONFIGS['api_call']!;
-    const config: RetryConfig = {
-      maxAttempts: customConfig?.maxAttempts ?? baseConfig.maxAttempts,
-      baseDelay: customConfig?.baseDelay ?? baseConfig.baseDelay,
-      maxDelay: customConfig?.maxDelay ?? baseConfig.maxDelay,
-      backoffFactor: customConfig?.backoffFactor ?? baseConfig.backoffFactor,
-      jitterFactor: customConfig?.jitterFactor ?? baseConfig.jitterFactor,
-      ...(customConfig?.timeoutMs !== undefined ? { timeoutMs: customConfig.timeoutMs } : {}),
-      ...(baseConfig.timeoutMs !== undefined && customConfig?.timeoutMs === undefined
-        ? { timeoutMs: baseConfig.timeoutMs }
-        : {}),
-    };
-    const circuitBreaker = getCircuitBreaker(configName);
-
-    descriptor.value = async function (...args: T): Promise<R> {
-      const methodName = `${target.constructor.name}.${propertyKey}`;
-      let lastError: Error | undefined;
-
-      for (let attempt = 0; attempt < config.maxAttempts; attempt++) {
-        try {
-          // Check circuit breaker
-          if (!circuitBreaker.canCall()) {
-            const cbStatus = circuitBreaker.getStatus();
-            throw new Error(`Circuit breaker ${cbStatus.name} is ${cbStatus.state.toUpperCase()}`);
-          }
-
-          logger.debug(`🔄 Attempting ${methodName} (${attempt + 1}/${config.maxAttempts})`);
-
-          // Create promise with timeout
-          const timeoutPromise = config.timeoutMs
-            ? new Promise<R>((_, reject) =>
-                setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs),
-              )
-            : null;
-
-          const operationPromise = originalMethod.apply(this, args);
-
-          const result = timeoutPromise
-            ? await Promise.race([operationPromise, timeoutPromise])
-            : await operationPromise;
-
-          // Success
-          circuitBreaker.onSuccess();
-          errorStats.recordCall(true, undefined, attempt, attempt > 0);
-
-          if (attempt > 0) {
-            logger.info(`✅ ${methodName} succeeded on attempt ${attempt + 1}`);
-          }
-
-          return result;
-        } catch (error) {
-          lastError = error as Error;
-          const severity = classifyError(lastError);
-
-          logger.warn(
-            `❌ ${methodName} failed (${attempt + 1}/${config.maxAttempts}): ${lastError.message} (${severity})`,
-          );
-
-          // Record failure in circuit breaker
-          circuitBreaker.onFailure();
-
-          // Don't retry permanent errors
-          if (severity === ErrorSeverity.PERMANENT) {
-            logger.error(`🚫 Permanent error in ${methodName}, not retrying`);
-            errorStats.recordCall(false, lastError.constructor.name, attempt);
-            throw lastError;
-          }
-
-          // Don't retry critical errors immediately
-          if (severity === ErrorSeverity.CRITICAL) {
-            logger.error(`🚨 Critical error in ${methodName}, escalating`);
-            errorStats.recordCall(false, lastError.constructor.name, attempt);
-            throw lastError;
-          }
-
-          // Last attempt failed
-          if (attempt === config.maxAttempts - 1) {
-            logger.error(`💥 ${methodName} failed after ${config.maxAttempts} attempts`);
-            errorStats.recordCall(false, lastError.constructor.name, attempt);
-            break;
-          }
-
-          // Calculate delay and wait
-          const delay = calculateRetryDelay(lastError, attempt, config);
-          logger.info(`⏳ Retrying ${methodName} in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-
-      // All attempts failed
-      throw lastError || new Error(`${methodName} failed without capturing error`);
-    };
-
-    return descriptor;
-  };
-}
-
 /**
  * Simple function wrapper for retry logic
  */
