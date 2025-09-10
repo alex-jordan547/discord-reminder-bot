@@ -10,12 +10,6 @@
     "forceConsistentCasingInFileNames": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": [
-    "types/**/*",
-    "utils/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["types/**/*", "utils/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
