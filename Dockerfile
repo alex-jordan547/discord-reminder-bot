@@ -31,7 +31,7 @@ COPY client/ ./client/
 COPY scripts/ ./scripts/
 
 # Build les composants
-RUN npm run build || true
+RUN npm run build
 
 # Stage 2: Production
 FROM node:20-alpine AS production
