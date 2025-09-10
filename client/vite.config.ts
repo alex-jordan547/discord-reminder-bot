@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { VitePWA } from 'vite-plugin-pwa';
 import { splitVendorChunkPlugin } from 'vite';
-import { compression } from 'vite-plugin-compression';
+import compression from 'vite-plugin-compression';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
@@ -111,8 +111,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'chart-vendor': ['chart.js', 'vue-chartjs'],
-          'utils': ['axios', 'date-fns']
+          'chart-vendor': ['chart.js', 'vue-chartjs']
         },
         // Dynamic import chunk naming
         chunkFileNames: (chunkInfo) => {

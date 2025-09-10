@@ -20,7 +20,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x 20.x]
     
     steps:
     - name: Checkout code
@@ -32,28 +32,28 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        cache: 'yarn'
     
     - name: Install dependencies
       run: |
-        npm ci
-        cd client && npm ci
-        cd ../server && npm ci
+        yarn ci
+        cd client && yarn ci
+        cd ../server && yarn ci
     
     - name: Run linting
       run: |
-        npm run lint
-        npm run lint:strict
+        yarn lint
+        yarn lint:strict
     
     - name: Run type checking
       run: |
-        npm run type-check
-        npm run type-check:strict
+        yarn type-check
+        yarn type-check:strict
     
     - name: Run tests
       run: |
-        npm run test:coverage
-        npm run test:integration
+        yarn test:coverage
+        yarn test:integration
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -73,11 +73,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Run npm audit
+    - name: Run yarn audit
       run: |
-        npm audit --audit-level moderate
-        cd client && npm audit --audit-level moderate
-        cd ../server && npm audit --audit-level moderate
+        yarn audit --audit-level moderate
+        cd client && yarn audit --audit-level moderate
+        cd ../server && yarn audit --audit-level moderate
     
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -204,10 +204,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        cache: 'npm'
+        cache: 'yarn'
     
     - name: Install dependencies
-      run: npm ci
+      run: yarn ci
     
     - name: Install Playwright
       run: npx playwright install --with-deps
@@ -229,7 +229,7 @@ jobs:
         REDIS_HOST: localhost
         REDIS_PORT: 6379
       run: |
-        npm run test:infrastructure
+        yarn test:infrastructure
         npx playwright test tests/infrastructure/
 
   # Staging Deployment

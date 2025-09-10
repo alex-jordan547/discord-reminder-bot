@@ -20,7 +20,7 @@ COPY package-lock.json ./
 COPY tsconfig.json ./
 
 # Installer les dépendances
-RUN npm install
+RUN yarn install
 
 # Copier le code source
 COPY server/ ./server/ 
@@ -31,7 +31,7 @@ COPY client/ ./client/
 COPY scripts/ ./scripts/
 
 # Build les composants
-RUN npm run build
+RUN yarn build
 
 # Stage 2: Production
 FROM node:20-alpine AS production
@@ -46,7 +46,7 @@ RUN apk add --no-cache \
     tzdata
 
 # Copier les fichiers package et installer uniquement les dépendances de production
-COPY package.json package-lock.json ./
+COPY package.json yarn.lock ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Copier les fichiers buildés et le code source
@@ -101,7 +101,7 @@ FROM builder AS development
 WORKDIR /app
 
 # Installer nodemon pour le développement
-RUN npm install -g nodemon
+RUN yarn add -g nodemon
 
 # Exposer les ports pour le développement
 EXPOSE 3000 5432 6379
@@ -111,4 +111,4 @@ ENV NODE_ENV=development
 ENV DATABASE_TYPE=sqlite
 
 # Script de développement
-CMD ["npm", "run", "dev"]
+CMD ["yarn", "dev"]

@@ -270,3 +270,8 @@ temp/
 server/backups/*
 
 client/test-results/
+/server/backups/
+/.claude/
+/.crush/
+/.gemini/
+/.kiro/

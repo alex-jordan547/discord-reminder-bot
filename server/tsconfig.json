@@ -14,7 +14,7 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "baseUrl": ".",
     "paths": {
       "#/*": ["./src/*"],
