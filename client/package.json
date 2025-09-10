@@ -36,7 +36,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.34.0",
+    "@eslint/js": "^9.35.0",
     "@playwright/test": "^1.55.0",
     "@types/eslint": "^9.6.1",
     "@types/node": "^20.8.10",
