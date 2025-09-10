@@ -2,24 +2,22 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import vue from '@vitejs/plugin-vue';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { VitePWA } from 'vite-plugin-pwa';
 import { splitVendorChunkPlugin } from 'vite';
-import compression from 'vite-plugin-compression';
-import { visualizer } from 'rollup-plugin-visualizer';
 
-export default defineConfig({
-  plugins: [
+export default defineConfig(async ({ command, mode }) => {
+  const plugins = [
     // Vue.js 3 support
     vue(),
-
     // Support des chemins TypeScript définis dans tsconfig.json
     tsconfigPaths(),
-
     // Split vendor chunks for better caching
     splitVendorChunkPlugin(),
+  ];
 
-    // PWA support with advanced caching
-    VitePWA({
+  // Try to add PWA plugin if available
+  try {
+    const { VitePWA } = await import('vite-plugin-pwa');
+    plugins.push(VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       workbox: {
@@ -72,32 +70,48 @@ export default defineConfig({
           },
         ],
       },
-    }),
+    }));
+    console.log('✅ PWA plugin loaded successfully');
+  } catch (error) {
+    console.warn('⚠️  vite-plugin-pwa not available, building without PWA support');
+  }
 
+  // Try to add compression plugins if available
+  try {
+    const compression = (await import('vite-plugin-compression')).default;
     // Gzip compression for production
-    compression({
+    plugins.push(compression({
       algorithm: 'gzip',
       ext: '.gz',
-    }),
-
+    }));
     // Brotli compression for modern browsers
-    compression({
+    plugins.push(compression({
       algorithm: 'brotliCompress',
       ext: '.br',
-    }),
+    }));
+    console.log('✅ Compression plugins loaded successfully');
+  } catch (error) {
+    console.warn('⚠️  vite-plugin-compression not available, building without compression');
+  }
 
-    // Bundle analyzer
-    ...(process.env.ANALYZE
-      ? [
-          visualizer({
-            filename: 'dist/stats.html',
-            open: true,
-            gzipSize: true,
-            brotliSize: true,
-          }),
-        ]
-      : []),
-  ],
+  // Try to add bundle analyzer if available
+  if (process.env.ANALYZE) {
+    try {
+      const { visualizer } = await import('rollup-plugin-visualizer');
+      plugins.push(visualizer({
+        filename: 'dist/stats.html',
+        open: true,
+        gzipSize: true,
+        brotliSize: true,
+      }));
+      console.log('✅ Bundle analyzer loaded successfully');
+    } catch (error) {
+      console.warn('⚠️  rollup-plugin-visualizer not available, skipping bundle analysis');
+    }
+  }
+
+  return {
+    plugins,
 
   // Configuration pour le build du dashboard
   build: {
@@ -189,10 +203,11 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
   },
 
-  // Configuration des tests pour Vue.js
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./tests/setup.ts'],
-  },
+    // Configuration des tests pour Vue.js
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./tests/setup.ts'],
+    },
+  };
 });
