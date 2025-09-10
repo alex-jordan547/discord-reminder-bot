@@ -93,6 +93,31 @@ jobs:
       - name: 📝 Format check  
         run: yarn format:check
 
+  lint-shared:
+    name: 🎨 Shared Lint & Format
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
+    defaults:
+      run:
+        working-directory: shared
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: 'shared/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🎨 Lint check
+        run: yarn lint
+      
+      - name: 📝 Format check  
+        run: yarn format:check
+
   typecheck:
     name: 🔷 Type Check
     runs-on: ubuntu-latest
