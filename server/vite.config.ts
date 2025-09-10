@@ -2,10 +2,9 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import compression from 'vite-plugin-compression';
 
-export default defineConfig({
-  plugins: [
+export default defineConfig(async ({ command, mode }) => {
+  const plugins = [
     tsconfigPaths(),
     nodePolyfills({
       include: ['buffer', 'crypto', 'events', 'fs', 'path', 'stream', 'util'],
@@ -15,11 +14,22 @@ export default defineConfig({
         process: true,
       },
     }),
-    compression({
+  ];
+
+  // Try to add compression plugin if available
+  try {
+    const { default: compression } = await import('vite-plugin-compression');
+    plugins.push(compression({
       algorithm: 'gzip',
       ext: '.gz',
-    }),
-  ],
+    }));
+    console.log('✅ Compression plugin loaded successfully');
+  } catch (error) {
+    console.warn('⚠️  vite-plugin-compression not available, building without compression');
+  }
+
+  return {
+    plugins,
 
   // Configuration pour build et développement
   build: {
@@ -87,7 +97,8 @@ export default defineConfig({
     },
   },
 
-  define: {
-    'process.env.NODE_ENV': '"development"',
-  },
+    define: {
+      'process.env.NODE_ENV': '"development"',
+    },
+  };
 });
