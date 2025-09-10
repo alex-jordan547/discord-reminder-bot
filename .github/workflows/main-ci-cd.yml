@@ -39,7 +39,9 @@ jobs:
           cache: 'yarn'
       
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn install --frozen-lockfile
+          yarn install:all
       
       - name: 🎨 Lint & Format
         run: |
@@ -105,7 +107,9 @@ jobs:
       
       - name: 📦 Install dependencies
         working-directory: ${{ matrix.component }}
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn cache clean
+          yarn install --frozen-lockfile
       
       - name: 🧪 Run tests with coverage
         working-directory: ${{ matrix.component }}
