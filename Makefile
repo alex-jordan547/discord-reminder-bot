@@ -237,7 +237,7 @@ validate-issue-38: ## Validation complète de l'issue #38
 	@[ -f "scripts/monitor.sh" ] && [ -x "scripts/monitor.sh" ] && echo "✓ Script monitor.sh présent et exécutable" || echo "✗ Script monitor.sh problématique"
 	@echo ""
 	@echo "$(YELLOW)8. Documentation mise à jour:$(NC)"
-	@[ -f "DEPLOYMENT.md" ] && echo "✓ Documentation DEPLOYMENT.md mise à jour" || echo "✗ Documentation manquante"
+	@[ -f "docs/DEPLOYMENT.md" ] && echo "✓ Documentation docs/DEPLOYMENT.md mise à jour" || echo "✗ Documentation manquante"
 	@echo ""
 	@echo "$(GREEN)=== RÉSUMÉ ISSUE #38 ===$(NC)"
 	@echo "✓ Dockerfile optimisé (Node.js Alpine)"

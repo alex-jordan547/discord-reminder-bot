@@ -33,8 +33,8 @@ pip install -r requirements.txt
 pip install audioop-lts  # Required for Python 3.13
 
 # Configure environment
-cp .env.example .env
-# Edit .env with your Discord token and settings
+cp server/.env.example server/.env
+# Edit server/.env with your Discord token and settings
 
 # Run the bot
 ./run_dev.sh
@@ -388,9 +388,9 @@ LOG_LEVEL=DEBUG  # Detailed logs including scheduling timestamps
 
 ## 📚 Documentation
 
-- **[CLAUDE.md](CLAUDE.md)**: Development guidelines and architecture details
-- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contributor guide
-- **[CHANGELOG.md](CHANGELOG.md)**: Version history
+- **[docs/CLAUDE.md](docs/CLAUDE.md)**: Development guidelines and architecture details
+- **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)**: Contributor guide
+- **[docs/CHANGELOG.md](docs/CHANGELOG.md)**: Version history
 
 ## 🤝 Contributing
 

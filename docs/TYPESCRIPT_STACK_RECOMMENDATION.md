@@ -132,8 +132,9 @@ discord-reminder-bot-ts/
 ├── migrations/                     # Database migrations
 ├── logs/                          # Log files (gitignored)
 ├── dist/                          # Compiled JavaScript (gitignored)
-├── .env.example                   # Environment template
-├── .env                           # Environment variables (gitignored)
+├── server/
+│   ├── .env.example               # Environment template
+│   ├── .env                       # Environment variables (gitignored)
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts

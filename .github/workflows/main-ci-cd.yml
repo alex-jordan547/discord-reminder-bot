@@ -1,0 +1,295 @@
+name: 🚀 Main CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, preprod]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment target'
+        required: true
+        default: 'preprod'
+        type: choice
+        options:
+          - preprod  
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+concurrency:
+  group: main-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: 🎯 Quality Gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+          yarn install:all
+      
+      - name: 🎨 Lint & Format
+        run: |
+          yarn lint
+          yarn format:check
+      
+      - name: 🔷 Type check
+        run: yarn type-check
+      
+      - name: 🏗️ Build check
+        run: yarn build
+      
+      - name: 📋 Generate version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION="v$(date +%Y%m%d)-${GITHUB_SHA:0:7}"
+          else
+            VERSION="preprod-$(date +%Y%m%d)-${GITHUB_SHA:0:7}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📋 Version: $VERSION" >> $GITHUB_STEP_SUMMARY
+
+  test-suite:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    strategy:
+      matrix:
+        component: [client, server]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: '${{ matrix.component }}/yarn.lock'
+      
+      - name: 📦 Install dependencies
+        working-directory: ${{ matrix.component }}
+        run: |
+          yarn cache clean
+          yarn install --frozen-lockfile
+      
+      - name: 🧪 Run tests with coverage
+        working-directory: ${{ matrix.component }}
+        env:
+          DATABASE_TYPE: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: yarn test:coverage
+      
+      - name: 📊 Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          flags: ${{ matrix.component }}
+          file: ${{ matrix.component }}/coverage/lcov.info
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🔒 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: 📊 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: 🔍 CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          languages: 'javascript'
+
+  build-and-push:
+    name: 🏗️ Build & Push
+    runs-on: ubuntu-latest
+    needs: [quality-gate, test-suite, security-scan]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.build.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🔑 Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.quality-gate.outputs.version }}
+            type=raw,value={{branch}}-latest
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: 🏗️ Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+      
+      - name: 📄 Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.quality-gate.outputs.version }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+      
+      - name: 📊 Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ needs.quality-gate.outputs.version }}
+          path: sbom.spdx.json
+          retention-days: 30
+
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: 🎭 Install Playwright
+        run: npx playwright install --with-deps
+      
+      - name: 🔗 Run integration tests
+        env:
+          DATABASE_TYPE: postgres
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: discord_bot_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: yarn test:infrastructure
+      
+      - name: 📊 Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+  deploy:
+    name: 🚀 Deploy
+    uses: ./.github/workflows/deploy.yml
+    needs: [quality-gate, build-and-push, integration-tests]
+    secrets: inherit
+    with:
+      environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'preprod' }}
+      image-tag: ${{ needs.quality-gate.outputs.version }}
+      image-digest: ${{ needs.build-and-push.outputs.image-digest }}

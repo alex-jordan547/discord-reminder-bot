@@ -55,8 +55,8 @@ source venv/bin/activate
 make dev-setup
 
 # 3. Configuration .env
-cp .env.example .env
-# Editez .env avec vos tokens Discord
+cp server/.env.example server/.env
+# Editez server/.env avec vos tokens Discord
 ```
 
 ## ✅ Workflow de développement recommandé

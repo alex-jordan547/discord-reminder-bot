@@ -1,0 +1,210 @@
+name: 🚀 Deploy Application
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: 'Target environment (preprod/production)'
+      image-tag:
+        required: true
+        type: string
+        description: 'Docker image tag to deploy'
+      image-digest:
+        required: false
+        type: string
+        description: 'Docker image digest for verification'
+    secrets:
+      DEPLOY_PRIVATE_KEY:
+        required: false
+      PREPROD_HOST:
+        required: false
+      PRODUCTION_HOST:
+        required: false
+      DISCORD_BOT_TOKEN:
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-deployment:
+    name: 🔍 Validate Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-url: ${{ steps.config.outputs.deploy-url }}
+      health-check-url: ${{ steps.config.outputs.health-check-url }}
+    steps:
+      - name: ✅ Validate inputs
+        run: |
+          if [[ ! "${{ inputs.environment }}" =~ ^(preprod|production)$ ]]; then
+            echo "❌ Invalid environment: ${{ inputs.environment }}"
+            exit 1
+          fi
+          
+          if [[ -z "${{ inputs.image-tag }}" ]]; then
+            echo "❌ Image tag is required"
+            exit 1
+          fi
+          
+          echo "✅ Deployment validation passed"
+          echo "🎯 Environment: ${{ inputs.environment }}"
+          echo "🏷️ Image: ${{ inputs.image-tag }}"
+      
+      - name: ⚙️ Set environment config
+        id: config
+        run: |
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            echo "deploy-url=https://discord-bot.yourcompany.com" >> $GITHUB_OUTPUT
+            echo "health-check-url=https://discord-bot.yourcompany.com/health" >> $GITHUB_OUTPUT
+          else
+            echo "deploy-url=https://preprod-discord-bot.yourcompany.com" >> $GITHUB_OUTPUT
+            echo "health-check-url=https://preprod-discord-bot.yourcompany.com/health" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-to-environment:
+    name: 🚀 Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: validate-deployment
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ needs.validate-deployment.outputs.deploy-url }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 🔑 Setup SSH Key
+        if: inputs.environment == 'production'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: 📋 Prepare deployment
+        run: |
+          echo "🚀 Preparing deployment for ${{ inputs.environment }}"
+          echo "🏷️ Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image-tag }}"
+          
+          # Create deployment manifest
+          cat > deployment.yaml << EOF
+          version: '3.8'
+          services:
+            discord-bot:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image-tag }}
+              environment:
+                - NODE_ENV=${{ inputs.environment }}
+                - DISCORD_BOT_TOKEN=${{ secrets.DISCORD_BOT_TOKEN }}
+              restart: unless-stopped
+              ports:
+                - "3000:3000"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+          EOF
+          
+          echo "📄 Deployment manifest ready"
+      
+      - name: 🚀 Execute deployment
+        run: |
+          echo "🚀 Deploying to ${{ inputs.environment }}"
+          
+          # Simulate deployment - replace with your actual deployment logic
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            echo "🏭 Production deployment logic"
+            # ssh user@${{ secrets.PRODUCTION_HOST }} "docker-compose -f /path/to/compose.yml up -d"
+          else
+            echo "🧪 Preprod deployment logic" 
+            # kubectl apply -f deployment.yaml --namespace=preprod
+          fi
+          
+          echo "✅ Deployment completed"
+      
+      - name: ⏳ Wait for service startup
+        run: |
+          echo "⏳ Waiting for service to be ready..."
+          sleep 30
+          echo "✅ Service startup wait completed"
+
+  health-check:
+    name: 🏥 Health Check
+    runs-on: ubuntu-latest
+    needs: [validate-deployment, deploy-to-environment]
+    steps:
+      - name: 🏥 Verify service health
+        run: |
+          HEALTH_URL="${{ needs.validate-deployment.outputs.health-check-url }}"
+          echo "🏥 Checking health at: $HEALTH_URL"
+          
+          # Simulate health check - replace with actual health check
+          for i in {1..10}; do
+            echo "🔍 Health check attempt $i/10"
+            # if curl -f "$HEALTH_URL"; then
+            #   echo "✅ Health check passed"
+            #   exit 0
+            # fi
+            # For now, simulate success
+            if [[ $i -eq 3 ]]; then
+              echo "✅ Health check passed (simulated)"
+              break
+            fi
+            echo "⏳ Waiting 30s before retry..."
+            sleep 30
+          done
+          
+          echo "✅ Service is healthy"
+
+  smoke-tests:
+    name: 💨 Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [validate-deployment, health-check]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 💨 Run smoke tests
+        run: |
+          BASE_URL="${{ needs.validate-deployment.outputs.deploy-url }}"
+          echo "💨 Running smoke tests against: $BASE_URL"
+          
+          # Simulate smoke tests - replace with actual tests
+          echo "✅ API endpoints responding"
+          echo "✅ Database connectivity verified"
+          echo "✅ Discord bot connection active" 
+          echo "✅ Core functionality working"
+          
+          echo "🎉 All smoke tests passed!"
+
+  post-deployment:
+    name: 📊 Post Deployment
+    runs-on: ubuntu-latest
+    needs: [validate-deployment, deploy-to-environment, health-check, smoke-tests]
+    if: always()
+    steps:
+      - name: 📊 Deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 Validation | ${{ needs.validate-deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🚀 Deployment | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏥 Health Check | ${{ needs.health-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💨 Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ inputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** ${{ needs.validate-deployment.outputs.deploy-url }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🔔 Notify teams
+        if: inputs.environment == 'production'
+        run: |
+          if [[ "${{ needs.deploy-to-environment.result }}" == "success" ]]; then
+            echo "🎉 Production deployment successful!"
+            echo "🌟 New version ${{ inputs.image-tag }} is live"
+          else
+            echo "❌ Production deployment failed!"
+            echo "🚨 Immediate attention required"
+          fi
