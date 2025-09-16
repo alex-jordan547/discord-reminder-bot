@@ -11,13 +11,13 @@ import {
   handleLogin,
   handleLogout,
   AuthenticatedRequest,
-} from '../middleware/auth';
-import { fileUploadMiddleware } from '../middleware/fileUpload';
-import { authService } from '../services/authService';
-import { sessionManager } from '../services/sessionManager';
-import { fileUploadService } from '../services/fileUploadService';
-import { auditLogger } from '../services/auditLogger';
-import { createLogger } from '#/utils/loggingConfig';
+} from '../middleware/auth.js';
+import { fileUploadMiddleware } from '../middleware/fileUpload.js';
+import { authService } from '../services/authService.js';
+import { sessionManager } from '../services/sessionManager.js';
+import { fileUploadService } from '../services/fileUploadService.js';
+import { auditLogger } from '../services/auditLogger.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('auth-routes');
 

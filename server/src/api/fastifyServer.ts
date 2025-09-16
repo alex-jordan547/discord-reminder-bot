@@ -13,19 +13,20 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
-import { DiscordBotClient } from '#/types/BotClient';
+import fastifyCookie from '@fastify/cookie';
+import { Settings } from '../config/settings.js';
+import { createLogger } from '../utils/loggingConfig.js';
+import { DiscordBotClient } from '../types/BotClient.js';
 import {
   getErrorStats,
   getCircuitBreakerStatuses,
   getErrorRecoveryHealth,
   generateErrorReport,
-} from '#/utils/errorRecovery';
-import { getSecurityStats, generateSecurityReport, cleanupRateLimits } from '#/utils/permissions';
-import { registerDashboardRoutes } from './dashboardRoutes';
-import { registerWebSocketRoutes } from './websocketRoutes';
-import { registerAuthRoutes } from './authRoutes';
+} from '../utils/errorRecovery.js';
+import { getSecurityStats, generateSecurityReport, cleanupRateLimits } from '../utils/permissions.js';
+import { registerDashboardRoutes } from './dashboardRoutes.js';
+import { registerWebSocketRoutes } from './websocketRoutes.js';
+import { registerAuthRoutes } from './authRoutes.js';
 
 const logger = createLogger('server');
 
@@ -178,6 +179,11 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastify.register(fastifyRateLimit, {
     max: 100,
     timeWindow: '1 minute',
+  });
+
+  // Register cookie support
+  await fastify.register(fastifyCookie, {
+    secret: Settings.JWT_SECRET || 'default-secret-key',
   });
 
   // Performance tracking middleware

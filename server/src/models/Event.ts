@@ -12,7 +12,7 @@ import {
   validateDiscordId,
   validateNonEmptyString,
   validateInterval,
-} from './BaseModel';
+} from './BaseModel.js';
 
 export interface EventData extends BaseModelData {
   messageId: string;

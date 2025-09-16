@@ -4,15 +4,15 @@
  */
 
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { SocketStream } from '@fastify/websocket';
-import { createLogger } from '#/utils/loggingConfig';
+import { WebSocket } from 'ws';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('websocket-routes');
 
 // WebSocket connection management
 interface WebSocketConnection {
   id: string;
-  socket: SocketStream;
+  socket: WebSocket;
   lastActivity: Date;
   subscriptions: Set<string>;
   messageCount: number;
@@ -65,7 +65,7 @@ function broadcastToAll(message: any, excludeConnectionId?: string): void {
   connections.forEach((connection, connectionId) => {
     if (connectionId !== excludeConnectionId) {
       try {
-        connection.socket.socket.send(messageStr);
+        connection.socket.send(messageStr);
       } catch (error) {
         logger.error(`Failed to send message to connection ${connectionId}: ${error}`);
         // Remove failed connection
@@ -85,7 +85,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
 
     // Check rate limiting
     if (!checkRateLimit(connection)) {
-      connection.socket.socket.send(
+      connection.socket.send(
         JSON.stringify({
           type: 'rate_limit_exceeded',
           error: 'Message rate limit exceeded. Please slow down.',
@@ -99,7 +99,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
     // Handle different message types
     switch (data.type) {
       case 'ping':
-        connection.socket.socket.send(
+        connection.socket.send(
           JSON.stringify({
             type: 'pong',
             timestamp: new Date().toISOString(),
@@ -111,7 +111,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
       case 'subscribe':
         if (data.channel) {
           connection.subscriptions.add(data.channel);
-          connection.socket.socket.send(
+          connection.socket.send(
             JSON.stringify({
               type: 'subscription_confirmed',
               channel: data.channel,
@@ -124,7 +124,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
       case 'unsubscribe':
         if (data.channel) {
           connection.subscriptions.delete(data.channel);
-          connection.socket.socket.send(
+          connection.socket.send(
             JSON.stringify({
               type: 'subscription_cancelled',
               channel: data.channel,
@@ -136,7 +136,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
 
       case 'request_metrics':
         // Send current metrics to the requesting client
-        connection.socket.socket.send(
+        connection.socket.send(
           JSON.stringify({
             type: 'metrics_update',
             data: {
@@ -152,7 +152,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
         break;
 
       case 'get_connection_count':
-        connection.socket.socket.send(
+        connection.socket.send(
           JSON.stringify({
             type: 'connection_count',
             count: connections.size,
@@ -177,7 +177,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
         break;
 
       default:
-        connection.socket.socket.send(
+        connection.socket.send(
           JSON.stringify({
             type: 'error',
             error: 'Unknown message type',
@@ -188,7 +188,7 @@ function handleWebSocketMessage(connection: WebSocketConnection, message: string
     }
   } catch (error) {
     logger.error(`Error handling WebSocket message: ${error}`);
-    connection.socket.socket.send(
+    connection.socket.send(
       JSON.stringify({
         type: 'error',
         error: 'Invalid message format',
@@ -207,7 +207,7 @@ function cleanupConnections(): void {
     if (now.getTime() - connection.lastActivity.getTime() > timeout) {
       logger.info(`Cleaning up inactive connection: ${connectionId}`);
       try {
-        connection.socket.socket.close();
+        connection.socket.close();
       } catch (error) {
         // Connection might already be closed
       }
@@ -257,7 +257,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         logger.info(`WebSocket connection established: ${connectionId}`);
 
         // Send welcome message
-        connection.socket.send(
+        connection.send(
           JSON.stringify({
             type: 'connected',
             connectionId,
@@ -266,12 +266,12 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         );
 
         // Handle incoming messages
-        connection.socket.on('message', message => {
+        connection.on('message', message => {
           handleWebSocketMessage(wsConnection, message.toString());
         });
 
         // Handle connection close
-        connection.socket.on('close', (code, reason) => {
+        connection.on('close', (code, reason) => {
           logger.info(
             `WebSocket connection closed: ${connectionId}, code: ${code}, reason: ${reason}`,
           );
@@ -279,7 +279,7 @@ export async function registerWebSocketRoutes(fastify: FastifyInstance): Promise
         });
 
         // Handle connection errors
-        connection.socket.on('error', error => {
+        connection.on('error', error => {
           logger.error(`WebSocket connection error: ${connectionId}, error: ${error}`);
           connections.delete(connectionId);
         });

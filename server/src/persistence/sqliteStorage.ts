@@ -6,8 +6,8 @@
  */
 
 import Database from 'better-sqlite3';
-import { Event } from '#/models';
-import { createLogger } from '#/utils/loggingConfig';
+import { Event } from '../models/index.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('sqliteStorage.ts');
 

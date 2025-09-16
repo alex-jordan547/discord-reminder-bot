@@ -4,8 +4,8 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
+import { Settings } from '../config/settings.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('dashboard-routes');
 

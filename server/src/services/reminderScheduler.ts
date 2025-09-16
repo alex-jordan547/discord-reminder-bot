@@ -10,13 +10,13 @@
  */
 
 import { Client, TextChannel, EmbedBuilder } from 'discord.js';
-import { createLogger } from '#/utils/loggingConfig';
-import { EventManager } from './eventManager';
-import { Event } from '#/models';
-import { Settings } from '#/config/settings';
-import { formatDateForDisplay } from '#/utils/dateUtils';
-import { GuildConfigManager } from './guildConfigManager';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
+import { createLogger } from '../utils/loggingConfig.js';
+import { EventManager } from './eventManager.js';
+import { Event } from '../models/index.js';
+import { Settings } from '../config/settings.js';
+import { formatDateForDisplay } from '../utils/dateUtils.js';
+import { GuildConfigManager } from './guildConfigManager.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
 
 const logger = createLogger('reminder-scheduler');
 

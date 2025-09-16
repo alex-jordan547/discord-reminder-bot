@@ -18,16 +18,16 @@ import {
   PartialUser,
   ActivityType,
 } from 'discord.js';
-import { featureFlagManager } from '#/config/featureFlags';
-import { createLogger } from '#/utils/loggingConfig';
-import { setupSlashCommands, syncSlashCommands } from '#/bot/slash';
-import { setupEventHandlers } from '#/bot/handlers';
-import { EventManager } from '#/services/eventManager';
-import { ReminderScheduler } from '#/services/reminderScheduler';
-import { ReactionTracker } from '#/services/reactionTracker';
-import { GuildConfigManager } from '#/services/guildConfigManager';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
-import { DiscordBotClient } from '#/types/BotClient';
+import { featureFlagManager } from '../config/featureFlags.js';
+import { createLogger } from '../utils/simpleLogger.js';
+import { setupSlashCommands, syncSlashCommands } from './slash.js';
+import { setupEventHandlers } from './handlers.js';
+import { EventManager } from '../services/eventManager.js';
+import { ReminderScheduler } from '../services/reminderScheduler.js';
+import { ReactionTracker } from '../services/reactionTracker.js';
+import { GuildConfigManager } from '../services/guildConfigManager.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
+import { DiscordBotClient } from '../types/BotClient.js';
 
 const logger = createLogger('bot.ts');
 

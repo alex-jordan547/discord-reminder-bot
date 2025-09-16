@@ -31,6 +31,14 @@ export default defineConfig(async ({ command, mode }) => {
   return {
     plugins,
 
+    // Fix ESBuild platform issues
+    optimizeDeps: {
+      esbuildOptions: {
+        target: 'node18',
+        platform: 'node',
+      },
+    },
+
   // Configuration pour build et développement
   build: {
     target: 'node18',
@@ -55,8 +63,6 @@ export default defineConfig(async ({ command, mode }) => {
         'ioredis',
         'jsonwebtoken',
         'pg',
-        'pino',
-        'pino-pretty',
         'chalk',
         'dotenv',
         'redis',
@@ -98,7 +104,7 @@ export default defineConfig(async ({ command, mode }) => {
   },
 
     define: {
-      'process.env.NODE_ENV': '"development"',
+      'process.env.NODE_ENV': `"${process.env.NODE_ENV || 'development'}"`,
     },
   };
 });

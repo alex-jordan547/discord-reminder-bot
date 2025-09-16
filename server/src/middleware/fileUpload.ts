@@ -5,8 +5,8 @@
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { fileUploadService } from '../services/fileUploadService';
-import { createLogger } from '#/utils/loggingConfig';
+import { fileUploadService } from '../services/fileUploadService.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('file-upload-middleware');
 

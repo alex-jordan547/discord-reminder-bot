@@ -7,7 +7,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('auth');
 
@@ -101,7 +101,7 @@ export class AuthService {
         iat: Math.floor(Date.now() / 1000),
       };
 
-      return jwt.sign(tokenPayload, this.jwtSecret, { expiresIn: expiry });
+      return jwt.sign(tokenPayload, this.jwtSecret, { expiresIn: expiry } as any);
     } catch (error) {
       throw error;
     }

@@ -6,7 +6,7 @@
 import { Pool, PoolClient, PoolConfig } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 import type {
   DatabaseConfig,
   DatabaseManager,

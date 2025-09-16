@@ -8,9 +8,9 @@
  * - Guild-based event filtering
  */
 
-import { createLogger } from '#/utils/loggingConfig';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
-import { Event } from '#/models';
+import { createLogger } from '../utils/loggingConfig.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
+import { Event } from '../models/index.js';
 
 const logger = createLogger('event-manager');
 

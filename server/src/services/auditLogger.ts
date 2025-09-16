@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('audit');
 
@@ -47,6 +47,11 @@ export interface AuditLog {
     ipAddress?: string;
     userAgent?: string;
     requestId?: string;
+    originalFilename?: string;
+    storedPath?: string;
+    checksum?: string;
+    severity?: string;
+    [key: string]: any;
   };
 }
 

@@ -39,7 +39,6 @@ class DatabaseQueryOptimizer implements QueryOptimizer {
     // Initialize Redis cache if available
     if (process.env.REDIS_URL) {
       this.cache = new Redis(process.env.REDIS_URL, {
-        retryDelayOnFailover: 100,
         maxRetriesPerRequest: 3,
         lazyConnect: true,
       });

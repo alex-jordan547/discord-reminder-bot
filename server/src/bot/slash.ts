@@ -17,17 +17,17 @@ import {
   Routes,
   MessageFlags,
 } from 'discord.js';
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
-import { DiscordBotClient, SlashCommand } from '#/types/BotClient';
+import { Settings } from '../config/settings.js';
+import { createLogger } from '../utils/loggingConfig.js';
+import { DiscordBotClient, SlashCommand } from '../types/BotClient.js';
 import {
   handleWatchCommand,
   handleUnwatchCommand,
   handleListCommand,
   handleStatusCommand,
   handleRemindNowCommand,
-} from './handlers';
-import { handleConfigCommand } from '#/bot/configHandler';
+} from './handlers.js';
+import { handleConfigCommand } from './configHandler.js';
 
 const logger = createLogger('slash-commands');
 

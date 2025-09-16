@@ -5,9 +5,9 @@
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { authService } from '../services/authService';
-import { sessionManager } from '../services/sessionManager';
-import { createLogger } from '#/utils/loggingConfig';
+import { authService } from '../services/authService.js';
+import { sessionManager } from '../services/sessionManager.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('auth-middleware');
 

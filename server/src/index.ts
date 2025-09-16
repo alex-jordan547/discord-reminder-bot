@@ -7,11 +7,11 @@
  * Migration from Python bot.py to TypeScript with enhanced features.
  */
 
-import { Settings } from '#/config/settings';
-import { createLogger, closeLogging } from '#/utils/loggingConfig';
-import { createDiscordClient } from '#/bot/index';
-import { createServer } from '#/api/fastifyServer';
-import { validateEnvironmentConfig } from '#/utils/validation';
+import { Settings } from './config/settings.js';
+import { createLogger, closeLogging } from './utils/simpleLogger.js';
+import { createDiscordClient } from './bot/index.js';
+import { createServer } from './api/fastifyServer.js';
+import { validateEnvironmentConfig } from './utils/validation.js';
 
 const logger = createLogger('index.ts');
 

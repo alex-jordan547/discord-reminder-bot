@@ -7,7 +7,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('error-reporting');
 

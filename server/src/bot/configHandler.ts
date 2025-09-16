@@ -22,10 +22,10 @@ import {
   Message,
   ChannelType,
 } from 'discord.js';
-import { createLogger } from '#/utils/loggingConfig';
-import { GuildConfigManager } from '#/services/guildConfigManager';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
-import { hasAdminRole } from '#/utils/permissions';
+import { createLogger } from '../utils/loggingConfig.js';
+import { GuildConfigManager } from '../services/guildConfigManager.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
+import { hasAdminRole } from '../utils/permissions.js';
 
 const logger = createLogger('config-handler');
 

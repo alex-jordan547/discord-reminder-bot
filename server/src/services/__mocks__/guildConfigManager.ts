@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { GuildConfig } from '#/models/GuildConfig';
+import { GuildConfig } from '../../models/GuildConfig.js';
 
 export class GuildConfigManager {
   private store: Map<string, any> = new Map();

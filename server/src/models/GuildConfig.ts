@@ -9,11 +9,11 @@
  * - Mention limits and reactions
  */
 
-import { BaseModel, type ModelValidationError } from './BaseModel';
-import { createTimezoneAwareDate } from '#/utils/dateUtils';
-import { Settings } from '#/config/settings';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
-import { createLogger } from '#/utils/loggingConfig';
+import { BaseModel, type ModelValidationError } from './BaseModel.js';
+import { createTimezoneAwareDate } from '../utils/dateUtils.js';
+import { Settings } from '../config/settings.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('guild-config');
 

@@ -8,7 +8,7 @@
  */
 
 import { Client, Message, TextChannel } from 'discord.js';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from './loggingConfig.js';
 
 const logger = createLogger('message-parser');
 

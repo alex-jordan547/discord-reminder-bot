@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema.js';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 import path from 'path';
 import { promises as fs } from 'fs';
 import * as fsSync from 'fs';

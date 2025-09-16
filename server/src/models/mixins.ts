@@ -4,7 +4,7 @@
  * Provides reusable functionality that can be mixed into model classes
  */
 
-import type { ModelValidationError } from './BaseModel';
+import type { ModelValidationError } from './BaseModel.js';
 
 /**
  * Validation mixin interface

@@ -4,7 +4,7 @@
  * Provides centralized exports for database and storage functionality using Drizzle ORM
  */
 
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('persistence');
 

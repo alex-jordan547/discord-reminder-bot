@@ -6,9 +6,9 @@
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { DatabaseManager } from './index';
-import { PostgreSQLManager } from './postgresql';
-import { createLogger } from '#/utils/loggingConfig';
+import { DatabaseManager } from './index.js';
+import { PostgreSQLManager } from './postgresql.js';
+import { createLogger } from '../utils/loggingConfig.js';
 import type {
   DatabaseConfig,
   MigrationOptions,

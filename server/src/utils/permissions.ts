@@ -18,9 +18,9 @@ import {
   TextChannel,
   Guild,
 } from 'discord.js';
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
-import { executeWithRetry } from '#/utils/errorRecovery';
+import { Settings } from '../config/settings.js';
+import { createLogger } from './loggingConfig.js';
+import { executeWithRetry } from './errorRecovery.js';
 
 const logger = createLogger('permissions');
 

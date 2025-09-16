@@ -18,7 +18,8 @@
     "dev:server-only": "cd server && yarn dev",
     "dev:client-only": "cd client && yarn dev",
     "start": "cd server && npm start",
-    "build": "yarn build:shared && yarn build:server && yarn build:client",
+    "build": "yarn build:shared && yarn build:server",
+    "build:full": "yarn build:shared && yarn build:server && yarn build:client",
     "build:shared": "cd shared && yarn build",
     "build:server": "cd server && yarn build",
     "build:client": "cd client && yarn build",
@@ -46,17 +47,11 @@
     "db:studio": "cd server && yarn db:studio",
     "db:migrate:manual": "node scripts/apply-migrations.js",
     "db:backup": "./scripts/backup-db.sh",
-    "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
-    "docker:restart": "docker-compose restart",
-    "docker:rebuild": "yarn db:backup && docker-compose up --build -d",
-    "docker:logs": "docker-compose logs -f",
     "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
     "docker:migrate": "docker compose --profile migration up db-migration",
-    "test:infrastructure": "playwright test --config=playwright-infrastructure.config.ts",
-    "test:infrastructure:ui": "playwright test --config=playwright-infrastructure.config.ts --ui",
-    "test:infrastructure:headed": "playwright test --config=playwright-infrastructure.config.ts --headed",
-    "test:docker": "yarn test:infrastructure"
+    "test:docker": "playwright test --config=playwright-infrastructure.config.ts"
   },
   "keywords": [
     "discord",
@@ -69,6 +64,7 @@
   ],
   "author": "Alex Jordan",
   "license": "MIT",
+  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/alex-jordan547/discord-reminder-bot.git"
@@ -89,8 +85,6 @@
     "fastify": "^5.6.0",
     "pg": "^8.16.3",
     "pinia": "^2.1.0",
-    "pino": "^8.16.2",
-    "pino-pretty": "^10.2.3",
     "vue": "^3.4.0",
     "vue-chartjs": "^5.3.0",
     "ws": "^8.16.0",

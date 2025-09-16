@@ -7,11 +7,11 @@
  */
 
 import { Client, ClientOptions, Collection, ChatInputCommandInteraction } from 'discord.js';
-import { EventManager } from '#/services/eventManager';
-import { ReminderScheduler } from '#/services/reminderScheduler';
-import { ReactionTracker } from '#/services/reactionTracker';
-import { GuildConfigManager } from '#/services/guildConfigManager';
-import { SqliteStorage } from '#/persistence/sqliteStorage';
+import { EventManager } from '../services/eventManager.js';
+import { ReminderScheduler } from '../services/reminderScheduler.js';
+import { ReactionTracker } from '../services/reactionTracker.js';
+import { GuildConfigManager } from '../services/guildConfigManager.js';
+import { SqliteStorage } from '../persistence/sqliteStorage.js';
 
 /**
  * Interface defining the services that will be attached to the bot client

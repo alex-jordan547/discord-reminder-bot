@@ -1,114 +1,96 @@
-# Multi-stage build pour Discord bot avec support PostgreSQL et SQLite
-# ===================================================================
+# Optimized Discord Bot Dockerfile
+# ================================
 
-# Stage 1: Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Installer les dépendances système nécessaires pour PostgreSQL
-RUN apk add --no-cache \
-    postgresql-client \
-    python3 \
-    make \
-    g++ \
-    git
+# Install system dependencies
+RUN apk add --no-cache postgresql-client python3 make g++
 
-# Copier les fichiers de configuration des packages
-COPY package.json ./
-COPY package-lock.json ./
-COPY tsconfig.json ./
+# Copy package files (no yarn.lock for architecture independence)
+COPY package.json tsconfig.json .yarnrc.yml ./
 
-# Installer les dépendances
-RUN yarn install
-
-# Copier le code source
-COPY server/ ./server/ 
+# Copy source code
+COPY server/ ./server/
 COPY shared/ ./shared/
 COPY client/ ./client/
-
-# Copier les scripts dans le builder
 COPY scripts/ ./scripts/
 
-# Build les composants
-RUN yarn build
+# Architecture-agnostic install and build with pure TypeScript
+ENV NODE_ENV=production
+RUN yarn install && \
+    yarn build
 
-# Stage 2: Production
+# Production stage
 FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Installer les dépendances système pour PostgreSQL et outils de base
-RUN apk add --no-cache \
-    postgresql-client \
-    curl \
-    bash \
-    tzdata
+# Install runtime dependencies
+RUN apk add --no-cache postgresql-client curl bash tzdata redis
 
-# Copier les fichiers package et installer uniquement les dépendances de production
-COPY package.json yarn.lock ./
-RUN npm ci --only=production && npm cache clean --force
+# Copy package.json files and lockfile for clean production install
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/yarn.lock ./
+COPY --from=builder /app/.yarnrc.yml ./
+COPY --from=builder /app/server/package.json ./server/
+COPY --from=builder /app/client/package.json ./client/
+COPY --from=builder /app/shared/package.json ./shared/
 
-# Copier les fichiers buildés et le code source
-COPY --from=builder /app/server ./server 
-COPY --from=builder /app/client ./client
-COPY --from=builder /app/shared ./shared
+# Install production dependencies - first workspace, then server-specific
+RUN yarn install --production --frozen-lockfile
+WORKDIR /app/server
+RUN yarn install --production --frozen-lockfile
+WORKDIR /app
 
-# Copier les scripts et configurations
+# Copy built files
+COPY --from=builder /app/server/dist ./server/dist
+COPY --from=builder /app/client/dist ./client/dist
+COPY --from=builder /app/shared/dist ./shared/dist
 COPY --from=builder /app/scripts ./scripts
 
-# Créer les répertoires nécessaires
-RUN mkdir -p data logs backups volumes/postgres volumes/redis
+# Create directories
+RUN mkdir -p data logs backups
 
-# Créer un utilisateur non-root pour la sécurité
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S botuser -u 1001 -G nodejs
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S botuser -u 1001 -G nodejs
 
-# Définir les permissions
-RUN chown -R botuser:nodejs /app && \
-    chmod +x scripts/*.sh scripts/*.js 2>/dev/null || true
-
-# Créer un script de santé pour le health check
-RUN echo '#!/bin/sh' > /app/healthcheck.sh && \
-    echo 'if [ "$ENABLE_DASHBOARD" = "true" ]; then' >> /app/healthcheck.sh && \
-    echo '  curl -f http://localhost:${DASHBOARD_PORT:-3000}/health || exit 1' >> /app/healthcheck.sh && \
-    echo 'else' >> /app/healthcheck.sh && \
-    echo '  node -e "process.exit(0)"' >> /app/healthcheck.sh && \
-    echo 'fi' >> /app/healthcheck.sh && \
-    chmod +x /app/healthcheck.sh
+# Set permissions
+RUN chown -R botuser:nodejs /app && chmod +x scripts/*.sh 2>/dev/null || true
 
 USER botuser
 
-# Variables d'environnement
+# Environment variables
 ENV NODE_ENV=production
 ENV DATABASE_TYPE=sqlite
 ENV DASHBOARD_PORT=3000
-ENV DASHBOARD_HOST=0.0.0.0
 
-# Port pour le dashboard
+# Expose port
 EXPOSE 3000
 
-# Script de démarrage avec vérification de base de données
+# Entry point
 COPY --chown=botuser:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "server/dist/index.js"]
+CMD ["node", "server/dist/src/index.js"]
 
-# Stage 3: Development
+# Development stage
 FROM builder AS development
 
 WORKDIR /app
 
-# Installer nodemon pour le développement
+# Install development tools
 RUN yarn add -g nodemon
 
-# Exposer les ports pour le développement
+# Expose ports
 EXPOSE 3000 5432 6379
 
-# Variables d'environnement pour le développement
-ENV NODE_ENV=development
-ENV DATABASE_TYPE=sqlite
+# Environment
+ENV NODE_ENV=production
+ENV DATABASE_TYPE=postgres
 
-# Script de développement
-CMD ["yarn", "dev"]
+# Start server from the server directory
+WORKDIR /app/server
+CMD ["node", "dist/src/index.js"]

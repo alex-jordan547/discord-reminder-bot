@@ -9,10 +9,10 @@
  */
 
 import { MessageReaction, User } from 'discord.js';
-import { createLogger } from '#/utils/loggingConfig';
-import { EventManager } from './eventManager';
-import { GuildConfig } from '#/models/GuildConfig';
-import { Settings } from '#/config/settings';
+import { createLogger } from '../utils/loggingConfig.js';
+import { EventManager } from './eventManager.js';
+import { GuildConfig } from '../models/GuildConfig.js';
+import { Settings } from '../config/settings.js';
 
 const logger = createLogger('reaction-tracker');
 

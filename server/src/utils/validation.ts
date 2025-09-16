@@ -8,8 +8,8 @@
  * - Input sanitization
  */
 
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
+import { Settings } from '../config/settings.js';
+import { createLogger } from './loggingConfig.js';
 
 const logger = createLogger('validation');
 

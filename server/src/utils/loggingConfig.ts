@@ -1,49 +1,26 @@
 /**
- * Logging configuration for Discord Reminder Bot.
- *
- * This module sets up centralized logging configuration for the entire application
- * with full ANSI color support matching the Python implementation.
+ * Ultra-simple logging configuration for Discord Reminder Bot.
+ * Console-only logging for maximum Docker compatibility.
  */
 
-import pino, { Logger, LoggerOptions } from 'pino';
-import { Settings } from '#/config/settings';
-import { formatDateForLogs } from './dateUtils';
-import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
+import { Settings } from '../config/settings.js';
+import { formatDateForLogs } from './dateUtils.js';
 
 /**
- * Log level mappings - using string levels as required by Pino
+ * Log levels
  */
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
-const LOG_LEVEL_MAP: Record<LogLevel, string> = {
-  DEBUG: 'debug',
-  INFO: 'info',
-  WARNING: 'warn',
-  ERROR: 'error',
-  CRITICAL: 'fatal',
+/**
+ * Log level numeric values for comparison
+ */
+const LOG_LEVEL_VALUES: Record<LogLevel, number> = {
+  DEBUG: 10,
+  INFO: 20,
+  WARNING: 30,
+  ERROR: 40,
+  CRITICAL: 50,
 };
-
-/**
- * Color configuration for different log levels
- */
-const LEVEL_COLORS = {
-  DEBUG: chalk.cyan,
-  INFO: chalk.green,
-  WARNING: chalk.yellow,
-  ERROR: chalk.red,
-  CRITICAL: chalk.magenta,
-} as const;
-
-/**
- * Color configuration for log components
- */
-const COMPONENT_COLORS = {
-  timestamp: chalk.gray,
-  separator: chalk.gray,
-  logger: chalk.white,
-} as const;
 
 /**
  * Emojis for log levels
@@ -57,204 +34,100 @@ const LEVEL_EMOJIS = {
 } as const;
 
 /**
- * Check if colors should be enabled
+ * Simple logger interface compatible with existing code
  */
-function shouldUseColors(): boolean {
-  // Force disable colors if NO_COLOR environment variable is set
-  if (process.env.NO_COLOR === '1' || Settings.NO_COLOR === true) {
-    return false;
+export interface Logger {
+  debug(msg: string, ...args: any[]): void;
+  info(msg: string, ...args: any[]): void;
+  warn(msg: string, ...args: any[]): void;
+  error(msg: string, ...args: any[]): void;
+  fatal(msg: string, ...args: any[]): void;
+  child(options: any): Logger;
+  level: string;
+}
+
+/**
+ * Current global log level
+ */
+let currentLogLevel: LogLevel = 'INFO';
+
+/**
+ * Simple console-based logger implementation
+ */
+class ConsoleLogger implements Logger {
+  private name: string;
+  public level: string = 'info';
+
+  constructor(name: string = 'app') {
+    this.name = name;
   }
 
-  // Force enable colors if FORCE_COLOR environment variable is set
-  if (process.env.FORCE_COLOR === '1' || Settings.FORCE_COLOR === true) {
-    return true;
+  private shouldLog(level: LogLevel): boolean {
+    return LOG_LEVEL_VALUES[level] >= LOG_LEVEL_VALUES[currentLogLevel];
   }
 
-  // Check if LOG_COLORS is explicitly set
-  if (Settings.LOG_COLORS !== undefined) {
-    return Settings.LOG_COLORS;
-  }
+  private formatMessage(level: LogLevel, msg: string, ...args: any[]): string {
+    const timestamp = formatDateForLogs(new Date());
+    const emoji = LEVEL_EMOJIS[level];
+    const loggerName = this.name.padEnd(20).slice(0, 20);
+    const levelName = level.padEnd(8);
 
-  // Check if stdout is a TTY (terminal) - simplified for Vite compatibility
-  // In development with Vite, default to false to avoid process.stdout issues
-  if (process.env.NODE_ENV === 'development') {
-    return false;
-  }
+    let formatted = `${timestamp} | ${emoji} ${levelName} | ${loggerName} | ${msg}`;
 
-  // In production or other environments, use safe access
-  try {
-    if (
-      typeof process !== 'undefined' &&
-      process.stdout &&
-      typeof process.stdout.isTTY === 'boolean'
-    ) {
-      return process.stdout.isTTY;
+    // Handle additional arguments
+    if (args.length > 0) {
+      const extraArgs = args.map(arg => {
+        if (arg instanceof Error) {
+          return `\n  Error: ${arg.message}\n  Stack: ${arg.stack}`;
+        } else if (typeof arg === 'object' && arg !== null) {
+          return `\n  ${JSON.stringify(arg, null, 2)}`;
+        }
+        return String(arg);
+      }).join(' ');
+      formatted += ` ${extraArgs}`;
     }
-    return false;
-  } catch (error) {
-    console.error('Error checking TTY status:', error);
-    return false;
+
+    return formatted;
+  }
+
+  debug(msg: string, ...args: any[]): void {
+    if (this.shouldLog('DEBUG')) {
+      console.log(this.formatMessage('DEBUG', msg, ...args));
+    }
+  }
+
+  info(msg: string, ...args: any[]): void {
+    if (this.shouldLog('INFO')) {
+      console.log(this.formatMessage('INFO', msg, ...args));
+    }
+  }
+
+  warn(msg: string, ...args: any[]): void {
+    if (this.shouldLog('WARNING')) {
+      console.warn(this.formatMessage('WARNING', msg, ...args));
+    }
+  }
+
+  error(msg: string, ...args: any[]): void {
+    if (this.shouldLog('ERROR')) {
+      console.error(this.formatMessage('ERROR', msg, ...args));
+    }
+  }
+
+  fatal(msg: string, ...args: any[]): void {
+    if (this.shouldLog('CRITICAL')) {
+      console.error(this.formatMessage('CRITICAL', msg, ...args));
+    }
+  }
+
+  child(options: any): Logger {
+    const childName = options?.name || options?.component || this.name;
+    return new ConsoleLogger(childName);
   }
 }
 
 /**
- * Custom error serializer for better error logging
- */
-function errorSerializer(error: Error): Record<string, unknown> {
-  return {
-    type: error.constructor.name,
-    message: error.message,
-    stack: error.stack,
-    ...(error.cause && typeof error.cause === 'object' && error.cause !== null
-      ? { cause: error.cause }
-      : {}),
-  };
-}
-
-/**
- * Custom formatter for colorized console output
- */
-function createColoredFormatter(useColors: boolean): (obj: Record<string, unknown>) => string {
-  return (obj: Record<string, unknown>): string => {
-    const { level, time, name, msg, err, error, ...extra } = obj;
-
-    // Type assertion for pino log object properties
-    const pinoLevel = level as number;
-    const pinoTime = time as number;
-    const pinoName = name as string;
-    const pinoMsg = msg as string;
-
-    // Convert pino level to our log level
-    let logLevel: LogLevel = 'INFO';
-    if (pinoLevel >= 60) logLevel = 'CRITICAL';
-    else if (pinoLevel >= 50) logLevel = 'ERROR';
-    else if (pinoLevel >= 40) logLevel = 'WARNING';
-    else if (pinoLevel >= 30) logLevel = 'INFO';
-    else if (pinoLevel >= 20) logLevel = 'DEBUG';
-
-    // Format timestamp in configured timezone
-    const timestamp = formatDateForLogs(new Date(pinoTime));
-
-    // Format logger name (truncate if too long)
-    const loggerName = (pinoName || 'app').padEnd(20).slice(0, 20);
-
-    // Format level name
-    const levelName = logLevel.padEnd(8);
-
-    // Handle error objects specially - check both err/error fields and extra fields
-    let errorObj = err || error;
-
-    // Also check if there's an Error object in the extra fields (this happens when you do logger.error('msg', errorObject))
-    if (!errorObj) {
-      for (const [key, value] of Object.entries(extra)) {
-        if (
-          value instanceof Error ||
-          (typeof value === 'object' && value && 'message' in value && 'stack' in value)
-        ) {
-          errorObj = value;
-          // Remove it from extra so it's not displayed twice
-          delete extra[key];
-          break;
-        }
-      }
-    }
-
-    let errorMessage = '';
-    if (errorObj && typeof errorObj === 'object') {
-      if ((errorObj as any).message && (errorObj as any).stack) {
-        // It's an Error object
-        errorMessage = `\n  Error: ${(errorObj as any).message}`;
-        if (useColors) {
-          errorMessage = chalk.red(errorMessage);
-        }
-
-        // Add stack trace on new lines, indented
-        if ((errorObj as any).stack && typeof (errorObj as any).stack === 'string') {
-          const stackLines = (errorObj as any).stack.split('\n').slice(1); // Skip first line (it's the message)
-          stackLines.forEach((line: string) => {
-            errorMessage += `\n    ${line}`;
-          });
-          if (useColors) {
-            // Apply dim style to stack trace lines
-            errorMessage = errorMessage.replace(/(\n {4}.+)/g, match => chalk.dim(match));
-          }
-        }
-      } else {
-        // It's some other object
-        errorMessage = `\n  ${JSON.stringify(errorObj, null, 2).split('\n').join('\n  ')}`;
-        if (useColors) {
-          errorMessage = chalk.yellow(errorMessage);
-        }
-      }
-    }
-
-    if (useColors) {
-      // Get colors for this level
-      const levelColor = LEVEL_COLORS[logLevel];
-      const emoji = LEVEL_EMOJIS[logLevel];
-
-      // Colorize each component
-      const coloredTimestamp = COMPONENT_COLORS.timestamp(timestamp);
-      const coloredLevel = levelColor.bold(`${emoji} ${levelName}`);
-      const coloredLogger = COMPONENT_COLORS.logger(loggerName);
-      const coloredMessage = levelColor(pinoMsg);
-      const separator = COMPONENT_COLORS.separator(' | ');
-
-      // Construct the formatted message with colored components
-      let formatted = `${coloredTimestamp}${separator}${coloredLevel}${separator}${coloredLogger}${separator}${coloredMessage}`;
-
-      // Add error information if present
-      if (errorMessage) {
-        formatted += errorMessage;
-      }
-
-      // Add extra fields if present (excluding error fields we already handled)
-      if (Object.keys(extra).length > 0) {
-        const extraStr = Object.entries(extra)
-          .map(([key, value]) => {
-            if (typeof value === 'object' && value !== null) {
-              return `${key}=${JSON.stringify(value, null, 2).split('\n').join('\n    ')}`;
-            }
-            return `${key}=${JSON.stringify(value)}`;
-          })
-          .join(' ');
-        formatted += ` ${chalk.dim(extraStr)}`;
-      }
-
-      return formatted;
-    } else {
-      // Non-colored format
-      const emoji = LEVEL_EMOJIS[logLevel];
-      let formatted = `${timestamp} | ${emoji} ${levelName} | ${loggerName} | ${pinoMsg}`;
-
-      // Add error information if present
-      if (errorMessage) {
-        formatted += errorMessage;
-      }
-
-      // Add extra fields if present
-      if (Object.keys(extra).length > 0) {
-        const extraStr = Object.entries(extra)
-          .map(([key, value]) => {
-            if (typeof value === 'object' && value !== null) {
-              return `${key}=${JSON.stringify(value, null, 2)}`;
-            }
-            return `${key}=${JSON.stringify(value)}`;
-          })
-          .join(' ');
-        formatted += ` ${extraStr}`;
-      }
-
-      return formatted;
-    }
-  };
-}
-
-// Global reference to file destination for proper cleanup
-let fileDestination: pino.DestinationStream | null = null;
-
-/**
- * Setup logging configuration
+ * Setup logging configuration - ultra simple console-only version
  */
 export function setupLogging(options: {
   logLevel?: LogLevel;
@@ -263,104 +136,22 @@ export function setupLogging(options: {
   useColors?: boolean;
 }): Logger {
   const {
-    logLevel = Settings.LOG_LEVEL,
-    logToFile = Settings.LOG_TO_FILE,
-    logFilePath,
-    useColors = shouldUseColors(),
+    logLevel = Settings.LOG_LEVEL || 'INFO',
   } = options;
 
-  // Convert string log level to pino level
-  const pinoLevel = LOG_LEVEL_MAP[logLevel] || 'info';
+  // Set global log level
+  currentLogLevel = logLevel;
 
-  const pinoOptions: LoggerOptions = {
-    base: null,
-    level: pinoLevel,
-    name: 'discord-reminder-bot',
-    // Add error serializer to handle Error objects properly
-    serializers: {
-      err: errorSerializer,
-      error: errorSerializer,
-    },
-  };
+  // Create main logger
+  const logger = new ConsoleLogger('discord-reminder-bot');
 
-  // Create streams
-  const streams: pino.StreamEntry[] = [];
-
-  // Console stream with colored formatter
-  streams.push({
-    level: pinoLevel as pino.Level,
-    stream: {
-      write: (chunk: string) => {
-        // Parse the JSON log entry
-        try {
-          const logObj = JSON.parse(chunk);
-          const formatted = createColoredFormatter(useColors)(logObj);
-          process.stdout.write(formatted + '\n');
-        } catch (err) {
-          console.error('Failed to parse log chunk for console output:', err);
-          // Fallback to raw output if parsing fails
-          process.stdout.write(chunk);
-        }
-      },
-    },
-  });
-
-  // File stream (without colors)
-  if (logToFile) {
-    const filePath = logFilePath || `logs/bot_${new Date().toISOString().slice(0, 10)}.log`;
-
-    // Create logs directory if it doesn't exist
-    try {
-      const dir = path.dirname(filePath);
-      fs.mkdirSync(dir, { recursive: true });
-    } catch (err) {
-      // Directory creation failed, continue without file logging
-      console.warn(`Warning: Could not create logs directory: ${err}`);
-    }
-
-    // Create file destination with proper error handling
-    try {
-      fileDestination = pino.destination({
-        dest: filePath,
-        sync: false,
-        mkdir: true,
-        // Add these options to prevent sonic-boom issues
-        append: true,
-        minLength: 0, // Flush immediately
-      });
-
-      // Handle destination errors
-      (fileDestination as any).on('error', (err: any) => {
-        console.warn('File logging error:', err.message);
-      });
-
-      streams.push({
-        level: pinoLevel as pino.Level,
-        stream: fileDestination,
-      });
-    } catch (err) {
-      console.warn(`Warning: Could not create file destination: ${err}`);
-    }
-  }
-
-  // Create the logger with multiple streams
-  const logger = pino(pinoOptions, pino.multistream(streams));
-
-  // Configure discord.js logging to be less verbose
-  const discordLogger = logger.child({ name: 'discord' });
-  discordLogger.level = 'warn';
-
-  // Log the logging configuration using setTimeout to avoid recursion issues
+  // Log initialization
   setTimeout(() => {
     logger.info('=' + '='.repeat(48) + '=');
-    logger.info('Discord Reminder Bot - Logging Initialized');
+    logger.info('Discord Reminder Bot - Console Logging Initialized');
     logger.info(`Log Level: ${logLevel}`);
     logger.info('Console Logging: Enabled');
-    logger.info(`Colors: ${useColors ? 'Enabled' : 'Disabled'}`);
-    logger.info(`File Logging: ${logToFile ? 'Enabled' : 'Disabled'}`);
-    if (logToFile && logFilePath) {
-      logger.info(`Log File: ${logFilePath}`);
-    }
+    logger.info('File Logging: Disabled (Console Only)');
     logger.info('=' + '='.repeat(48) + '=');
   }, 0);
 
@@ -368,20 +159,10 @@ export function setupLogging(options: {
 }
 
 /**
- * Gracefully close logging resources
+ * No-op for compatibility
  */
 export function closeLogging(): Promise<void> {
-  return new Promise(resolve => {
-    if (fileDestination) {
-      // Close the file destination properly
-      (fileDestination as any).end(() => {
-        fileDestination = null;
-        resolve();
-      });
-    } else {
-      resolve();
-    }
-  });
+  return Promise.resolve();
 }
 
 /**
@@ -389,51 +170,34 @@ export function closeLogging(): Promise<void> {
  */
 export function getLogLevelFromEnv(): LogLevel {
   const envLevel = process.env.LOG_LEVEL?.toUpperCase() as LogLevel;
-  return envLevel && envLevel in LOG_LEVEL_MAP ? envLevel : 'INFO';
+  return envLevel && envLevel in LOG_LEVEL_VALUES ? envLevel : 'INFO';
 }
 
 /**
- * Check if file logging should be enabled
+ * File logging is disabled in this simple implementation
  */
 export function shouldLogToFile(): boolean {
-  return process.env.LOG_TO_FILE?.toLowerCase() === 'true';
+  return false;
 }
 
 /**
- * Test function to demonstrate colorized logging
+ * Test function for logging levels
  */
 export function testColorizedLogging(logger: Logger): void {
-  logger.debug('🔧 DEBUG - Timestamp, niveau, logger et message colorisés');
-  logger.info('ℹ️ INFO - Hiérarchie visuelle parfaite avec couleurs');
-  logger.warn('⚠️ WARNING - Structure complète colorisée');
-  logger.error('❌ ERROR - Détection instantanée des erreurs');
-  logger.fatal('🚨 CRITICAL - Maximum de visibilité');
+  logger.debug('🔧 DEBUG - Simple console debug message');
+  logger.info('ℹ️ INFO - Simple console info message');
+  logger.warn('⚠️ WARNING - Simple console warning message');
+  logger.error('❌ ERROR - Simple console error message');
+  logger.fatal('🚨 CRITICAL - Simple console critical message');
 }
 
 /**
- * Test function to demonstrate error logging
+ * Test function for error logging
  */
 export function testErrorLogging(logger: Logger): void {
-  // Test with a real Error object
-  const testError = new Error('This is a test error message');
-  testError.stack =
-    'Error: This is a test error message\n    at testErrorLogging (/path/to/file.ts:123:45)\n    at someFunction (/path/to/file.ts:67:89)';
-
-  logger.error('Error fetching selectable messages', testError);
-
-  // Test with error as named parameter (recommended)
-  logger.error('Error fetching selectable messages', { err: testError });
-
-  // Test with custom object
-  logger.error('Custom error object', { customData: { id: 123, status: 'failed' } });
-
-  // Test with multiple parameters
-  logger.error('Complex error scenario', {
-    err: testError,
-    userId: '12345',
-    operation: 'fetchMessages',
-    retryCount: 3,
-  });
+  const testError = new Error('Test error message');
+  logger.error('Error occurred', testError);
+  logger.error('Error with context', testError, { userId: '12345', operation: 'test' });
 }
 
 // Default logger instance
@@ -446,60 +210,16 @@ export function getDefaultLogger(): Logger {
   if (!defaultLogger) {
     defaultLogger = setupLogging({
       logLevel: getLogLevelFromEnv(),
-      logToFile: shouldLogToFile(),
-      useColors: shouldUseColors(),
     });
   }
   return defaultLogger;
 }
 
 /**
- * Create a child logger with a specific name and error handling wrapper
+ * Create a child logger with a specific name
  */
 export function createLogger(name: string): Logger {
-  const parentLogger = getDefaultLogger();
-  const childLogger = parentLogger.child({ name });
-
-  // Create a wrapper that handles Error objects properly
-  const wrappedLogger = Object.create(childLogger);
-
-  // Override the error method to handle Error objects as second parameter
-  wrappedLogger.error = function (messageOrObj: any, ...args: any[]): void {
-    // If second argument is an Error object, put it in the err field
-    if (args.length > 0 && args[0] instanceof Error) {
-      const error = args[0];
-      const additionalData = args.length > 1 ? args[1] : {};
-      return childLogger.error({ err: error, ...additionalData }, messageOrObj);
-    }
-    // If second argument is an object with error data
-    else if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      return childLogger.error(args[0], messageOrObj);
-    }
-    // Otherwise, use normal Pino behavior
-    else {
-      return childLogger.error(messageOrObj, ...args);
-    }
-  };
-
-  // Override other log levels to maintain consistency
-  ['debug', 'info', 'warn', 'fatal'].forEach(level => {
-    wrappedLogger[level] = function (messageOrObj: any, ...args: any[]): any {
-      if (args.length > 0 && args[0] instanceof Error) {
-        const error = args[0];
-        const additionalData = args.length > 1 ? args[1] : {};
-        return (childLogger as any)[level]({ err: error, ...additionalData }, messageOrObj);
-      } else if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-        return (childLogger as any)[level](args[0], messageOrObj);
-      } else {
-        return (childLogger as any)[level](messageOrObj, ...args);
-      }
-    };
-  });
-
-  // Preserve other properties and methods
-  Object.setPrototypeOf(wrappedLogger, childLogger);
-
-  return wrappedLogger as Logger;
+  return new ConsoleLogger(name);
 }
 
 export default getDefaultLogger;
@@ -512,46 +232,5 @@ export function serializeError(error: Error): Record<string, any> {
     name: error.name,
     message: error.message,
     stack: error.stack,
-    ...(error.cause && typeof error.cause === 'object' && error.cause !== null
-      ? { cause: error.cause }
-      : {}),
   };
-}
-
-/**
- * Format error objects for logging
- */
-export function formatErrorForLogging(errorObj: any): string {
-  let errorMessage = '';
-
-  // Type guard for error objects
-  if (errorObj && typeof errorObj === 'object') {
-    if ('message' in errorObj && 'stack' in errorObj) {
-      const error = errorObj as Error;
-      errorMessage = `\n  Error: ${error.message}`;
-
-      // Log relevant properties
-      if ('code' in errorObj) errorMessage += `\n  Code: ${(errorObj as any).code}`;
-      if ('path' in errorObj) errorMessage += `\n  Path: ${(errorObj as any).path}`;
-      if ('errno' in errorObj) errorMessage += `\n  Errno: ${(errorObj as any).errno}`;
-
-      // Format stack trace
-      if (error.stack && typeof error.stack === 'string') {
-        const stackLines = error.stack.split('\n').slice(1); // Skip first line (it's the message)
-        stackLines.forEach((line: string) => {
-          if (line.trim()) {
-            errorMessage += `\n    ${line.trim()}`;
-          }
-        });
-      }
-    } else {
-      // Generic object
-      errorMessage = `\n  Object: ${JSON.stringify(errorObj, null, 2)}`;
-    }
-  } else {
-    // Primitive or other type
-    errorMessage = `\n  Value: ${String(errorObj)}`;
-  }
-
-  return errorMessage;
 }

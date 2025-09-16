@@ -24,6 +24,7 @@ const envSchema = z.object({
   AUTO_DELETE_REMINDERS: z.coerce.boolean().default(true),
   AUTO_DELETE_DELAY_HOURS: z.coerce.number().positive().default(1),
   TEST_MODE: z.coerce.boolean().default(false),
+  JWT_SECRET: z.string().optional(),
   LOG_LEVEL: z.enum(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']).default('INFO'),
   LOG_TO_FILE: z.coerce.boolean().default(true),
   LOG_COLORS: z.coerce.boolean().optional(),
@@ -71,6 +72,7 @@ export class Settings {
   // Discord Bot Configuration
   static readonly TOKEN = envConfig.DISCORD_TOKEN;
   static readonly COMMAND_PREFIX = '!';
+  static readonly JWT_SECRET = envConfig.JWT_SECRET;
 
   // Reminder Configuration
   static readonly REMINDER_INTERVAL_HOURS = envConfig.REMINDER_INTERVAL_HOURS;

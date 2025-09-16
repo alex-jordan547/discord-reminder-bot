@@ -7,7 +7,7 @@ import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import { createReadStream } from 'fs';
 import path from 'path';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 import type {
   DatabaseConfig,
   ExportOptions,

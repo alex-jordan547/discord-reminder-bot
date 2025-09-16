@@ -5,7 +5,7 @@
  * using the modern Drizzle ORM with better-sqlite3 as recommended in the documentation.
  */
 
-import { db, schema, eq, and, or, desc, isNull } from '#/db/index.js';
+import { db, schema, eq, and, or, desc, isNull } from '../db/index.js';
 import type {
   Event as DbEvent,
   NewEvent,
@@ -17,8 +17,8 @@ import type {
   NewGuildConfig,
   ReminderLog as DbReminderLog,
   NewReminderLog,
-} from '#/db/schema.js';
-import { createLogger } from '#/utils/loggingConfig.js';
+} from '../db/schema.js';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('database-repositories');
 

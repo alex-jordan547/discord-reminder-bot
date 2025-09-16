@@ -4,7 +4,7 @@
  * Provides consistent date handling across the application with proper timezone support.
  */
 
-import { Settings } from '#/config/settings';
+import { Settings } from '../config/settings.js';
 
 /**
  * Get the current date and time in the configured timezone

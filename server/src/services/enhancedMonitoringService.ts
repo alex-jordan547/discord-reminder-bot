@@ -3,7 +3,7 @@
  * Provides comprehensive system and database monitoring with alerting capabilities
  */
 
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import * as path from 'path';

@@ -5,7 +5,7 @@
  */
 
 import crypto from 'crypto';
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from '../utils/loggingConfig.js';
 
 const logger = createLogger('session');
 

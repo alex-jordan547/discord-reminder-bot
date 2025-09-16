@@ -9,7 +9,7 @@
  * - Type-safe error handling with proper logging
  */
 
-import { createLogger } from '#/utils/loggingConfig';
+import { createLogger } from './loggingConfig.js';
 import { DiscordAPIError, HTTPError, RateLimitError } from 'discord.js';
 
 const logger = createLogger('error-recovery');

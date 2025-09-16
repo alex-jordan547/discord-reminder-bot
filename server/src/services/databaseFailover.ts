@@ -7,8 +7,8 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { createLogger } from '#/utils/loggingConfig';
-import { Settings } from '#/config/settings';
+import { createLogger } from '../utils/loggingConfig.js';
+import { Settings } from '../config/settings.js';
 
 const logger = createLogger('db-failover');
 
@@ -108,26 +108,17 @@ export class DatabaseFailoverService {
         return true;
       } else {
         // Test SQLite connection
-        const sqlite3 = await import('sqlite3');
-        const { Database } = sqlite3;
+        const sqlite3 = await import('better-sqlite3');
+        const Database = sqlite3.default;
 
-        return new Promise((resolve, reject) => {
-          const db = new Database(connection.config.path, err => {
-            if (err) {
-              reject(err);
-              return;
-            }
-
-            db.get('SELECT 1', selectErr => {
-              db.close();
-              if (selectErr) {
-                reject(selectErr);
-              } else {
-                resolve(true);
-              }
-            });
-          });
-        });
+        try {
+          const db = new Database(connection.config.path);
+          db.prepare('SELECT 1').get();
+          db.close();
+          return true;
+        } catch (error) {
+          return false;
+        }
       }
     } catch (error) {
       logger.error(`Connection test failed for ${connection.type}:`, error);

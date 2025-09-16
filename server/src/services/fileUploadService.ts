@@ -7,8 +7,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { createLogger } from '#/utils/loggingConfig';
-import { auditLogger } from './auditLogger';
+import { createLogger } from '../utils/loggingConfig.js';
+import { auditLogger } from './auditLogger.js';
 
 const logger = createLogger('file-upload');
 
@@ -605,6 +605,7 @@ export class FileUploadService {
       filename,
       userId,
       timestamp: new Date(),
+      success: true,
       metadata,
     });
   }

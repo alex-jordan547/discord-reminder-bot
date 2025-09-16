@@ -19,13 +19,13 @@ import {
   Message,
   MessageComponentInteraction,
 } from 'discord.js';
-import { DiscordBotClient } from '#/types/BotClient';
-import { Settings } from '#/config/settings';
-import { createLogger } from '#/utils/loggingConfig';
-import { parseMessageLink, validateMessageLink } from '#/utils/messageParser';
-import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '#/utils/permissions';
-import { createTimezoneAwareDate } from '#/utils/dateUtils';
-import { Event as EventModel } from '#/models';
+import { DiscordBotClient } from '../types/BotClient.js';
+import { Settings } from '../config/settings.js';
+import { createLogger } from '../utils/loggingConfig.js';
+import { parseMessageLink, validateMessageLink } from '../utils/messageParser.js';
+import { validatePermissions, hasAdminRole, hasGuildAdminRole } from '../utils/permissions.js';
+import { createTimezoneAwareDate } from '../utils/dateUtils.js';
+import { Event as EventModel } from '../models/index.js';
 import {
   getSelectableMessages,
   createMessageSelectMenu,
@@ -33,7 +33,7 @@ import {
   createTimeSelectMenu,
   createTimeSelectionEmbed,
   MessageSelectionOption,
-} from '#/utils/messageSelector';
+} from '../utils/messageSelector.js';
 
 const logger = createLogger('handlers');
 
