@@ -156,18 +156,23 @@ setInterval(() => {
  * Create and configure enhanced Fastify server instance
  */
 export async function createServer(): Promise<FastifyInstance> {
-  const fastify = Fastify({
-    logger: {
-      level: Settings.LOG_LEVEL.toLowerCase(),
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: Settings.LOG_COLORS,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
+  // Configure logger based on environment
+  const loggerConfig = Settings.NODE_ENV === 'production'
+    ? { level: Settings.LOG_LEVEL.toLowerCase() }
+    : {
+        level: Settings.LOG_LEVEL.toLowerCase(),
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            colorize: Settings.LOG_COLORS,
+            translateTime: 'HH:MM:ss Z',
+            ignore: 'pid,hostname',
+          },
         },
-      },
-    },
+      };
+
+  const fastify = Fastify({
+    logger: loggerConfig,
   });
 
   // Register CORS for API access

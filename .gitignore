@@ -276,3 +276,4 @@ client/test-results/
 /.crush/
 /.gemini/
 /.kiro/
+backups/*
