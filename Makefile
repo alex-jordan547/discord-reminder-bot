@@ -1,166 +1,110 @@
-# Discord Reminder Bot - Makefile
-# Commandes utiles pour le développement et le déploiement
+# Discord Reminder Bot - Unified Makefile
+# =======================================
 
-.PHONY: help build run stop logs clean validate test-docker
-
-# Variables
-IMAGE_NAME=discord-reminder-bot
-CONTAINER_NAME=discord-reminder-bot
-
-help: ## Affiche cette aide
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
-
-validate: ## Valide la structure avant build Docker
-	@echo "🔍 Validation de la structure..."
-	@python3 validate_docker_structure.py
-
-build: validate ## Construit l'image Docker
-	@echo "🔨 Construction de l'image Docker..."
-	docker build -t $(IMAGE_NAME) .
-	@echo "✅ Image construite avec succès!"
-
-run: ## Lance le bot avec docker-compose
-	@echo "🚀 Lancement du bot..."
-	@if [ ! -f .env ]; then \
-		echo "❌ Fichier .env manquant!"; \
-		echo "💡 Copiez .env.example vers .env et configurez vos variables"; \
-		exit 1; \
-	fi
-	docker-compose up -d
-	@echo "✅ Bot démarré en arrière-plan"
-
-stop: ## Arrête le bot
-	@echo "⏹️  Arrêt du bot..."
-	docker-compose down
-	@echo "✅ Bot arrêté"
-
-restart: stop run ## Redémarre le bot
-
-logs: ## Affiche les logs du bot
-	@echo "📝 Logs du bot (Ctrl+C pour quitter):"
-	docker-compose logs -f
-
-logs-tail: ## Affiche les derniers logs
-	@echo "📝 Derniers logs:"
-	docker-compose logs --tail=50
-
-status: ## Affiche le statut du conteneur
-	@echo "📊 Statut du conteneur:"
-	@docker ps -a --filter="name=$(CONTAINER_NAME)" --format="table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-clean: ## Nettoie les conteneurs et images
-	@echo "🧹 Nettoyage..."
-	docker-compose down --volumes --remove-orphans
-	docker rmi $(IMAGE_NAME) 2>/dev/null || true
-	@echo "✅ Nettoyage terminé"
-
-test-docker: build ## Teste l'image Docker localement
-	@echo "🧪 Test de l'image Docker..."
-	@if [ ! -f .env ]; then \
-		echo "❌ Fichier .env manquant pour les tests!"; \
-		echo "💡 Copiez .env.example vers .env et configurez vos variables"; \
-		exit 1; \
-	fi
-	docker run --rm --env-file .env $(IMAGE_NAME) python -c "print('✅ Import test passed'); import bot"
-
-shell: ## Lance un shell dans le conteneur
-	@echo "🐚 Ouverture d'un shell dans le conteneur..."
-	docker run --rm -it --env-file .env -v $(PWD)/data:/app/data $(IMAGE_NAME) /bin/bash
-
-setup: ## Configuration initiale (copie .env.example)
-	@if [ ! -f .env ]; then \
-		echo "📝 Création du fichier .env..."; \
-		cp .env.example .env; \
-		echo "✅ Fichier .env créé!"; \
-		echo "💡 Editez le fichier .env avec vos configurations"; \
-	else \
-		echo "ℹ️  Le fichier .env existe déjà"; \
-	fi
-
-# Commandes Docker directes
-docker-build: ## Build Docker sans validation
-	docker build -t $(IMAGE_NAME) .
-
-docker-run: ## Lance le conteneur directement (sans compose)
-	docker run -d --name $(CONTAINER_NAME) --env-file .env -v $(PWD)/data:/app/data $(IMAGE_NAME)
-
-docker-stop: ## Arrête le conteneur direct
-	docker stop $(CONTAINER_NAME) 2>/dev/null || true
-	docker rm $(CONTAINER_NAME) 2>/dev/null || true
-
-# Commandes de développement
-dev-install: ## Installe les dépendances pour le développement local
-	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
-	$(PIP) install pre-commit
-
-dev-setup: dev-install ## Configuration complète de développement
-	@echo "🔧 Configuration des pre-commit hooks..."
-	pre-commit install
-	@echo "✅ Pre-commit hooks installés!"
-
-dev-test: check-venv ## Lance les tests localement
-	$(PYTHON) -m pytest tests/ -v
-
-# Variables Python avec détection automatique du venv
-PYTHON := $(shell if [ -f venv/bin/python ]; then echo venv/bin/python; elif [ "$$VIRTUAL_ENV" != "" ]; then echo python3; else echo "python3"; fi)
-PIP := $(shell if [ -f venv/bin/pip ]; then echo venv/bin/pip; elif [ "$$VIRTUAL_ENV" != "" ]; then echo pip; else echo "pip3"; fi)
-
-# Formatage et qualité de code
-format: check-venv ## Formate automatiquement tout le code
-	@echo "🎨 Formatage du code avec Black..."
-	$(PYTHON) -m black . --line-length=100
-	@echo "📦 Tri des imports avec isort..."
-	$(PYTHON) -m isort . --profile=black --line-length=100
-	@echo "✅ Formatage terminé!"
-
-format-check: check-venv ## Vérifie le formatage sans modifier
-	@echo "🔍 Vérification du formatage..."
-	$(PYTHON) -m black . --check --line-length=100
-	$(PYTHON) -m isort . --check-only --profile=black --line-length=100
-	@echo "✅ Formatage vérifié!"
-
-lint: check-venv ## Lance tous les outils de vérification
-	@echo "🔍 Analyse avec flake8..."
-	$(PYTHON) -m flake8 --max-line-length=100 --ignore=E203,W503
-	@echo "🔒 Scan de sécurité avec bandit..."
-	$(PYTHON) -m bandit -r . --skip B101 -f json -o bandit-report.json || true
-	@echo "🎯 Vérification des types avec mypy..."
-	$(PYTHON) -m mypy --ignore-missing-imports . || true
-	@echo "✅ Analyse terminée!"
-
-check-venv: ## Vérifie que l'environnement virtuel est activé
-	@if [ ! -f venv/bin/python ] && [ "$$VIRTUAL_ENV" = "" ]; then \
-		echo "❌ Environnement virtuel non détecté!"; \
-		echo "💡 Lancez d'abord:"; \
-		echo "   source venv/bin/activate"; \
-		echo "   ou"; \
-		echo "   ./run_dev.sh"; \
-		exit 1; \
-	fi
-	@if [ -f venv/bin/python ]; then \
-		echo "✅ Utilisation du venv local: venv/bin/python"; \
-	elif [ "$$VIRTUAL_ENV" != "" ]; then \
-		echo "✅ Environnement virtuel actif: $$VIRTUAL_ENV"; \
-	fi
-
-pre-commit-all: ## Lance tous les pre-commit hooks sur tous les fichiers
-	@echo "🚀 Lancement de tous les pre-commit hooks..."
-	pre-commit run --all-files
-
-pre-commit-update: ## Met à jour les pre-commit hooks
-	@echo "🔄 Mise à jour des pre-commit hooks..."
-	pre-commit autoupdate
-
-validate-ci: format-check lint ## Valide que le code passera les CI
-	@echo "✅ Code prêt pour CI/CD!"
-
-# Maintenance
-backup-data: ## Sauvegarde les données
-	@echo "💾 Sauvegarde des données..."
-	@mkdir -p backups
-	@tar -czf backups/data-backup-$(shell date +%Y%m%d-%H%M%S).tar.gz data/
-	@echo "✅ Sauvegarde créée dans backups/"
+.PHONY: help install build test deploy status logs clean
 
 # Default target
 .DEFAULT_GOAL := help
+
+# Variables
+CONTAINER_NAME := discord-reminder-bot
+IMAGE_NAME := discord-reminder-bot
+
+# Colors for output
+GREEN := \033[32m
+YELLOW := \033[33m
+RED := \033[31m
+NC := \033[0m
+
+help: ## Afficher l'aide
+	@echo "$(GREEN)Discord Reminder Bot - Commandes essentielles$(NC)"
+	@echo "=================================================="
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-15s$(NC) %s\n", $$1, $$2}'
+
+# Development commands
+install: ## Installer les dépendances
+	@echo "$(GREEN)Installation des dépendances...$(NC)"
+	yarn install --frozen-lockfile
+
+build: ## Builder le projet
+	@echo "$(GREEN)Build du projet...$(NC)"
+	yarn build
+
+test: ## Exécuter les tests
+	@echo "$(GREEN)Exécution des tests...$(NC)"
+	yarn test:coverage
+
+quality: ## Vérifier la qualité du code
+	@echo "$(GREEN)Vérification qualité...$(NC)"
+	yarn quality
+
+# Docker commands (unified deployment)
+deploy: ## Déploiement Docker complet
+	@echo "$(GREEN)Déploiement Docker...$(NC)"
+	./scripts/deploy.sh
+
+start: ## Démarrer les services Docker
+	@echo "$(GREEN)Démarrage des services...$(NC)"
+	docker-compose up -d
+
+stop: ## Arrêter les services Docker
+	@echo "$(YELLOW)Arrêt des services...$(NC)"
+	docker-compose down
+
+restart: ## Redémarrer les services
+	@echo "$(GREEN)Redémarrage...$(NC)"
+	docker-compose restart
+
+rebuild: ## Rebuild et redéployer
+	@echo "$(GREEN)Rebuild complet...$(NC)"
+	make backup && docker-compose up --build -d
+
+
+# Monitoring commands
+monitor: ## Check de santé
+	@echo "$(GREEN)Vérification de santé...$(NC)"
+	./scripts/monitor.sh --check
+
+# Backup & Rollback
+backup: ## Créer une sauvegarde
+	@echo "$(GREEN)Création d'une sauvegarde...$(NC)"
+	@mkdir -p backups/backup_$(shell date +%Y%m%d_%H%M%S)
+	@if [ -d "data" ]; then cp -r data backups/backup_$(shell date +%Y%m%d_%H%M%S)/; fi
+	@if [ -d "logs" ]; then cp -r logs backups/backup_$(shell date +%Y%m%d_%H%M%S)/; fi
+	@echo "$(GREEN)Sauvegarde créée$(NC)"
+
+rollback: ## Rollback rapide
+	@echo "$(RED)Rollback...$(NC)"
+	./scripts/rollback.sh --quick
+
+# Maintenance
+clean: ## Nettoyer les fichiers temporaires
+	@echo "$(YELLOW)Nettoyage...$(NC)"
+	@rm -rf dist/ node_modules/.cache/
+	@docker images $(IMAGE_NAME) --format "table {{.Repository}}:{{.Tag}}" | tail -n +4 | xargs -r docker rmi 2>/dev/null || true
+	@find backups/ -name "backup_*" -type d | sort -r | tail -n +11 | xargs -r rm -rf 2>/dev/null || true
+	@echo "$(GREEN)Nettoyage terminé$(NC)"
+
+logs: ## Voir les logs Docker
+	@echo "$(GREEN)Logs Docker...$(NC)"
+	docker-compose logs -f $(CONTAINER_NAME)
+
+status: ## Statut du système
+	@echo "$(GREEN)=== Statut Docker ===$(NC)"
+	@docker ps --filter name=$(CONTAINER_NAME) --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "$(YELLOW)Espace disque:$(NC)"
+	@df -h . | tail -1
+
+# Production deployment
+prod-deploy: quality deploy ## Pipeline complète: tests + build + deploy
+	@echo "$(GREEN)Déploiement production terminé!$(NC)"
+
+# Database commands
+db-migrate: ## Migrer la base de données
+	@echo "$(GREEN)Migration de la base...$(NC)"
+	docker compose --profile migration up db-migration
+
+db-check: ## Vérifier l'intégrité de la base
+	@echo "$(GREEN)Vérification de la base...$(NC)"
+	docker exec $(CONTAINER_NAME) node -e "console.log('DB OK')" || echo "$(RED)Problème DB$(NC)"

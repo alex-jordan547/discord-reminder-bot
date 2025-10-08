@@ -1,99 +1,96 @@
-# Multi-stage build for production-ready Discord bot
-# ==============================================
+# Optimized Discord Bot Dockerfile
+# ================================
 
-# Builder Stage - Install dependencies and validate
-# ================================================
-FROM python:3.13-slim AS builder
-
-LABEL stage=builder
-LABEL maintainer="Discord Reminder Bot"
-
-# Set build environment
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONUNBUFFERED=1
-
-WORKDIR /build
-
-# Install build dependencies 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Python 3.13 compatibility package
-RUN pip install --no-cache-dir audioop-lts
-
-# Copy source code for validation
-COPY commands/ ./commands/
-COPY config/ ./config/
-COPY models/ ./models/
-COPY persistence/ ./persistence/
-COPY utils/ ./utils/
-COPY bot.py .
-COPY healthcheck.py .
-
-# Validate imports and basic functionality
-RUN python -c "import discord; print('✓ discord.py imports successfully')"
-RUN python -c "import bot; print('✓ Bot module imports successfully')"
-RUN python -m py_compile bot.py && echo "✓ Bot syntax validation passed"
-RUN python -m py_compile healthcheck.py && echo "✓ Health check script validation passed"
-RUN python healthcheck.py && echo "✓ Health check execution successful"
-
-# Production Stage - Minimal runtime environment
-# ==============================================
-FROM python:3.13-slim AS production
-
-# Image metadata for production
-LABEL org.opencontainers.image.title="Discord Reminder Bot" \
-      org.opencontainers.image.description="Production-ready Discord bot for managing reminders" \
-      org.opencontainers.image.version="latest" \
-      org.opencontainers.image.authors="alex-jordan547" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/alex-jordan547/discord-reminder-bot"
-
-# Set production environment
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Create non-root system user for enhanced security
-RUN groupadd --system --gid 1000 app \
-    && useradd --system --uid 1000 --gid 1000 --no-create-home --shell /bin/false app
+# Install system dependencies
+RUN apk add --no-cache postgresql-client python3 make g++
 
-# Copy Python environment from builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy package files (no yarn.lock for architecture independence)
+COPY package.json tsconfig.json .yarnrc.yml ./
 
-# Copy only production code (no tests, dev files)
-COPY --from=builder --chown=app:app /build/commands/ ./commands/
-COPY --from=builder --chown=app:app /build/config/ ./config/
-COPY --from=builder --chown=app:app /build/models/ ./models/
-COPY --from=builder --chown=app:app /build/persistence/ ./persistence/
-COPY --from=builder --chown=app:app /build/utils/ ./utils/
-COPY --from=builder --chown=app:app /build/bot.py ./
-COPY --from=builder --chown=app:app /build/healthcheck.py ./
+# Copy source code
+COPY server/ ./server/
+COPY shared/ ./shared/
+COPY client/ ./client/
+COPY scripts/ ./scripts/
 
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/data /app/logs \
-    && chown -R app:app /app
+# Architecture-agnostic install and build with pure TypeScript
+ENV NODE_ENV=production
+RUN yarn install && \
+    yarn build
 
-# Switch to non-root user
-USER app
+# Production stage
+FROM node:20-alpine AS production
 
-# Health check - verify production readiness
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD ["python", "healthcheck.py"]
+WORKDIR /app
 
-# Expose common port (though bot doesn't serve HTTP)
-EXPOSE 8080
+# Install runtime dependencies
+RUN apk add --no-cache postgresql-client curl bash tzdata redis
 
-# Run the bot with optimized settings
-CMD ["python", "-u", "bot.py"]
+# Copy package.json files and lockfile for clean production install
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/yarn.lock ./
+COPY --from=builder /app/.yarnrc.yml ./
+COPY --from=builder /app/server/package.json ./server/
+COPY --from=builder /app/client/package.json ./client/
+COPY --from=builder /app/shared/package.json ./shared/
+
+# Install production dependencies - first workspace, then server-specific
+RUN yarn install --production --frozen-lockfile
+WORKDIR /app/server
+RUN yarn install --production --frozen-lockfile
+WORKDIR /app
+
+# Copy built files
+COPY --from=builder /app/server/dist ./server/dist
+COPY --from=builder /app/client/dist ./client/dist
+COPY --from=builder /app/shared/dist ./shared/dist
+COPY --from=builder /app/scripts ./scripts
+
+# Create directories
+RUN mkdir -p data logs backups
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S botuser -u 1001 -G nodejs
+
+# Set permissions
+RUN chown -R botuser:nodejs /app && chmod +x scripts/*.sh 2>/dev/null || true
+
+USER botuser
+
+# Environment variables
+ENV NODE_ENV=production
+ENV DATABASE_TYPE=sqlite
+ENV DASHBOARD_PORT=3000
+
+# Expose port
+EXPOSE 3000
+
+# Entry point
+COPY --chown=botuser:nodejs docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "server/dist/src/index.js"]
+
+# Development stage
+FROM builder AS development
+
+WORKDIR /app
+
+# Install development tools
+RUN yarn add -g nodemon
+
+# Expose ports
+EXPOSE 3000 5432 6379
+
+# Environment
+ENV NODE_ENV=production
+ENV DATABASE_TYPE=postgres
+
+# Start server from the server directory
+WORKDIR /app/server
+CMD ["node", "dist/src/index.js"]

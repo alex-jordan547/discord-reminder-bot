@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "exportDate": "2025-09-09T03:00:00Z",
+    "format": "json",
+    "version": "1.0"
+  },
+  "tables": {
+    "users": [
+      {"id": 1, "username": "test_user", "email": "test@example.com"}
+    ]
+  }
+}

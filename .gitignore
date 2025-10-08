@@ -106,6 +106,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.docker
 .venv
 env/
 venv/
@@ -175,6 +176,13 @@ staging_setup_*.log
 # Backup directories
 data/backups/
 .kiro/*
+
+# Backup files
+.last_backup
+*.backup-*
+
+# Test coverage reports
+coverage/
 
 # ===== TypeScript/Node.js specific =====
 # Dependencies
@@ -259,3 +267,13 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+server/backups/*
+
+client/test-results/
+/server/backups/
+/.claude/
+/.crush/
+/.gemini/
+/.kiro/
+backups/*
