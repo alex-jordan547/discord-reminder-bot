@@ -29,7 +29,7 @@ check_postgres() {
     timeout_seconds=$((timeout / 1000))
     
     for i in $(seq 1 $timeout_seconds); do
-        if PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -h "$host" -p "$port" -U "$user" -d "$db" -t 1 >/dev/null 2>&1; then
+        if PGPASSWORD="${POSTGRES_PASSWORD:-postgres}" pg_isready -h "$host" -p "$port" -U "$user" -d "$db" -t 1 >/dev/null 2>&1; then
             log "✅ PostgreSQL is ready!"
             return 0
         fi
@@ -73,8 +73,8 @@ create_directories() {
     log "📁 Creating necessary directories..."
     mkdir -p data logs backups
     
-    # Ensure correct permissions
-    chown -R "$(id -u):$(id -g)" data logs backups 2>/dev/null || true
+    # Ensure correct permissions (skip chown as we're non-root user)
+    chmod -R u+rwX data logs backups 2>/dev/null || true
     log "✅ Directories created and permissions set"
 }
 

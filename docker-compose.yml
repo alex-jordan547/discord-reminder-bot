@@ -58,9 +58,9 @@ services:
     ports:
       - '${PORT:-3000}:3000'
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./backups:/app/backups
+      - bot_data:/app/data
+      - bot_logs:/app/logs
+      - bot_backups:/app/backups
     # Healthcheck temporarily disabled to avoid restarts during Discord session limit
     # healthcheck:
     #   test: ['CMD', 'curl', '-f', 'http://localhost:3000/health', '||', 'exit', '1']
@@ -106,6 +106,12 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  bot_data:
+    driver: local
+  bot_logs:
+    driver: local
+  bot_backups:
     driver: local
 
 # Network

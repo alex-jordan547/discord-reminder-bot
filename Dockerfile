@@ -8,8 +8,8 @@ WORKDIR /app
 # Install system dependencies
 RUN apk add --no-cache postgresql-client python3 make g++
 
-# Copy package files (no yarn.lock for architecture independence)
-COPY package.json tsconfig.json .yarnrc.yml ./
+# Copy package files (including yarn.lock for reproducible builds)
+COPY package.json yarn.lock tsconfig.json .yarnrc.yml docker-entrypoint.sh ./
 
 # Copy source code
 COPY server/ ./server/
@@ -17,10 +17,10 @@ COPY shared/ ./shared/
 COPY client/ ./client/
 COPY scripts/ ./scripts/
 
-# Architecture-agnostic install and build with pure TypeScript
+# Install dependencies and build
 ENV NODE_ENV=production
-RUN yarn install && \
-    yarn build
+RUN yarn install --frozen-lockfile && \
+    yarn build:full
 
 # Production stage
 FROM node:20-alpine AS production
@@ -38,17 +38,16 @@ COPY --from=builder /app/server/package.json ./server/
 COPY --from=builder /app/client/package.json ./client/
 COPY --from=builder /app/shared/package.json ./shared/
 
-# Install production dependencies - first workspace, then server-specific
-RUN yarn install --production --frozen-lockfile
-WORKDIR /app/server
-RUN yarn install --production --frozen-lockfile
-WORKDIR /app
+# Note: node_modules already copied from builder, no need to reinstall
 
-# Copy built files
+# Copy built files, scripts and node_modules from builder
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/client/dist ./client/dist
 COPY --from=builder /app/shared/dist ./shared/dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/server/node_modules ./server/node_modules
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Create directories
 RUN mkdir -p data logs backups
@@ -57,7 +56,9 @@ RUN mkdir -p data logs backups
 RUN addgroup -g 1001 -S nodejs && adduser -S botuser -u 1001 -G nodejs
 
 # Set permissions
-RUN chown -R botuser:nodejs /app && chmod +x scripts/*.sh 2>/dev/null || true
+RUN chown -R botuser:nodejs /app && \
+    chmod +x docker-entrypoint.sh && \
+    chmod +x scripts/*.sh 2>/dev/null || true
 
 USER botuser
 
@@ -69,10 +70,7 @@ ENV DASHBOARD_PORT=3000
 # Expose port
 EXPOSE 3000
 
-# Entry point
-COPY --chown=botuser:nodejs docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
-
+# Entry point already copied and permissions set above
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server/dist/src/index.js"]
 
@@ -80,6 +78,10 @@ CMD ["node", "server/dist/src/index.js"]
 FROM builder AS development
 
 WORKDIR /app
+
+COPY --from=builder /app/docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 
 # Install development tools
 RUN yarn add -g nodemon

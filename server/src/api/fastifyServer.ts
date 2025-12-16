@@ -18,8 +18,6 @@ import { Settings } from '../config/settings.js';
 import { createLogger } from '../utils/loggingConfig.js';
 import { DiscordBotClient } from '../types/BotClient.js';
 import {
-  getErrorStats,
-  getCircuitBreakerStatuses,
   getErrorRecoveryHealth,
   generateErrorReport,
 } from '../utils/errorRecovery.js';
@@ -749,15 +747,26 @@ export async function createServer(): Promise<FastifyInstance> {
   /**
    * Global error handler
    */
-  fastify.setErrorHandler(async (error, request, reply) => {
-    logger.error(`Server error on ${request.method} ${request.url}: ${error.message}`);
+  fastify.setErrorHandler(async (error: unknown, request, reply) => {
+    if (error instanceof Error) {
+      logger.error(`Server error on ${request.method} ${request.url}: ${error.message}`);
 
-    reply.code(error.statusCode || 500);
-    return {
-      error: error.name || 'Internal Server Error',
-      message: Settings.NODE_ENV === 'development' ? error.message : 'Something went wrong',
-    };
+      reply.code((error as any).statusCode || 500);
+      return {
+        error: error.name,
+        message: Settings.NODE_ENV === 'development' ? error.message : 'Something went wrong',
+      };
+    } else {
+      logger.error(`Server error on ${request.method} ${request.url}: Unknown error`);
+
+      reply.code(500);
+      return {
+        error: 'Internal Server Error',
+        message: 'Something went wrong',
+      };
+    }
   });
+
 
   // Register authentication routes
   await registerAuthRoutes(fastify);

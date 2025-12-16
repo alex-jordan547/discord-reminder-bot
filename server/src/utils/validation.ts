@@ -110,8 +110,8 @@ function isValidDiscordToken(token: string): boolean {
 
   // First part should be base64-encoded user ID
   // Second part should be base64-encoded timestamp
-  // Third part should be base64-encoded HMAC
-  const base64Pattern = /^[A-Za-z0-9+/]+=*$/;
+  // Third part should be base64url-encoded HMAC (can contain - and _)
+  const base64Pattern = /^[A-Za-z0-9+/_-]+=*$/;
   return parts.every(part => base64Pattern.test(part));
 }
 /**
